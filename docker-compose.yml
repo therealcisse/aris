@@ -1,0 +1,24 @@
+services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: cqrs
+      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: cqrs
+    ports:
+      - 5432:5432
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  adminer:
+    image: adminer
+    restart: always
+    environment:
+      ADMINER_DESIGN: 'pepa-linha'
+      ADMINER_DEFAULT_SERVER: 'postgres'
+    ports:
+      - 8080:8080
+
+volumes:
+  postgres_data:
+
