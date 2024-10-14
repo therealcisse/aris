@@ -1,5 +1,4 @@
 package com.youtoo.cqrs
-package example
 package config
 
 import zio.*
@@ -7,8 +6,8 @@ import zio.*
 import cats.implicits.*
 
 case class DatabaseConfig(
-  driverName: String,
-  databaseUrl: String,
+  driverClassName: String,
+  jdbcUrl: String,
   username: String,
   password: String,
   migrations: String,
@@ -42,22 +41,22 @@ object DatabaseConfig {
         Config.string("url").optional ++ Config.string("username").optional ++ Config
           .string("password")
           .optional ++ Config.string("migrations").optional
-    ).map { case (driverName, databaseUrl, username, password, migrations) =>
+    ).nested("database").map { case (driverClassName, jdbcUrl, username, password, migrations) =>
       (
-        driverName,
-        databaseUrl,
+        driverClassName orElse "org.postgresql.Driver".some,
+        jdbcUrl,
         username,
         password,
         migrations orElse "migrations".some,
       ) mapN {
         case (
-              driverName,
-              databaseUrl,
+              driverClassName,
+              jdbcUrl,
               username,
               password,
               migrations,
             ) =>
-          DatabaseConfig(driverName, databaseUrl, username, password, migrations)
+          DatabaseConfig(driverClassName, jdbcUrl, username, password, migrations)
 
       } getOrElse DatabaseConfig.postgres
 

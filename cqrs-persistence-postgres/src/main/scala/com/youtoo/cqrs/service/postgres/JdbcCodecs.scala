@@ -2,8 +2,6 @@ package com.youtoo.cqrs
 package service
 package postgres
 
-import com.youtoo.cqrs.domain.*
-
 import zio.schema.*
 import zio.schema.codec.*
 

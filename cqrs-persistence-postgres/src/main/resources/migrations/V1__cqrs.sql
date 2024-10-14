@@ -4,9 +4,9 @@ DROP TABLE IF EXISTS events CASCADE;
 DROP TABLE IF EXISTS aggregates CASCADE;
 
 CREATE TABLE IF NOT EXISTS snapshots (
-  aggregate_id TEXT NOT NULL,
-  version INT NOT NULL,
-  PRIMARY KEY (aggregate_id, version)
+  aggregate_id TEXT NOT NULL PRIMARY KEY,
+  version TEXT NOT NULL,
+  UNIQUE (aggregate_id, version)
 );
 
 CREATE TABLE IF NOT EXISTS events (

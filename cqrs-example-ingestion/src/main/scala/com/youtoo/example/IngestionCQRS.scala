@@ -77,7 +77,12 @@ object IngestionCQRS {
               }
 
               o flatMap (_.fold(ZIO.none) {
-                case (inn, ch, size) if size >= Threshold => checkpointer.save(inn, version = ch.version) as inn.some
+                case (inn, ch, size) if size >= Threshold =>
+                  for {
+                    _ <- checkpointer.save(inn)
+                    _ <- snapshotStore.save(id = id, version = ch.version)
+
+                  } yield inn.some
                 case (inn, _, _) => ZIO.some(inn)
               })
             }

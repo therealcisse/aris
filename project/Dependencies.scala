@@ -52,6 +52,10 @@ object Dependencies {
   val `zio-schema-avro` = "dev.zio" %% "zio-schema-avro" % ZioSchemaVersion
   val `zio-schema-thrift` = "dev.zio" %% "zio-schema-thrift" % ZioSchemaVersion
   val `zio-schema-msg-pack` = "dev.zio" %% "zio-schema-msg-pack" % ZioSchemaVersion
-  val `zio-test` = "dev.zio" %% "zio-test" % ZioVersion % "test"
-  val `zio-test-sbt` = "dev.zio" %% "zio-test-sbt" % ZioVersion % "test"
+  val `zio-test` = "dev.zio" %% "zio-test" % ZioVersion % Test
+  val `zio-test-sbt` = "dev.zio" %% "zio-test-sbt" % ZioVersion % Test
+  val `zio-mock` = "dev.zio" %% "zio-mock" % "1.0.0-RC12" % Test
+  val `zio-test-magnolia` = "dev.zio" %% "zio-test-magnolia" % "2.1.9" % Test
+  val `testcontainers-scala-postgresql` = "com.dimafeng" %% "testcontainers-scala-postgresql" % "0.41.4" % Test
+
 }

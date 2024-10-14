@@ -55,7 +55,7 @@ object PostgresCQRSPersistence {
 
   object Queries extends JdbcCodecs {
 
-    inline def READ_EVENTS[Event: BinaryCodec](id: Key, discriminator: Discriminator): Query[Change[Event]] =
+    def READ_EVENTS[Event: BinaryCodec](id: Key, discriminator: Discriminator): Query[Change[Event]] =
       sql"""
       SELECT
         version,
@@ -65,7 +65,7 @@ object PostgresCQRSPersistence {
       ORDER BY version ASC
       """.query[(Version, Event)].map(Change.apply)
 
-    inline def READ_EVENTS[Event: BinaryCodec](
+    def READ_EVENTS[Event: BinaryCodec](
       id: Key,
       discriminator: Discriminator,
       snapshotVersion: Version,
@@ -79,24 +79,31 @@ object PostgresCQRSPersistence {
       ORDER BY version ASC
       """.query[(Version, Event)].map(Change.apply)
 
-    inline def SAVE_EVENT[Event: BinaryCodec](
+    def SAVE_EVENT[Event: BinaryCodec](
       id: Key,
       discriminator: Discriminator,
       event: Change[Event],
     ): SqlFragment =
+      val payload = java.util.Base64.getEncoder.encodeToString(summon[BinaryCodec[Event]].encode(event.payload).toArray)
+
       sql"""
-      INSERT INTO events (aggregate_id, discriminator, payload)
-      VALUES ($id, $discriminator, ${summon[BinaryCodec[Event]].encode(event.payload)})
+      INSERT INTO events (version, aggregate_id, discriminator, payload)
+      VALUES (
+        ${event.version},
+        ${id},
+        ${discriminator},
+        decode(${payload}, 'base64')
+      )
       """
 
-    inline def READ_SNAPSHOT(id: Key): Query[Version] =
+    def READ_SNAPSHOT(id: Key): Query[Version] =
       sql"""
       SELECT version
       FROM snapshots
       WHERE aggregate_id = $id
       """.query[Version]
 
-    inline def SAVE_SNAPSHOT(id: Key, version: Version): SqlFragment =
+    def SAVE_SNAPSHOT(id: Key, version: Version): SqlFragment =
       sql"""
       INSERT INTO snapshots (aggregate_id, version)
       VALUES ($id, $version)

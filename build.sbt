@@ -23,6 +23,8 @@ lazy val core = (project in file("cqrs-core"))
   .settings(stdSettings("cqrs-core"))
   .settings(publishSetting(false))
   .settings(
+    Test / fork := true,
+    testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
     libraryDependencies ++= Seq(
       `zio-jdbc`,
       `zio-schema-protobuf`,
@@ -31,6 +33,10 @@ lazy val core = (project in file("cqrs-core"))
       zio,
       `zio-prelude`,
       `zio-schema`,
+      `zio-test`,
+      `zio-test-sbt`,
+      `zio-test-magnolia`,
+      `zio-mock`,
     ),
   )
 
@@ -38,8 +44,19 @@ lazy val postgres = (project in file("cqrs-persistence-postgres"))
   .settings(stdSettings("cqrs-persistence-postgres"))
   .settings(publishSetting(false))
   .settings(
+    Test / fork := true,
+    testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
+    Test / unmanagedResourceDirectories ++= (Compile / unmanagedResourceDirectories).value,
     libraryDependencies ++= Seq(
+      flyway,
+      hicariCP,
+      `postgres-driver`,
+      `testcontainers-scala-postgresql`,
       `zio-jdbc`,
+      `zio-test`,
+      `zio-test-sbt`,
+      `zio-test-magnolia`,
+      `zio-mock`,
       `slf4j-api`,
       `slf4j-simple`,
     ),
@@ -51,10 +68,7 @@ lazy val exampleIngestion = (project in file("cqrs-example-ingestion"))
   .settings(publishSetting(false))
   .settings(
     libraryDependencies ++= Seq(
-      `postgres-driver`,
       `zio-json`,
-      flyway,
-      hicariCP,
     ),
   )
   .dependsOn(postgres, core)

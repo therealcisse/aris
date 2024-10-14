@@ -14,21 +14,15 @@ trait IngestionCheckpointer extends Checkpointer[Ingestion] {}
 
 object IngestionCheckpointer {
 
-  def live()
-    : ZLayer[CQRSPersistence & IngestionService & SnapshotStore & ZConnectionPool, Throwable, IngestionCheckpointer] =
-    ZLayer.fromFunction {
-      (persistence: CQRSPersistence, service: IngestionService, snapshotStore: SnapshotStore, pool: ZConnectionPool) =>
-        new IngestionCheckpointer {
-          def save(o: Ingestion, version: Version): Task[Unit] = persistence.atomically {
-            for {
-              _ <- service.save(o)
-              _ <- snapshotStore.save(id = o.id.asKey, version)
+  def live(): ZLayer[CQRSPersistence & IngestionService & ZConnectionPool, Throwable, IngestionCheckpointer] =
+    ZLayer.fromFunction { (persistence: CQRSPersistence, service: IngestionService, pool: ZConnectionPool) =>
+      new IngestionCheckpointer {
+        def save(o: Ingestion): Task[Unit] = persistence.atomically {
+          service.save(o) as ()
 
-            } yield ()
+        }.provideEnvironment(ZEnvironment(pool))
 
-          }.provideEnvironment(ZEnvironment(pool))
-
-        }
+      }
     }
 
 }

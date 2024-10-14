@@ -3,7 +3,7 @@ package example
 
 import zio.jdbc.*
 
-import com.youtoo.cqrs.example.config.*
+import com.youtoo.cqrs.config.*
 import com.youtoo.cqrs.example.model.*
 
 import com.youtoo.cqrs.Codecs.*
@@ -32,13 +32,15 @@ object Main extends ZIOApp {
 
   val run: ZIO[Environment & Scope, Throwable, Unit] =
     for {
-      _ <- Migration.run
+      config <- ZIO.config[DatabaseConfig]
+
+      _ <- Migration.run(config)
 
       id <- Ingestion.Id.gen
       version <- Version.gen
       // agg = Aggregate(id = id.value, version = version)
       //
-      // service <- ZIO.service[CQRSPersistence]
+      service <- ZIO.service[CQRSPersistence]
       //
       // _ <- CQRSPersistence.atomically {
       //   for {
@@ -56,6 +58,17 @@ object Main extends ZIOApp {
       e0 = IngestionEvent.IngestionStarted(id, timestamp)
       version1 <- Version.gen
       e1 = IngestionEvent.IngestionFilesResolved(files = Set("1"))
+
+      _ <- service.atomically(
+        service.saveEvent(id.asKey, IngestionEvent.discriminator, Change(version = version0, payload = e0)),
+      )
+      _ <- service.atomically(
+        service.saveEvent(id.asKey, IngestionEvent.discriminator, Change(version = version1, payload = e1)),
+      )
+
+      events <- service.atomically(service.readEvents[IngestionEvent](id.asKey, IngestionEvent.discriminator))
+
+      _ = println(events.mkString("[\n", ",\n ", "\n]"))
 
       _ = println(e0)
       _ = println(e1)

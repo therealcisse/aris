@@ -1,28 +1,25 @@
 package com.youtoo.cqrs
-package example
+package service
+package postgres
 
-import com.youtoo.cqrs.example.config.*
+import com.youtoo.cqrs.config.*
 
 import zio.*
 
 trait Migration {
-  def run: Task[Unit]
+  def run(config: DatabaseConfig): Task[Unit]
 
 }
 
 object Migration {
-  inline def run: RIO[Migration, Unit] =
-    ZIO.serviceWithZIO(_.run)
+  inline def run(config: DatabaseConfig): RIO[Migration, Unit] =
+    ZIO.serviceWithZIO(_.run(config))
 
   def live(): ZLayer[Any, Throwable, Migration] =
     ZLayer.succeed {
       new Migration {
-        def run: Task[Unit] =
-          for {
-            config <- ZIO.config[DatabaseConfig]
-
-            _ <- runMigration(config)
-          } yield ()
+        def run(config: DatabaseConfig): Task[Unit] =
+          runMigration(config)
 
       }
     }
@@ -34,8 +31,8 @@ object Migration {
 
       val hikariConfig = HikariConfig()
 
-      hikariConfig.setDriverClassName(config.driverName)
-      hikariConfig.setJdbcUrl(config.databaseUrl)
+      hikariConfig.setDriverClassName(config.driverClassName)
+      hikariConfig.setJdbcUrl(config.jdbcUrl)
       hikariConfig.setUsername(config.username)
       hikariConfig.setPassword(config.password)
 
@@ -45,6 +42,7 @@ object Migration {
         .configure()
         .dataSource(dataSource)
         .locations(config.migrations)
+        .outOfOrder(true)
         .load()
 
       flyway.migrate()
