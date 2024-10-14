@@ -18,12 +18,12 @@ object DatabaseConfig {
   import zio.jdbc.*
 
   val connectionPool: ZLayer[ZConnectionPoolConfig, Throwable, ZConnectionPool] =
-    ZLayer {
+    ZLayer.fromZIO {
       for {
         config <- ZIO.config[DatabaseConfig]
 
         props = Map(
-          "user"     -> config.username,
+          "user" -> config.username,
           "password" -> config.password,
         )
 
@@ -34,7 +34,7 @@ object DatabaseConfig {
   val createZIOPoolConfig: ULayer[ZConnectionPoolConfig] =
     ZLayer.succeed(ZConnectionPoolConfig.default)
 
-  val pool = createZIOPoolConfig >>> connectionPool
+  val pool: ZLayer[Any, Throwable, ZConnectionPool] = createZIOPoolConfig >>> connectionPool
 
   given Config[DatabaseConfig] =
     (

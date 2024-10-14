@@ -1,8 +1,6 @@
 package com.youtoo.cqrs
 package service
 
-import com.youtoo.cqrs.domain.*
-
 import zio.*
 
 transparent trait Provider[T] {

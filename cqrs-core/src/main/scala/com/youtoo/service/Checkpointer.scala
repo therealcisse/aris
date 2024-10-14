@@ -6,6 +6,6 @@ import com.youtoo.cqrs.domain.*
 import zio.*
 
 transparent trait Checkpointer[T] {
-  def save(o: T): Task[Unit]
+  def save(o: T, version: Version): Task[Unit]
 
 }

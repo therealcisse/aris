@@ -4,16 +4,26 @@ package service
 import com.youtoo.cqrs.domain.*
 
 import zio.*
+import zio.jdbc.*
 import zio.schema.codec.*
 
 trait CQRSPersistence {
-  def readAggregate(id: Key): Task[Option[Aggregate]]
-  def saveAggregate(agg: Aggregate): Task[Unit]
+  def readEvents[Event: BinaryCodec](id: Key, discriminator: Discriminator): RIO[ZConnection, Chunk[Change[Event]]]
+  def readEvents[Event: BinaryCodec](
+    id: Key,
+    discriminator: Discriminator,
+    snapshotVersion: Version,
+  ): RIO[ZConnection, Chunk[Change[Event]]]
+  def saveEvent[Event: BinaryCodec](id: Key, discriminator: Discriminator, event: Change[Event]): RIO[ZConnection, Long]
 
-  def readEvents[Event: BinaryCodec](id: Key, discriminator: String): Task[Chunk[Change[Event]]]
-  def saveEvent[Event: BinaryCodec](id: Key, discriminator: String, event: Change[Event]): Task[Unit]
+  def readSnapshot(id: Key): RIO[ZConnection, Option[Version]]
+  def saveSnapshot(id: Key, version: Version): RIO[ZConnection, Long]
 
-  def readSnapshot(id: Key): Task[Option[Version]]
-  def saveSnapshot(id: Key, version: Version): Task[Unit]
+  def atomically[T](fa: ZIO[ZConnection, Throwable, T]): ZIO[ZConnectionPool, Throwable, T]
+}
+
+object CQRSPersistence {
+  inline def atomically[T](fa: ZIO[ZConnection, Throwable, T]): RIO[CQRSPersistence & ZConnectionPool, T] =
+    ZIO.serviceWithZIO[CQRSPersistence](_.atomically(fa))
 
 }

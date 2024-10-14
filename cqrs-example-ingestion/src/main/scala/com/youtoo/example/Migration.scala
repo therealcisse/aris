@@ -5,11 +5,6 @@ import com.youtoo.cqrs.example.config.*
 
 import zio.*
 
-import cats.implicits.*
-import cats.effect.kernel.*
-
-import zio.interop.catz.*
-
 trait Migration {
   def run: Task[Unit]
 
@@ -26,14 +21,14 @@ object Migration {
           for {
             config <- ZIO.config[DatabaseConfig]
 
-            _ <- runMigration[Task](config)
+            _ <- runMigration(config)
           } yield ()
 
       }
     }
 
-  def runMigration[F[_]: Async](config: DatabaseConfig): F[Unit] =
-    Async[F].delay {
+  def runMigration(config: DatabaseConfig): Task[Unit] =
+    ZIO.attemptBlocking {
       import org.flywaydb.core.Flyway
       import com.zaxxer.hikari.{HikariConfig, HikariDataSource}
 

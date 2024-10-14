@@ -2,27 +2,52 @@ package com.youtoo.cqrs
 package example
 package model
 
-import io.github.thibaultmeyer.cuid.CUID
-
 import zio.*
-import zio.json.*
 
 import zio.prelude.*
+import zio.schema.*
 
-case class Ingestion(id: Ingestion.Id)
+case class Ingestion(id: Ingestion.Id, status: Ingestion.Status, timestamp: Timestamp)
 
 object Ingestion {
   type Id = Id.Type
 
-  object Id extends Newtype[CUID] {
-    extension (a: Id) inline def value: CUID = Id.unwrap(a)
+  object Id extends Newtype[Key] {
+    import zio.schema.*
 
-    def gen: Task[Id] = ZIO.attempt(Id(CUID.randomCUID2(32)))
+    def gen: Task[Id] = Key.gen.map(wrap)
 
-    inline def fromString(s: String): Task[Id] = ZIO.attempt(Id(CUID.fromString(s)))
+    extension (a: Id) inline def asKey: Key = Id.unwrap(a)
 
-    given JsonDecoder[Id] = JsonDecoder.string.map(s => Id(CUID.fromString(s)))
-    given JsonEncoder[Id] = JsonEncoder.string.contramap(_.toString)
+    given Schema[Id] = Schema[Key]
+      .transform(
+        wrap,
+        unwrap,
+      )
+
   }
 
+  def empty(id: Ingestion.Id): Task[Ingestion] =
+    Timestamp.now map { timestamp =>
+      Ingestion(
+        id = id,
+        status = Ingestion.Status.Initial(),
+        timestamp = timestamp,
+      )
+    }
+
+  enum Status {
+    case Initial()
+    case Resolved(files: Set[String])
+    case Processing(remaining: Set[String], processed: Set[String], failed: Set[String])
+    case Completed(files: Set[String], failed: Set[String])
+
+  }
+
+  object Status {
+    inline def empty: Status = Status.Initial()
+
+    given Schema[Status] = DeriveSchema.gen
+
+  }
 }

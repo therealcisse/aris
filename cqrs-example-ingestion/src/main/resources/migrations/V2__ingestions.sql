@@ -4,7 +4,7 @@ DROP TABLE IF EXISTS ingestion CASCADE;
 -- ingestions Table: id and version as composite primary key
 CREATE TABLE IF NOT EXISTS ingestions (
   id TEXT NOT NULL,
-  status JSONB NOT NULL,
+  status BYTEA NOT NULL,
   timestamp BIGINT NOT NULL,
   PRIMARY KEY (id)
 );

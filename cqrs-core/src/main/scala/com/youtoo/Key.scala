@@ -3,28 +3,19 @@ package com.youtoo.cqrs
 import zio.*
 import zio.prelude.*
 
-import io.github.thibaultmeyer.cuid.CUID
-
 type Key = Key.Type
 
-object Key extends Newtype[CUID] {
+object Key extends Newtype[String] {
   import zio.schema.*
 
-  def gen: Task[Key] = ZIO.attempt(Key(CUID.randomCUID2(32)))
+  def gen: Task[Key] = ZIO.attempt(Key(UlidGenerator.monotonic()))
 
-  inline def fromString(s: String): Task[Key] = ZIO.attempt(Key(CUID.fromString(s)))
+  extension (a: Key) inline def value: String = Key.unwrap(a)
 
-  extension (a: Key) inline def value: CUID = Key.unwrap(a)
-
-  given Schema[CUID] = Schema
+  given Schema[Key] = Schema
     .primitive[String]
     .transform(
-      CUID.fromString,
-      _.toString,
+      wrap,
+      unwrap,
     )
-
-  given Schema[Key] = Schema[CUID].transform(
-    wrap,
-    unwrap,
-  )
 }

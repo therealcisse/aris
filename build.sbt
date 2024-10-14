@@ -8,7 +8,9 @@ val _ = sys.props += ("CQRSLogLevel" -> Debug.CQRSLogLevel)
 
 lazy val aggregatedProjects: Seq[ProjectReference] =
   Seq(
-    cqrsCore,
+    core,
+    postgres,
+    exampleIngestion,
   )
 
 lazy val root = (project in file("."))
@@ -17,54 +19,42 @@ lazy val root = (project in file("."))
   .settings(meta)
   .aggregate(aggregatedProjects *)
 
-lazy val cqrsCore = (project in file("cqrs-core"))
+lazy val core = (project in file("cqrs-core"))
   .settings(stdSettings("cqrs-core"))
   .settings(publishSetting(false))
   .settings(
     libraryDependencies ++= Seq(
+      `zio-jdbc`,
+      `zio-schema-protobuf`,
+      cats,
+      ulid,
       zio,
-      cuid,
       `zio-prelude`,
       `zio-schema`,
-      "org.slf4j" % "slf4j-api"    % "2.0.13",
-      "org.slf4j" % "slf4j-simple" % "2.0.13",
     ),
   )
 
-lazy val cqrsPostgres = (project in file("cqrs-persistence-postgres"))
+lazy val postgres = (project in file("cqrs-persistence-postgres"))
   .settings(stdSettings("cqrs-persistence-postgres"))
   .settings(publishSetting(false))
   .settings(
     libraryDependencies ++= Seq(
-      zio,
       `zio-jdbc`,
-      `zio-schema`,
-      `zio-schema-protobuf`,
-      `zio-interop-cats`,
-      "org.slf4j" % "slf4j-api"    % "2.0.13",
-      "org.slf4j" % "slf4j-simple" % "2.0.13",
+      `slf4j-api`,
+      `slf4j-simple`,
     ),
   )
-  .dependsOn(cqrsCore)
+  .dependsOn(core)
 
-lazy val cqrsExampleIngestion = (project in file("cqrs-example-ingestion"))
+lazy val exampleIngestion = (project in file("cqrs-example-ingestion"))
   .settings(stdSettings("cqrs-example-ingestion"))
   .settings(publishSetting(false))
   .settings(
     libraryDependencies ++= Seq(
-      postgres,
+      `postgres-driver`,
       `zio-json`,
-      cuid,
       flyway,
       hicariCP,
-      zio,
-      `zio-prelude`,
-      `zio-jdbc`,
-      `zio-schema`,
-      `zio-schema-protobuf`,
-      `zio-interop-cats`,
-      "org.slf4j" % "slf4j-api"    % "2.0.13",
-      "org.slf4j" % "slf4j-simple" % "2.0.13",
     ),
   )
-  .dependsOn(cqrsPostgres, cqrsCore)
+  .dependsOn(postgres, core)
