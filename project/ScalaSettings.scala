@@ -48,7 +48,6 @@ trait ScalaSettings {
   )
 
   val scala3Settings: Seq[String] = Seq(
-    "-Xignore-scala2-macros",
     "-source:future",
     // "-noindent",
     "-Wunused:imports",

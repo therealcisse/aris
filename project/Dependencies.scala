@@ -57,5 +57,6 @@ object Dependencies {
   val `zio-mock` = "dev.zio" %% "zio-mock" % "1.0.0-RC12" % Test
   val `zio-test-magnolia` = "dev.zio" %% "zio-test-magnolia" % "2.1.9" % Test
   val `testcontainers-scala-postgresql` = "com.dimafeng" %% "testcontainers-scala-postgresql" % "0.41.4" % Test
+  val `zio-http` = "dev.zio" %% "zio-http" % "3.0.1"
 
 }

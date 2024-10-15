@@ -21,6 +21,15 @@ trait IngestionCQRS extends CQRS[IngestionCommand, IngestionEvent, Ingestion] {}
 object IngestionCQRS {
   inline val Threshold = 10
 
+  inline def add(id: Key, cmd: IngestionCommand)(using
+    Cmd: IngestionCommandHandler,
+  ): RIO[IngestionCQRS & ZConnectionPool & CQRSPersistence, Unit] = ZIO.serviceWithZIO[IngestionCQRS](_.add(id, cmd))
+
+  inline def load(id: Key)(using
+    Evt: IngestionEventHandler,
+  ): RIO[IngestionCQRS & ZConnectionPool & CQRSPersistence, Option[Ingestion]] =
+    ZIO.serviceWithZIO[IngestionCQRS](_.load(id))
+
   def live(): ZLayer[
     ZConnectionPool & CQRSPersistence & IngestionCheckpointer & IngestionProvider & IngestionEventStore & SnapshotStore,
     Throwable,
@@ -54,7 +63,8 @@ object IngestionCQRS {
           ): RIO[ZConnectionPool & CQRSPersistence, Option[Ingestion]] =
             CQRSPersistence.atomically {
               val deps = (
-                provider.load(id) <&> snapshotStore.readSnapshot(id)
+                provider.load(id) <&> snapshotStore
+                  .readSnapshot(id)
               ).map(_.tupled)
 
               val o = deps flatMap {
@@ -68,7 +78,8 @@ object IngestionCQRS {
                   } yield inn
 
                 case Some((in, version)) =>
-                  val events = eventStore.readEvents(id, snapshotVersion = version)
+                  val events = eventStore
+                    .readEvents(id, snapshotVersion = version)
 
                   events map (_.map { es =>
                     (Evt.applyEvents(in, es), es.head, es.size)
@@ -80,7 +91,8 @@ object IngestionCQRS {
                 case (inn, ch, size) if size >= Threshold =>
                   for {
                     _ <- checkpointer.save(inn)
-                    _ <- snapshotStore.save(id = id, version = ch.version)
+                    _ <- snapshotStore
+                      .save(id = id, version = ch.version)
 
                   } yield inn.some
                 case (inn, _, _) => ZIO.some(inn)

@@ -6,9 +6,6 @@ import com.youtoo.cqrs.domain.*
 
 import cats.implicits.*
 
-import zio.*
-import zio.json.*
-
 import zio.prelude.*
 import zio.schema.*
 
@@ -64,6 +61,9 @@ object IngestionEvent {
               case Ingestion.Status.Processing(remaining, processed, failed) =>
                 state.copy(status = Ingestion.Status.Processing(remaining - file, processed + file, failed))
 
+              case Ingestion.Status.Resolved(files) =>
+                state.copy(status = Ingestion.Status.Processing(files - file, Set() + file, Set()))
+
               case _ => state
             }
 
@@ -72,16 +72,14 @@ object IngestionEvent {
               case Ingestion.Status.Processing(remaining, processed, failed) =>
                 state.copy(status = Ingestion.Status.Processing(remaining - file, processed, failed + file))
 
+              case Ingestion.Status.Resolved(files) =>
+                state.copy(status = Ingestion.Status.Processing(files - file, Set(), Set() + file))
+
               case _ => state
             }
 
           case IngestionEvent.IngestionCompleted() =>
-            state.status match {
-              case Ingestion.Status.Processing(remaining, processed, failed) =>
-                state.copy(status = Ingestion.Status.Completed(processed -- remaining, remaining ++ failed))
-
-              case _ => state
-            }
+            state
 
         }
       }

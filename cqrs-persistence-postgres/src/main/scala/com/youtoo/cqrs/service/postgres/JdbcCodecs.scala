@@ -17,9 +17,11 @@ trait JdbcCodecs {
   given SqlFragment.Setter[Timestamp] = SqlFragment.Setter[Long].contramap(_.value)
   given SqlFragment.Setter[Discriminator] = SqlFragment.Setter[String].contramap(_.value)
 
-  given [T: BinaryCodec]: JdbcDecoder[T] =
+  inline def byteArrayDecoder[T: BinaryCodec]: JdbcDecoder[T] =
     JdbcDecoder[Array[Byte]].map(array =>
-      summon[BinaryCodec[T]].decode(Chunk(array*)).getOrElse(throw IllegalArgumentException("Can't decode array")),
+      summon[BinaryCodec[T]]
+        .decode(Chunk(array*))
+        .getOrElse(throw IllegalArgumentException(s"""Can't decode array: ${new String(array)}""")),
     )
 
   given [T: BinaryCodec]: JdbcEncoder[T] =

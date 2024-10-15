@@ -2,6 +2,7 @@
 .DS_Store
 
 # sbt specific
+.env
 dist/*
 target/
 lib_managed/

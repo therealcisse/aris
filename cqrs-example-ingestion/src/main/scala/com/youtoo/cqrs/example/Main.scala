@@ -57,7 +57,7 @@ object Main extends ZIOApp {
       version0 <- Version.gen
       e0 = IngestionEvent.IngestionStarted(id, timestamp)
       version1 <- Version.gen
-      e1 = IngestionEvent.IngestionFilesResolved(files = Set("1"))
+      e1 = IngestionEvent.IngestionFilesResolved(files = Set((0 to 100).map(_.toString)*))
 
       _ <- service.atomically(
         service.saveEvent(id.asKey, IngestionEvent.discriminator, Change(version = version0, payload = e0)),
@@ -69,6 +69,29 @@ object Main extends ZIOApp {
       events <- service.atomically(service.readEvents[IngestionEvent](id.asKey, IngestionEvent.discriminator))
 
       _ = println(events.mkString("[\n", ",\n ", "\n]"))
+
+      events <- ZIO.collectAll {
+        (0 to 100).map { i =>
+          for {
+            version <- Version.gen
+            ch = Change(version = version, payload = IngestionEvent.IngestionFileProcessed(file = i.toString))
+
+          } yield ch
+        }
+
+      }
+
+      _ <- service.atomically {
+        ZIO.foreachDiscard(events) { e =>
+          service.saveEvent(id.asKey, IngestionEvent.discriminator, e)
+        }
+      }
+
+      es1 <- service.atomically(
+        service.readEvents[IngestionEvent](id.asKey, IngestionEvent.discriminator),
+      )
+
+      _ = println(es1.mkString("[\n", ",\n ", "\n]"))
 
       _ = println(e0)
       _ = println(e1)

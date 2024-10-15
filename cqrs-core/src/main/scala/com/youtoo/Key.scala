@@ -3,6 +3,8 @@ package com.youtoo.cqrs
 import zio.*
 import zio.prelude.*
 
+import cats.Order
+
 type Key = Key.Type
 
 object Key extends Newtype[String] {
@@ -18,4 +20,6 @@ object Key extends Newtype[String] {
       wrap,
       unwrap,
     )
+
+  given Order[Key] = Order.by(_.value)
 }

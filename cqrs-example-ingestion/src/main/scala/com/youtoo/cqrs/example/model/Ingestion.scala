@@ -2,6 +2,8 @@ package com.youtoo.cqrs
 package example
 package model
 
+import cats.implicits.*
+
 import zio.*
 
 import zio.prelude.*
@@ -10,6 +12,8 @@ import zio.schema.*
 case class Ingestion(id: Ingestion.Id, status: Ingestion.Status, timestamp: Timestamp)
 
 object Ingestion {
+  given Schema[Ingestion] = DeriveSchema.gen
+
   type Id = Id.Type
 
   object Id extends Newtype[Key] {
@@ -19,10 +23,11 @@ object Ingestion {
 
     extension (a: Id) inline def asKey: Key = Id.unwrap(a)
 
-    given Schema[Id] = Schema[Key]
+    given Schema[Id] = Schema
+      .primitive[String]
       .transform(
-        wrap,
-        unwrap,
+        Key.wrap `andThen` wrap,
+        unwrap `andThen` Key.unwrap,
       )
 
   }

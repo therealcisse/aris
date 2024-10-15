@@ -16,6 +16,17 @@ case class DatabaseConfig(
 object DatabaseConfig {
   import zio.jdbc.*
 
+  import scala.util.matching.Regex
+
+  object JDBCUrlExtractor {
+    val pattern: Regex = "jdbc:\\w+://([\\w.-]+):(\\d+)/\\w+".r
+
+    inline def unapply(string: String): Option[(String, Int)] = string match {
+      case pattern(host, port) => Some((host, port.toInt))
+      case _ => None
+    }
+  }
+
   val connectionPool: ZLayer[ZConnectionPoolConfig, Throwable, ZConnectionPool] =
     ZLayer.fromZIO {
       for {
@@ -26,7 +37,12 @@ object DatabaseConfig {
           "password" -> config.password,
         )
 
-      } yield ZConnectionPool.postgres("localhost", 5432, "cqrs", props)
+        pool = config.jdbcUrl match {
+          case JDBCUrlExtractor(host, port) => ZConnectionPool.postgres(host, port, "cqrs", props)
+          case _ => ZConnectionPool.postgres("localhost", 5432, "cqrs", props)
+        }
+
+      } yield pool
 
     }.flatten
 
@@ -58,16 +74,8 @@ object DatabaseConfig {
             ) =>
           DatabaseConfig(driverClassName, jdbcUrl, username, password, migrations)
 
-      } getOrElse DatabaseConfig.postgres
+      } getOrElse (throw IllegalArgumentException("Load database config"))
 
     }
-
-  val postgres = DatabaseConfig(
-    "org.postgresql.Driver",
-    "jdbc:postgresql://localhost:5432/cqrs",
-    "cqrs",
-    "admin",
-    "migrations",
-  )
 
 }

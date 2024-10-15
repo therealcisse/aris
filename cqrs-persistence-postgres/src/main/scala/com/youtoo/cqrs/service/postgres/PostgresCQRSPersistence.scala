@@ -6,7 +6,7 @@ import com.youtoo.cqrs.domain.*
 
 import zio.schema.codec.*
 
-import com.youtoo.cqrs.Codecs.*
+import com.youtoo.cqrs.Codecs.given
 
 trait PostgresCQRSPersistence extends CQRSPersistence {}
 
@@ -54,6 +54,7 @@ object PostgresCQRSPersistence {
     }
 
   object Queries extends JdbcCodecs {
+    given [E: BinaryCodec]: JdbcDecoder[E] = byteArrayDecoder[E]
 
     def READ_EVENTS[Event: BinaryCodec](id: Key, discriminator: Discriminator): Query[Change[Event]] =
       sql"""
@@ -75,7 +76,7 @@ object PostgresCQRSPersistence {
         version,
         payload
       FROM events
-      WHERE aggregate_id = $id AND discriminator = $discriminator AND id > $snapshotVersion
+      WHERE aggregate_id = $id AND discriminator = $discriminator AND version > $snapshotVersion
       ORDER BY version ASC
       """.query[(Version, Event)].map(Change.apply)
 

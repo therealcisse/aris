@@ -3,8 +3,12 @@ import Dependencies.{scalafmt, *}
 
 ThisBuild / resolvers ++= Resolver.sonatypeOssRepos("snapshots")
 
+ThisBuild / version := "0.1.0-SNAPSHOT"
+
 // Setting default log level to INFO
 val _ = sys.props += ("CQRSLogLevel" -> Debug.CQRSLogLevel)
+
+lazy val g = ProjectRef(file("../cqrs-core"), "core")
 
 lazy val aggregatedProjects: Seq[ProjectReference] =
   Seq(
@@ -12,6 +16,10 @@ lazy val aggregatedProjects: Seq[ProjectReference] =
     postgres,
     exampleIngestion,
   )
+
+inThisBuild(
+  replSettings,
+)
 
 lazy val root = (project in file("."))
   .settings(stdSettings("cqrs-root"))
@@ -22,12 +30,15 @@ lazy val root = (project in file("."))
 lazy val core = (project in file("cqrs-core"))
   .settings(stdSettings("cqrs-core"))
   .settings(publishSetting(false))
+  .settings(buildInfoSettings("cqrs"))
+  .enablePlugins(BuildInfoPlugin)
   .settings(
-    Test / fork := true,
+    Test / fork := false,
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
     libraryDependencies ++= Seq(
       `zio-jdbc`,
       `zio-schema-protobuf`,
+      `zio-schema-json`,
       cats,
       ulid,
       zio,
@@ -68,6 +79,7 @@ lazy val exampleIngestion = (project in file("cqrs-example-ingestion"))
   .settings(publishSetting(false))
   .settings(
     libraryDependencies ++= Seq(
+      `zio-http`,
       `zio-json`,
     ),
   )

@@ -7,20 +7,23 @@ import com.youtoo.cqrs.config.*
 import com.youtoo.cqrs.domain.*
 import com.youtoo.cqrs.Codecs.*
 
+import cats.implicits.*
+
 import zio.*
 import zio.test.*
 import zio.test.Assertion.*
 import zio.jdbc.*
 import zio.schema.*
-import java.time.Instant
 import com.dimafeng.testcontainers.PostgreSQLContainer
 import org.testcontainers.utility.DockerImageName
 
 object PostgresCQRSPersistenceSpec extends ZIOSpecDefault {
-  case class DummyEvent(id: String, timestamp: Instant)
+  case class DummyEvent(id: String)
 
   object DummyEvent {
     given Schema[DummyEvent] = DeriveSchema.gen[DummyEvent]
+
+    val discriminator = Discriminator("DummyEvent")
   }
 
   def config(): ZLayer[Scope & PostgreSQLContainer, Throwable, DatabaseConfig] =
@@ -70,18 +73,117 @@ object PostgresCQRSPersistenceSpec extends ZIOSpecDefault {
         persistence <- ZIO.service[CQRSPersistence]
 
         version <- Version.gen
-        event = Change(version = version, DummyEvent("test", Instant.now()))
+        event = Change(version = version, DummyEvent("test"))
         key <- Key.gen
-        discriminator = Discriminator("DummyEvent")
 
-        saveResult <- persistence.atomically(persistence.saveEvent(key, discriminator, event))
+        saveResult <- persistence.atomically(persistence.saveEvent(key, DummyEvent.discriminator, event))
 
         a <- assert(saveResult)(equalTo(1L))
 
-        events <- persistence.atomically(persistence.readEvents[DummyEvent](key, discriminator))
+        events <- persistence.atomically(persistence.readEvents[DummyEvent](key, DummyEvent.discriminator))
         b <- assert(events)(isNonEmpty)
 
       } yield a && b
+    },
+    test("should retrieve events in sorted order") {
+      for {
+        config <- ZIO.service[DatabaseConfig]
+        _ <- Migration.run(config)
+
+        persistence <- ZIO.service[CQRSPersistence]
+
+        events <- ZIO.collectAll {
+          (0 to 100).map { i =>
+            TestClock.adjust(Duration.fromMillis(1)) *> (for {
+              version <- Version.gen
+              ch = Change(version = version, payload = DummyEvent(s"$i"))
+
+            } yield ch)
+          }
+
+        }
+
+        key <- Key.gen
+
+        _ <- persistence.atomically {
+          ZIO.foreachDiscard(events) { e =>
+            persistence.saveEvent(key, DummyEvent.discriminator, e)
+          }
+        }
+
+        es <- persistence.atomically(persistence.readEvents[DummyEvent](key, DummyEvent.discriminator))
+
+        a <- assert(es)(equalTo(es.sortBy(_.version)))
+
+      } yield a
+    },
+    test("should retrieve events from given version") {
+      for {
+        config <- ZIO.service[DatabaseConfig]
+        _ <- Migration.run(config)
+
+        persistence <- ZIO.service[CQRSPersistence]
+
+        events <- ZIO.collectAll {
+          (0 to 100).map { i =>
+            TestClock.adjust(Duration.fromMillis(1L)) *> (for {
+              version <- Version.gen
+              ch = Change(version = version, payload = DummyEvent(s"$i"))
+
+            } yield ch)
+          }
+
+        }
+
+        key <- Key.gen
+
+        _ <- persistence.atomically {
+          ZIO.foreachDiscard(events) { e =>
+            persistence.saveEvent(key, DummyEvent.discriminator, e)
+          }
+        }
+
+        es <- persistence.atomically(persistence.readEvents[DummyEvent](key, DummyEvent.discriminator))
+
+        a <- assert(es)(equalTo(events))
+
+        max = es.maxBy(_.version).version
+
+        es1 <- persistence.atomically(
+          persistence.readEvents[DummyEvent](key, DummyEvent.discriminator, snapshotVersion = max),
+        )
+
+        b <- assert(es1)(isEmpty)
+
+        events1 <- ZIO.collectAll {
+          (0 to 100).map { i =>
+            TestClock.adjust(Duration.fromMillis(1L)) *> (for {
+              version <- Version.gen
+              ch = Change(version = version, payload = DummyEvent(s"$i"))
+
+            } yield ch)
+          }
+
+        }
+
+        _ <- persistence.atomically {
+          ZIO.foreachDiscard(events1) { e =>
+            persistence.saveEvent(key, DummyEvent.discriminator, e)
+          }
+        }
+
+        es2 <- persistence.atomically(
+          persistence.readEvents[DummyEvent](key, DummyEvent.discriminator, snapshotVersion = max),
+        )
+
+        c <- assert(es2)(equalTo(events1))
+
+        max1 = es2.maxBy(_.version).version
+        es3 <- persistence.atomically(
+          persistence.readEvents[DummyEvent](key, DummyEvent.discriminator, snapshotVersion = max1),
+        )
+        d <- assert(es3)(isEmpty)
+      } yield a && b && c && d
     },
     test("should handle snapshot storage correctly") {
       for {

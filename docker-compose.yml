@@ -5,6 +5,8 @@ services:
       POSTGRES_USER: cqrs
       POSTGRES_PASSWORD: admin
       POSTGRES_DB: cqrs
+    networks:
+      - cqrs-net
     ports:
       - 5432:5432
     volumes:
@@ -21,4 +23,6 @@ services:
 
 volumes:
   postgres_data:
-
+networks:
+  cqrs-net:
+    driver: bridge

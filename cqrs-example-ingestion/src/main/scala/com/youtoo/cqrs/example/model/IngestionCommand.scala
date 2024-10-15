@@ -3,9 +3,9 @@ package example
 package model
 
 import zio.*
-import zio.json.*
 
 import zio.prelude.*
+import zio.schema.*
 
 enum IngestionCommand {
   case StartIngestion(id: Ingestion.Id, timestamp: Timestamp)
@@ -19,6 +19,7 @@ enum IngestionCommand {
 type IngestionCommandHandler = CmdHandler[IngestionCommand, IngestionEvent]
 
 object IngestionCommand {
+  given Schema[IngestionCommand] = DeriveSchema.gen
 
   given IngestionCommandHandler with {
     def applyCmd(cmd: IngestionCommand): NonEmptyList[IngestionEvent] =

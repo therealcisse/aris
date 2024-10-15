@@ -1,6 +1,8 @@
 import de.heikoseeberger.sbtheader.HeaderPlugin.autoImport.{HeaderLicense, headerLicense}
 import sbt.*
 import sbt.Keys.*
+import sbtbuildinfo.*
+import sbtbuildinfo.BuildInfoKeys.*
 import scalafix.sbt.ScalafixPlugin.autoImport.*
 import xerial.sbt.Sonatype.autoImport.*
 
@@ -29,7 +31,7 @@ object BuildHelper extends ScalaSettings {
     }
 
   def settingsWithHeaderLicense =
-    headerLicense := Some(HeaderLicense.ALv2("2024 - 2024", "YouToo Group."))
+    headerLicense := Some(HeaderLicense.ALv2("2024", "YouToo Group."))
 
   def publishSetting(publishArtifacts: Boolean) = {
     val publishSettings = Seq(
@@ -60,6 +62,64 @@ object BuildHelper extends ScalaSettings {
     if (publishArtifacts) publishSettings else publishSettings ++ skipSettings
   }
 
+  def buildInfoSettings(packageName: String) =
+    Seq(
+      // BuildInfoOption.ConstantValue required to disable assertions in FiberRuntime!
+      buildInfoOptions += BuildInfoOption.ConstantValue,
+      buildInfoKeys := Seq[BuildInfoKey](
+        organization,
+        moduleName,
+        name,
+        version,
+        scalaVersion,
+        sbtVersion,
+        isSnapshot,
+      ),
+      buildInfoPackage := packageName,
+    )
+
+  // Keep this consistent with the version in .core-tests/shared/src/test/scala/REPLSpec.scala
+  val replSettings = makeReplSettings {
+    """|import zio.*
+       |import zio.jdbc.*
+       |
+       |import com.youtoo.cqrs.store.*
+       |import com.youtoo.cqrs.service.*
+       |
+       |import com.youtoo.cqrs.example.model.*
+       |import com.youtoo.cqrs.example.service.*
+       |import com.youtoo.cqrs.example.repository.*
+       |import com.youtoo.cqrs.service.postgres.*
+       |import com.youtoo.cqrs.config.*
+       |
+       |import zio.http.{Version as _, *}
+       |import zio.http.netty.NettyConfig
+       |import zio.http.netty.NettyConfig.LeakDetectionLevel
+       |import zio.schema.codec.*
+       |implicit class RunSyntax[A](io: ZIO[Any, Any, A]) {
+       |  def r: A =
+       |    Unsafe.unsafe { implicit unsafe =>
+       |      Runtime.default.unsafe.run(io).getOrThrowFiberFailure()
+       |    }
+       |}
+    """.stripMargin
+  }
+
+  def makeReplSettings(initialCommandsStr: String) = Seq(
+    // In the repl most warnings are useless or worse.
+    // This is intentionally := as it's more direct to enumerate the few
+    // options we do want than to try to subtract off the ones we don't.
+    // One of -Ydelambdafy:inline or -Yrepl-class-based must be given to
+    // avoid deadlocking on parallel operations, see
+    //   https://issues.scala-lang.org/browse/SI-9076
+    Compile / console / scalacOptions := Seq(
+      "-language:higherKinds",
+      "-language:existentials",
+      "-Xsource:2.13",
+      "-Yrepl-class-based",
+    ),
+    Compile / console / initialCommands := initialCommandsStr,
+  )
   def stdSettings(prjName: String) = Seq(
     name := prjName,
     ThisBuild / crossScalaVersions := Seq(Scala3),
