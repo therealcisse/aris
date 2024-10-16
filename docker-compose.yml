@@ -15,6 +15,7 @@ services:
   adminer:
     image: adminer
     restart: always
+    network_mode: "host"
     environment:
       ADMINER_DESIGN: 'pepa-linha'
       ADMINER_DEFAULT_SERVER: 'postgres'
