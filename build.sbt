@@ -15,6 +15,7 @@ lazy val aggregatedProjects: Seq[ProjectReference] =
     core,
     postgres,
     exampleIngestion,
+    benchmark,
   )
 
 inThisBuild(
@@ -84,3 +85,17 @@ lazy val exampleIngestion = (project in file("cqrs-example-ingestion"))
     ),
   )
   .dependsOn(postgres, core)
+
+lazy val benchmark = (project in file("cqrs-benchmark"))
+  .settings(stdSettings("cqrs-benchmark"))
+  .settings(publishSetting(false))
+  .settings(Gatling / javaOptions := overrideDefaultJavaOptions("-Xms1024m", "-Xmx2048m"))
+  .enablePlugins(GatlingPlugin)
+  .settings(
+    excludeDependencies += "org.scala-lang.modules" % "scala-collection-compat_2.13",
+    libraryDependencies ++= Seq(
+      `gatling-charts-highcharts`,
+      `gatling-test-framework`,
+    ),
+  )
+  .dependsOn(exampleIngestion)

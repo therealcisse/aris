@@ -20,6 +20,7 @@ object Dependencies {
   val SL4JVersion = "2.0.13"
   val CatsVersion = "2.9.0"
   val CatsEffectKernelVersion = "3.5.4"
+  val GatlingVersion = "3.12.0"
 
   val scalafmt = "org.scalameta" %% "scalafmt-dynamic" % "3.8.1"
 
@@ -59,4 +60,9 @@ object Dependencies {
   val `testcontainers-scala-postgresql` = "com.dimafeng" %% "testcontainers-scala-postgresql" % "0.41.4" % Test
   val `zio-http` = "dev.zio" %% "zio-http" % "3.0.1"
 
+  val `gatling-charts-highcharts` = "io.gatling.highcharts" % "gatling-charts-highcharts" % GatlingVersion % Test
+  val `gatling-test-framework` = "io.gatling" % "gatling-test-framework" % GatlingVersion % Test
+
+  val `scala-collection-compat` =
+    "org.scala-lang.modules" %% "scala-collection-compat" % "2.12.0" cross CrossVersion.for3Use2_13
 }

@@ -13,6 +13,7 @@ addSbtPlugin("org.scoverage" % "sbt-scoverage" % "2.0.12")
 addSbtPlugin("com.github.cb372" % "sbt-explicit-dependencies" % "0.3.1")
 addSbtPlugin("com.thesamet" % "sbt-protoc" % "1.0.7")
 addSbtPlugin("com.thesamet" % "sbt-protoc-gen-project" % "0.1.8")
+addSbtPlugin("io.gatling" % "gatling-sbt" % "4.10.1")
 
 addSbtPlugin("org.jetbrains.scala" % "sbt-ide-settings" % "1.1.2")
 

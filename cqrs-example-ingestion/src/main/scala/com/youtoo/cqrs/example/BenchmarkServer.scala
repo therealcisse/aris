@@ -2,7 +2,10 @@ package com.youtoo.cqrs
 package example
 
 import zio.*
+import zio.stream.*
 import zio.jdbc.*
+
+import cats.implicits.*
 
 import com.youtoo.cqrs.store.*
 import com.youtoo.cqrs.service.*
@@ -17,7 +20,7 @@ import zio.http.{Version as _, *}
 import zio.http.netty.NettyConfig
 import zio.http.netty.NettyConfig.LeakDetectionLevel
 import zio.schema.codec.BinaryCodec
-import zio.http.SSLConfig.Data
+import java.nio.charset.StandardCharsets
 
 object BenchmarkServer extends ZIOApp {
   import com.youtoo.cqrs.Codecs.json.given
@@ -56,6 +59,61 @@ object BenchmarkServer extends ZIOApp {
       .orDie ++ Runtime.setConfigProvider(ConfigProvider.envProvider)
 
   val routes: Routes[Environment, Response] = Routes(
+    Method.POST / "dataload" / "ingestion" -> handler { (req: Request) =>
+      for {
+        body <- req.body.asChunk
+
+        resp <- summon[BinaryCodec[List[Key]]].decode(body) match {
+          case Left(_) => ZIO.succeed(Response.status(Status.NotFound))
+          case Right(ids) =>
+            for {
+              ingestions <- ZIO.foreachPar(ids) { key =>
+                IngestionCQRS.load(key)
+              }
+
+              ins = ingestions.mapFilter(identity)
+
+              bytes = ins
+                .map(in => String(summon[BinaryCodec[Ingestion]].encode(in).toArray, StandardCharsets.UTF_8.name))
+                .mkString("[", ",", "]")
+
+              resp = Response(
+                Status.Ok,
+                Headers(Header.ContentType(MediaType.application.json).untyped),
+                Body.fromCharSequence(s"""{"ingestions":$bytes}"""),
+              )
+
+            } yield resp
+
+        }
+
+      } yield resp
+
+    },
+    Method.GET / "ingestion" -> handler { (req: Request) =>
+
+      val offset = req.queryParam("offset")
+      val limit = req.queryParamToOrElse[Long]("limit", 1000L)
+
+      CQRSPersistence.atomically {
+
+        IngestionService
+          .loadMany(offset = offset.map(Key.apply), limit)
+          .onError(e => Console.printLine(s"Error: $e").orDie) map { ids =>
+          val bytes = String(summon[BinaryCodec[Chunk[Key]]].encode(ids).toArray, StandardCharsets.UTF_8.name)
+
+          val nextOffset = ids.minOption.map(id => s""","nextOffset":"$id"""").getOrElse("")
+
+          Response(
+            Status.Ok,
+            Headers(Header.ContentType(MediaType.application.json).untyped),
+            Body.fromCharSequence(s"""{"ids":$bytes$nextOffset}"""),
+          )
+
+        }
+      }
+
+    },
     Method.GET / "ingestion" / string("id") -> handler { (id: String, req: Request) =>
 
       val key = Key.wrap(id)
@@ -73,8 +131,8 @@ object BenchmarkServer extends ZIOApp {
         case None => Response.status(Status.NotFound)
       }
 
-    }.sandbox,
-    Method.POST / "ingestion" / string("id") -> handler { (id: String, req: Request) =>
+    },
+    Method.PUT / "ingestion" / string("id") -> handler { (id: String, req: Request) =>
 
       val key = Key.wrap(id)
 
@@ -99,7 +157,9 @@ object BenchmarkServer extends ZIOApp {
 
         _ <- IngestionCQRS.add(id, IngestionCommand.StartIngestion(Ingestion.Id(id), timestamp))
 
-      } yield Response.json(s"""{"id":$id}""")
+        _ <- IngestionCQRS.load(id)
+
+      } yield Response.json(s"""{"id":"$id"}""")
 
     },
   ).sandbox

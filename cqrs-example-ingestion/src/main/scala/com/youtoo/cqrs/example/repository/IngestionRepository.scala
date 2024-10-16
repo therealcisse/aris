@@ -16,6 +16,7 @@ import com.youtoo.cqrs.Codecs.given
 
 trait IngestionRepository {
   def load(id: Ingestion.Id): ZIO[ZConnection, Throwable, Option[Ingestion]]
+  def loadMany(offset: Option[Key], limit: Long): ZIO[ZConnection, Throwable, Chunk[Key]]
   def save(o: Ingestion): ZIO[ZConnection, Throwable, Long]
 
 }
@@ -31,6 +32,11 @@ object IngestionRepository {
             .READ_INGESTION(id)
             .selectOne
 
+        def loadMany(offset: Option[Key], limit: Long): ZIO[ZConnection, Throwable, Chunk[Key]] =
+          Queries
+            .READ_INGESTIONS(offset, limit)
+            .selectAll
+
         def save(o: Ingestion): ZIO[ZConnection, Throwable, Long] =
           Queries
             .SAVE_INGESTION(o)
@@ -42,6 +48,7 @@ object IngestionRepository {
   object Queries extends JdbcCodecs {
     given JdbcDecoder[Ingestion.Status] = byteArrayDecoder[Ingestion.Status]
     given JdbcDecoder[Ingestion.Id] = JdbcDecoder[String].map(string => Ingestion.Id(Key(string)))
+    given JdbcDecoder[Key] = JdbcDecoder[String].map(string => Key(string))
     given JdbcDecoder[Timestamp] = JdbcDecoder[Long].map(long => Timestamp(long))
 
     given SqlFragment.Setter[Ingestion.Id] = SqlFragment.Setter[String].contramap(_.asKey.value)
@@ -52,6 +59,26 @@ object IngestionRepository {
       FROM ingestions
       WHERE id = $id
       """.query[(Ingestion.Id, Ingestion.Status, Timestamp)].map(Ingestion.apply)
+
+    inline def READ_INGESTIONS(offset: Option[Key], limit: Long): Query[Key] =
+      offset match {
+        case None =>
+          sql"""
+          SELECT id
+          FROM ingestions
+          ORDER BY id DESC
+          """.query[Key]
+
+        case Some(key) =>
+          sql"""
+          SELECT id
+          FROM ingestions
+          WHERE id < $key
+          ORDER BY id DESC
+          LIMIT $limit
+          """.query[Key]
+
+      }
 
     inline def SAVE_INGESTION(o: Ingestion): SqlFragment =
       val payload =
