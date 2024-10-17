@@ -57,7 +57,7 @@ object Main extends ZIOApp {
       version0 <- Version.gen
       e0 = IngestionEvent.IngestionStarted(id, timestamp)
       version1 <- Version.gen
-      e1 = IngestionEvent.IngestionFilesResolved(files = Set((0 to 100).map(_.toString)*))
+      e1 = IngestionEvent.IngestionFilesResolved(files = NonEmptySet("1", (2 to 100).map(_.toString)*))
 
       _ <- service.atomically(
         service.saveEvent(id.asKey, IngestionEvent.discriminator, Change(version = version0, payload = e0)),

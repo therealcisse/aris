@@ -78,7 +78,12 @@ lazy val exampleIngestion = (project in file("cqrs-example-ingestion"))
   .settings(stdSettings("cqrs-example-ingestion"))
   .settings(publishSetting(false))
   .settings(
+    testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
     libraryDependencies ++= Seq(
+      `zio-test`,
+      `zio-test-sbt`,
+      `zio-test-magnolia`,
+      `zio-mock`,
       `zio-http`,
       `zio-json`,
     ),

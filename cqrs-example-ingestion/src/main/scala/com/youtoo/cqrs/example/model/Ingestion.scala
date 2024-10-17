@@ -43,9 +43,27 @@ object Ingestion {
 
   enum Status {
     case Initial()
-    case Resolved(files: Set[String])
-    case Processing(remaining: Set[String], processed: Set[String], failed: Set[String])
-    case Completed(files: Set[String], failed: Set[String])
+    case Resolved(files: NonEmptySet[String])
+    case Processing(remaining: Set[String], processing: Set[String], processed: Set[String], failed: Set[String])
+    case Completed(files: NonEmptySet[String])
+    case Failed(done: Set[String], failed: NonEmptySet[String])
+    case Stopped(processing: Status.Processing, timestamp: Timestamp)
+
+    def isSuccessful: Status = this match {
+      case Processing(r, pp, p, f) if pp.isEmpty && r.isEmpty && f.isEmpty =>
+        NonEmptySet.fromIterableOption(p) match {
+          case None => this
+          case Some(nes) => Completed(nes)
+        }
+
+      case Processing(r, pp, p, f) if pp.isEmpty && r.isEmpty && !f.isEmpty =>
+        NonEmptySet.fromIterableOption(f) match {
+          case None => this
+          case Some(nes) => Failed(p, nes)
+        }
+
+      case s => s
+    }
 
   }
 

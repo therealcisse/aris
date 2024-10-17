@@ -12,8 +12,9 @@ import java.nio.charset.StandardCharsets
 import com.youtoo.cqrs.example.BenchmarkServer
 
 class IngestionLoadTest extends Simulation {
+  val port: Int = Integer.getInteger("port", 8181)
 
-  val baseUrl = "http://localhost:8181"
+  val baseUrl = s"http://localhost:$port"
 
   val numIngestions: Int = Integer.getInteger("numIngestions", 100)
   val minNumCommandsPerIngestion: Int = Integer.getInteger("minNumCommandsPerIngestion", 5)
@@ -27,8 +28,9 @@ class IngestionLoadTest extends Simulation {
     .contentTypeHeader("application/json")
 
   var ingestionIds = List[String]()
+  var allIds = Vector[String]()
 
-  val createIngestion: ScenarioBuilder = scenario("Create Ingestion")
+  val scn: ScenarioBuilder = scenario("Process Ingestion")
     .repeat(numIngestions) {
       exec(
         http("POST /ingestion")
@@ -41,9 +43,10 @@ class IngestionLoadTest extends Simulation {
         session
       }
     }
-
-  val setupAndProcessIngestion: ScenarioBuilder = scenario("Setup Ingestion")
-    .foreach(ingestionIds, "ingestionId") {
+    .exec { session =>
+      session.set("ingestionIds", ingestionIds)
+    }
+    .foreach("#{ingestionIds}", "ingestionId") {
       exec { session =>
         val numCommands = Random.between(minNumCommandsPerIngestion, maxNumCommandsPerIngestion)
         val data = summon[BinaryCodec[IngestionCommand]].encode(
@@ -70,24 +73,16 @@ class IngestionLoadTest extends Simulation {
               .put("/ingestion/#{ingestionId}")
               .body(StringBody("""#{command}"""))
               .check(status.is(200)),
+          ).exec(
+            http("GET /ingestion/{id}")
+              .get("/ingestion/#{ingestionId}")
+              .check(status.is(200)),
           )
         }
     }
-
-  val loadIngestion: ScenarioBuilder = scenario("Load Ingestion")
-    .foreach(ingestionIds, "ingestionId") {
-      exec(
-        http("GET /ingestion/{id}")
-          .get("/ingestion/#{ingestionId}")
-          .check(status.is(200)),
-      ).pause(1.millisecond)
+    .exec { session =>
+      session.set("offset", "")
     }
-
-  var allIds = Vector[String]()
-
-  val fetchAllIngestions: ScenarioBuilder = scenario("Fetch All Ingestions").exec { session =>
-    session.set("offset", "")
-  }
     .asLongAs(session => session("offset").as[String] != "end") {
       exec(
         http("GET /ingestion (fetch ids)")
@@ -104,7 +99,7 @@ class IngestionLoadTest extends Simulation {
         val fetchedIds = session("fetchedIds").asOption[Vector[String]].getOrElse(Vector())
         allIds = allIds ++ fetchedIds
 
-        if fetchedIds.size < BenchmarkServer.Limit then session.set("offset", "end")
+        if fetchedIds.size < BenchmarkServer.FetchSize then session.set("offset", "end")
         else
           allIds.minOption match {
             case None => session.set("offset", "end")
@@ -112,9 +107,16 @@ class IngestionLoadTest extends Simulation {
           }
       }
     }
-    .foreach(allIds.grouped(3).toSeq, "ids") {
+    .exec { session =>
+      session.set("allIds", allIds.grouped(8).toSeq)
+    }
+    .foreach("#{allIds}", "ids") {
       exec { session =>
-        session.set("data", session("ids").as[Vector[String]].map(id => s""""$id"""").mkString("[", ",", "]"))
+        val data = session("ids").as[Vector[String]]
+        session.set(
+          "data",
+          String(summon[BinaryCodec[Vector[String]]].encode(data).toArray, StandardCharsets.UTF_8.name),
+        )
       }.exec(
         http("POST /dataload/ingestion (fetch objects)")
           .post("/dataload/ingestion")
@@ -124,10 +126,7 @@ class IngestionLoadTest extends Simulation {
     }
 
   setUp(
-    createIngestion.inject(atOnceUsers(1)),
-    setupAndProcessIngestion.inject(rampUsers(concurrentUsers) during (testDuration.minutes)),
-    loadIngestion.inject(constantConcurrentUsers(concurrentUsers) during (testDuration.minutes)),
-    fetchAllIngestions.inject(rampUsers(concurrentUsers) during (testDuration.minutes)),
+    scn.inject(rampUsers(concurrentUsers) during testDuration.minutes),
   ).protocols(httpProtocol)
 
 }

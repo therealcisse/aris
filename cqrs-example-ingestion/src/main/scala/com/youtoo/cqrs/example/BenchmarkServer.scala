@@ -25,7 +25,7 @@ import java.nio.charset.StandardCharsets
 object BenchmarkServer extends ZIOApp {
   import com.youtoo.cqrs.Codecs.json.given
 
-  inline val Limit = 1_000L
+  inline val FetchSize = 1_000L
 
   type Environment =
     Migration & ZConnectionPool & CQRSPersistence & SnapshotStore & IngestionEventStore & IngestionCQRS & IngestionProvider & IngestionCheckpointer & Server & Server.Config & NettyConfig & IngestionService & IngestionRepository
@@ -43,23 +43,23 @@ object BenchmarkServer extends ZIOApp {
 
   val bootstrap: ZLayer[Any, Nothing, Environment] =
     Runtime.removeDefaultLoggers >>> SLF4J.slf4j ++
-    ZLayer
-      .make[Environment](
-        DatabaseConfig.pool,
-        PostgresCQRSPersistence.live(),
-        Migration.live(),
-        SnapshotStore.live(),
-        IngestionProvider.live(),
-        IngestionEventStore.live(),
-        IngestionCheckpointer.live(),
-        IngestionService.live(),
-        IngestionRepository.live(),
-        IngestionCQRS.live(),
-        configLayer,
-        nettyConfigLayer,
-        Server.customized,
-      )
-      .orDie ++ Runtime.setConfigProvider(ConfigProvider.envProvider)
+      ZLayer
+        .make[Environment](
+          DatabaseConfig.pool,
+          PostgresCQRSPersistence.live(),
+          Migration.live(),
+          SnapshotStore.live(),
+          IngestionProvider.live(),
+          IngestionEventStore.live(),
+          IngestionCheckpointer.live(),
+          IngestionService.live(),
+          IngestionRepository.live(),
+          IngestionCQRS.live(),
+          configLayer,
+          nettyConfigLayer,
+          Server.customized,
+        )
+        .orDie ++ Runtime.setConfigProvider(ConfigProvider.envProvider)
 
   val routes: Routes[Environment, Response] = Routes(
     Method.POST / "dataload" / "ingestion" -> handler { (req: Request) =>
@@ -95,7 +95,7 @@ object BenchmarkServer extends ZIOApp {
     },
     Method.GET / "ingestion" -> handler { (req: Request) =>
       val offset = req.queryParam("offset").filterNot(_.isEmpty)
-      val limit = req.queryParamToOrElse[Long]("limit", Limit)
+      val limit = req.queryParamToOrElse[Long]("limit", FetchSize)
 
       CQRSPersistence.atomically {
 
@@ -158,8 +158,6 @@ object BenchmarkServer extends ZIOApp {
 
         _ <- IngestionCQRS.add(id, IngestionCommand.StartIngestion(Ingestion.Id(id), timestamp))
 
-        _ <- IngestionCQRS.load(id)
-
       } yield Response.json(s"""{"id":"$id"}""")
 
     },
@@ -170,7 +168,7 @@ object BenchmarkServer extends ZIOApp {
       for {
         config <- ZIO.config[DatabaseConfig]
         _ <- Migration.run(config)
-        _ <- Server.serve(routes).onError(e => Console.printLine(s"Error: $e").orDie)
+        _ <- Server.serve(routes).onError(e => ZIO.logErrorCause(e))
       } yield ()
     ).exitCode
 

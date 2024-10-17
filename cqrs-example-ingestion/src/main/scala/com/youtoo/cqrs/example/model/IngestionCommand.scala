@@ -9,10 +9,11 @@ import zio.schema.*
 
 enum IngestionCommand {
   case StartIngestion(id: Ingestion.Id, timestamp: Timestamp)
-  case SetFiles(files: Set[String])
+  case SetFiles(files: NonEmptySet[String])
+  case FileProcessing(file: String)
   case FileProcessed(file: String)
   case FileFailed(file: String)
-  case FinishIngestion()
+  case StopIngestion(timestamp: Timestamp)
 
 }
 
@@ -30,14 +31,17 @@ object IngestionCommand {
         case IngestionCommand.SetFiles(files) =>
           NonEmptyList(IngestionEvent.IngestionFilesResolved(files))
 
+        case IngestionCommand.FileProcessing(file) =>
+          NonEmptyList(IngestionEvent.IngestionFileProcessing(file))
+
         case IngestionCommand.FileProcessed(file) =>
           NonEmptyList(IngestionEvent.IngestionFileProcessed(file))
 
         case IngestionCommand.FileFailed(file) =>
           NonEmptyList(IngestionEvent.IngestionFileFailed(file))
 
-        case IngestionCommand.FinishIngestion() =>
-          NonEmptyList(IngestionEvent.IngestionCompleted())
+        case IngestionCommand.StopIngestion(timestamp) =>
+          NonEmptyList(IngestionEvent.IngestionCompleted(timestamp))
 
       }
   }

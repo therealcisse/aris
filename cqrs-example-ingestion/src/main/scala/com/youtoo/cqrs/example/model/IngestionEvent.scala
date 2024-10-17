@@ -11,11 +11,11 @@ import zio.schema.*
 
 enum IngestionEvent {
   case IngestionStarted(id: Ingestion.Id, timestamp: Timestamp)
-  case IngestionFilesResolved(files: Set[String])
+  case IngestionFilesResolved(files: NonEmptySet[String])
+  case IngestionFileProcessing(file: String)
   case IngestionFileProcessed(file: String)
   case IngestionFileFailed(file: String)
-  case IngestionCompleted()
-
+  case IngestionCompleted(timestamp: Timestamp)
 }
 
 type IngestionEventHandler = EventHandler[IngestionEvent, Ingestion]
@@ -49,39 +49,51 @@ object IngestionEvent {
 
     def applyEvents(zero: Ingestion, events: NonEmptyList[Change[IngestionEvent]]): Ingestion =
       events.foldLeft(zero) { (state, event) =>
-        event.payload match {
+        val status = event.payload match {
           case IngestionEvent.IngestionStarted(_, _) =>
-            throw IllegalArgumentException(s"Unexpected event, current state is ${state.getClass.getName}")
+            throw IllegalArgumentException(s"Unexpected event, current state is ${event.payload.getClass.getName}")
 
           case IngestionEvent.IngestionFilesResolved(files) =>
-            state.copy(status = Ingestion.Status.Resolved(files))
+            Ingestion.Status.Resolved(files)
+
+          case IngestionEvent.IngestionFileProcessing(file) =>
+            state.status match {
+              case Ingestion.Status.Processing(remaining, processing, processed, failed) if remaining contains file =>
+                Ingestion.Status.Processing(remaining - file, processing + file, processed, failed)
+
+              case Ingestion.Status.Resolved(files) if files contains file =>
+                Ingestion.Status.Processing(files - file, Set() + file, Set(), Set())
+
+              case _ => state.status
+            }
 
           case IngestionEvent.IngestionFileProcessed(file) =>
             state.status match {
-              case Ingestion.Status.Processing(remaining, processed, failed) =>
-                state.copy(status = Ingestion.Status.Processing(remaining - file, processed + file, failed))
+              case Ingestion.Status.Processing(remaining, processing, processed, failed) if processing contains file =>
+                Ingestion.Status.Processing(remaining, processing - file, processed + file, failed)
 
-              case Ingestion.Status.Resolved(files) =>
-                state.copy(status = Ingestion.Status.Processing(files - file, Set() + file, Set()))
-
-              case _ => state
+              case _ => state.status
             }
 
           case IngestionEvent.IngestionFileFailed(file) =>
             state.status match {
-              case Ingestion.Status.Processing(remaining, processed, failed) =>
-                state.copy(status = Ingestion.Status.Processing(remaining - file, processed, failed + file))
+              case Ingestion.Status.Processing(remaining, processing, processed, failed) if processing contains file =>
+                Ingestion.Status.Processing(remaining, processing - file, processed, failed + file)
 
-              case Ingestion.Status.Resolved(files) =>
-                state.copy(status = Ingestion.Status.Processing(files - file, Set(), Set() + file))
-
-              case _ => state
+              case _ => state.status
             }
 
-          case IngestionEvent.IngestionCompleted() =>
-            state
+          case IngestionEvent.IngestionCompleted(timestamp) =>
+            state.status match {
+              case processing @ Ingestion.Status.Processing(_, _, _, _) =>
+                Ingestion.Status.Stopped(processing, timestamp)
+
+              case _ => state.status
+            }
 
         }
+
+        state.copy(status = status.isSuccessful)
       }
 
   }
