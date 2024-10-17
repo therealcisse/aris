@@ -34,7 +34,7 @@ object IngestionEvent {
             case IngestionEvent.IngestionStarted(id, timestamp) =>
               Ingestion(id = id, status = Ingestion.Status.empty, timestamp = timestamp)
 
-            case _ => throw IllegalArgumentException("Unexpected event")
+            case _ => throw IllegalArgumentException("Unexpected event, current state is empty")
           }
 
         case NonEmptyList.Cons(ch, ls) =>
@@ -42,7 +42,7 @@ object IngestionEvent {
             case IngestionEvent.IngestionStarted(id, timestamp) =>
               applyEvents(zero = Ingestion(id = id, status = Ingestion.Status.empty, timestamp = timestamp), ls)
 
-            case _ => throw IllegalArgumentException("Unexpected event")
+            case _ => throw IllegalArgumentException("Unexpected event, current state is empty")
           }
 
       }
@@ -51,7 +51,7 @@ object IngestionEvent {
       events.foldLeft(zero) { (state, event) =>
         event.payload match {
           case IngestionEvent.IngestionStarted(_, _) =>
-            throw IllegalArgumentException("Unexpected event")
+            throw IllegalArgumentException(s"Unexpected event, current state is ${state.getClass.getName}")
 
           case IngestionEvent.IngestionFilesResolved(files) =>
             state.copy(status = Ingestion.Status.Resolved(files))

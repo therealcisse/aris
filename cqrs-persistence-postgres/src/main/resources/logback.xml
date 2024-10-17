@@ -38,7 +38,7 @@
     </appender>
 
     <!-- Root Logger Configuration -->
-    <root level="INFO">
+    <root level="${CQRSLogLevel}">
         <appender-ref ref="CONSOLE"/>
         <appender-ref ref="ROLLING_FILE"/>
     </root>

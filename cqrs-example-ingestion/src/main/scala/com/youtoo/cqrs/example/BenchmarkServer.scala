@@ -2,8 +2,9 @@ package com.youtoo.cqrs
 package example
 
 import zio.*
-import zio.stream.*
 import zio.jdbc.*
+import zio.logging.*
+import zio.logging.backend.*
 
 import cats.implicits.*
 
@@ -18,12 +19,13 @@ import com.youtoo.cqrs.config.*
 
 import zio.http.{Version as _, *}
 import zio.http.netty.NettyConfig
-import zio.http.netty.NettyConfig.LeakDetectionLevel
 import zio.schema.codec.BinaryCodec
 import java.nio.charset.StandardCharsets
 
 object BenchmarkServer extends ZIOApp {
   import com.youtoo.cqrs.Codecs.json.given
+
+  inline val Limit = 1_000L
 
   type Environment =
     Migration & ZConnectionPool & CQRSPersistence & SnapshotStore & IngestionEventStore & IngestionCQRS & IngestionProvider & IngestionCheckpointer & Server & Server.Config & NettyConfig & IngestionService & IngestionRepository
@@ -34,12 +36,13 @@ object BenchmarkServer extends ZIOApp {
     .port(8181)
 
   private val nettyConfig = NettyConfig.default
-    .leakDetection(LeakDetectionLevel.DISABLED)
+    .leakDetection(NettyConfig.LeakDetectionLevel.DISABLED)
 
   private val configLayer = ZLayer.succeed(config)
   private val nettyConfigLayer = ZLayer.succeed(nettyConfig)
 
   val bootstrap: ZLayer[Any, Nothing, Environment] =
+    Runtime.removeDefaultLoggers >>> SLF4J.slf4j ++
     ZLayer
       .make[Environment](
         DatabaseConfig.pool,
@@ -91,18 +94,17 @@ object BenchmarkServer extends ZIOApp {
 
     },
     Method.GET / "ingestion" -> handler { (req: Request) =>
-
-      val offset = req.queryParam("offset")
-      val limit = req.queryParamToOrElse[Long]("limit", 1000L)
+      val offset = req.queryParam("offset").filterNot(_.isEmpty)
+      val limit = req.queryParamToOrElse[Long]("limit", Limit)
 
       CQRSPersistence.atomically {
 
         IngestionService
-          .loadMany(offset = offset.map(Key.apply), limit)
-          .onError(e => Console.printLine(s"Error: $e").orDie) map { ids =>
+          .loadMany(offset = offset.map(Key.apply), limit) map { ids =>
           val bytes = String(summon[BinaryCodec[Chunk[Key]]].encode(ids).toArray, StandardCharsets.UTF_8.name)
 
-          val nextOffset = ids.minOption.map(id => s""","nextOffset":"$id"""").getOrElse("")
+          val nextOffset =
+            (if ids.size < limit then None else ids.minOption).map(id => s""","nextOffset":"$id"""").getOrElse("")
 
           Response(
             Status.Ok,
@@ -111,11 +113,11 @@ object BenchmarkServer extends ZIOApp {
           )
 
         }
+
       }
 
     },
     Method.GET / "ingestion" / string("id") -> handler { (id: String, req: Request) =>
-
       val key = Key.wrap(id)
 
       IngestionCQRS.load(key) map {
@@ -133,7 +135,6 @@ object BenchmarkServer extends ZIOApp {
 
     },
     Method.PUT / "ingestion" / string("id") -> handler { (id: String, req: Request) =>
-
       val key = Key.wrap(id)
 
       for {
@@ -169,7 +170,7 @@ object BenchmarkServer extends ZIOApp {
       for {
         config <- ZIO.config[DatabaseConfig]
         _ <- Migration.run(config)
-        _ <- Server.serve(routes)
+        _ <- Server.serve(routes).onError(e => Console.printLine(s"Error: $e").orDie)
       } yield ()
     ).exitCode
 

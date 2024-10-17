@@ -8,8 +8,6 @@ ThisBuild / version := "0.1.0-SNAPSHOT"
 // Setting default log level to INFO
 val _ = sys.props += ("CQRSLogLevel" -> Debug.CQRSLogLevel)
 
-lazy val g = ProjectRef(file("../cqrs-core"), "core")
-
 lazy val aggregatedProjects: Seq[ProjectReference] =
   Seq(
     core,
@@ -37,6 +35,9 @@ lazy val core = (project in file("cqrs-core"))
     Test / fork := false,
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
     libraryDependencies ++= Seq(
+      `zio-logging`,
+      `zio-logging-slf4j`,
+      logback,
       `zio-jdbc`,
       `zio-schema-protobuf`,
       `zio-schema-json`,
@@ -69,8 +70,6 @@ lazy val postgres = (project in file("cqrs-persistence-postgres"))
       `zio-test-sbt`,
       `zio-test-magnolia`,
       `zio-mock`,
-      `slf4j-api`,
-      `slf4j-simple`,
     ),
   )
   .dependsOn(core)
