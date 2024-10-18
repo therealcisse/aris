@@ -6,7 +6,7 @@ services:
       POSTGRES_PASSWORD: admin
       POSTGRES_DB: cqrs
     networks:
-      - cqrs-net
+      - app-network
     ports:
       - 5432:5432
     volumes:
@@ -16,15 +16,38 @@ services:
     image: adminer
     restart: always
     networks:
-      - cqrs-net
+      - app-network
     environment:
       ADMINER_DESIGN: 'pepa-linha'
       ADMINER_DEFAULT_SERVER: 'postgres'
     ports:
       - 8080:8080
 
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - app-network
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana-storage:/var/lib/grafana
+
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9091:9090" # Prometheus server port (mapped to 9091 to avoid conflict)
+    networks:
+      - app-network
+
 volumes:
   postgres_data:
+  grafana-storage:
 networks:
-  cqrs-net:
+  app-network:
     driver: bridge

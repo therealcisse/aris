@@ -22,6 +22,14 @@ trait IngestionRepository {
 }
 
 object IngestionRepository {
+  inline def load(id: Ingestion.Id): RIO[IngestionRepository & ZConnection, Option[Ingestion]] =
+    ZIO.serviceWithZIO[IngestionRepository](_.load(id))
+
+  inline def loadMany(offset: Option[Key], limit: Long): RIO[IngestionRepository & ZConnection, Chunk[Key]] =
+    ZIO.serviceWithZIO[IngestionRepository](_.loadMany(offset, limit))
+
+  inline def save(o: Ingestion): RIO[IngestionRepository & ZConnection, Long] =
+    ZIO.serviceWithZIO[IngestionRepository](_.save(o))
 
   def live(): ZLayer[Any, Throwable, IngestionRepository] =
     ZLayer.succeed {

@@ -1,5 +1,5 @@
 import BuildHelper.*
-import Dependencies.{scalafmt, *}
+import Dependencies.*
 
 ThisBuild / resolvers ++= Resolver.sonatypeOssRepos("snapshots")
 
@@ -32,7 +32,6 @@ lazy val core = (project in file("cqrs-core"))
   .settings(buildInfoSettings("cqrs"))
   .enablePlugins(BuildInfoPlugin)
   .settings(
-    Test / fork := false,
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
     libraryDependencies ++= Seq(
       `zio-logging`,
@@ -57,7 +56,6 @@ lazy val postgres = (project in file("cqrs-persistence-postgres"))
   .settings(stdSettings("cqrs-persistence-postgres"))
   .settings(publishSetting(false))
   .settings(
-    Test / fork := true,
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
     Test / unmanagedResourceDirectories ++= (Compile / unmanagedResourceDirectories).value,
     libraryDependencies ++= Seq(
@@ -70,6 +68,7 @@ lazy val postgres = (project in file("cqrs-persistence-postgres"))
       `zio-test-sbt`,
       `zio-test-magnolia`,
       `zio-mock`,
+      mockito,
     ),
   )
   .dependsOn(core)
@@ -80,6 +79,9 @@ lazy val exampleIngestion = (project in file("cqrs-example-ingestion"))
   .settings(
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
     libraryDependencies ++= Seq(
+      `zio-metrics`,
+      `zio-metrics-connectors-prometheus`,
+      `testcontainers-scala-postgresql`,
       `zio-test`,
       `zio-test-sbt`,
       `zio-test-magnolia`,
@@ -88,12 +90,12 @@ lazy val exampleIngestion = (project in file("cqrs-example-ingestion"))
       `zio-json`,
     ),
   )
-  .dependsOn(postgres, core)
+  .dependsOn(postgres % "compile->compile;test->test", core % "compile->compile;test->test")
 
 lazy val benchmark = (project in file("cqrs-benchmark"))
   .settings(stdSettings("cqrs-benchmark"))
   .settings(publishSetting(false))
-  .settings(Gatling / javaOptions := overrideDefaultJavaOptions("-Xms1024m", "-Xmx2048m"))
+  .settings(Gatling / javaOptions := overrideDefaultJavaOptions("-Xms1G", "-Xmx4G"))
   .enablePlugins(GatlingPlugin)
   .settings(
     excludeDependencies += "org.scala-lang.modules" % "scala-collection-compat_2.13",

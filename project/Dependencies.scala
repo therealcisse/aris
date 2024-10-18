@@ -36,6 +36,8 @@ object Dependencies {
   val cats = "org.typelevel" %% "cats-core" % CatsVersion
   val `cats-effect-kernel` = "org.typelevel" %% "cats-effect" % CatsEffectKernelVersion
 
+  val `zio-metrics-connectors-prometheus` = "dev.zio" %% "zio-metrics-connectors-prometheus" % "2.3.1"
+  val `zio-metrics` = "dev.zio" %% "zio-metrics" % "2.0.1"
   val `zio-json` = "dev.zio" %% "zio-json" % ZioJsonVersion
   val `zio-jdbc` = "dev.zio" %% "zio-jdbc" % ZioJdbcVersion
   val `zio-prelude` = "dev.zio" %% "zio-prelude" % ZioPreludeVersion
@@ -68,4 +70,6 @@ object Dependencies {
 
   val `scala-collection-compat` =
     "org.scala-lang.modules" %% "scala-collection-compat" % "2.12.0" cross CrossVersion.for3Use2_13
+
+  val mockito = "org.mockito" % "mockito-core" % "5.14.2" % Test
 }

@@ -56,6 +56,7 @@ src_managed/
 project/boot/
 project/plugins/project/
 logs/
+*.hprof
 project/*-shim.sbt
 project/project/
 project/target/

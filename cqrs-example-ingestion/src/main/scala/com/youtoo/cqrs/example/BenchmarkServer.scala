@@ -6,6 +6,12 @@ import zio.jdbc.*
 import zio.logging.*
 import zio.logging.backend.*
 
+import zio.metrics.*
+import zio.metrics.connectors.prometheus.*
+import zio.metrics.connectors.prometheus.PrometheusPublisher
+import zio.metrics.connectors.MetricsConfig
+import zio.metrics.connectors.prometheus
+
 import cats.implicits.*
 
 import com.youtoo.cqrs.store.*
@@ -15,20 +21,24 @@ import com.youtoo.cqrs.example.model.*
 import com.youtoo.cqrs.example.service.*
 import com.youtoo.cqrs.example.repository.*
 import com.youtoo.cqrs.service.postgres.*
+import com.youtoo.cqrs.example.store.*
 import com.youtoo.cqrs.config.*
 
 import zio.http.{Version as _, *}
 import zio.http.netty.NettyConfig
 import zio.schema.codec.BinaryCodec
 import java.nio.charset.StandardCharsets
+import java.util.concurrent.TimeUnit
 
 object BenchmarkServer extends ZIOApp {
   import com.youtoo.cqrs.Codecs.json.given
 
   inline val FetchSize = 1_000L
 
+  val jvmMetricsLayer = zio.metrics.jvm.DefaultJvmMetrics.live
+
   type Environment =
-    Migration & ZConnectionPool & CQRSPersistence & SnapshotStore & IngestionEventStore & IngestionCQRS & IngestionProvider & IngestionCheckpointer & Server & Server.Config & NettyConfig & IngestionService & IngestionRepository
+    Migration & ZConnectionPool & CQRSPersistence & SnapshotStore & IngestionEventStore & IngestionCQRS & IngestionProvider & IngestionCheckpointer & Server & Server.Config & NettyConfig & IngestionService & IngestionRepository & PrometheusPublisher & MetricsConfig
 
   given environmentTag: EnvironmentTag[Environment] = EnvironmentTag[Environment]
 
@@ -58,10 +68,14 @@ object BenchmarkServer extends ZIOApp {
           configLayer,
           nettyConfigLayer,
           Server.customized,
+          prometheus.publisherLayer,
+          prometheus.prometheusLayer,
+          ZLayer.succeed(MetricsConfig(interval = Duration(5L, TimeUnit.SECONDS))),
         )
         .orDie ++ Runtime.setConfigProvider(ConfigProvider.envProvider)
 
   val routes: Routes[Environment, Response] = Routes(
+    Method.GET / "metrics" -> handler(ZIO.serviceWithZIO[PrometheusPublisher](_.get.map(Response.text))),
     Method.POST / "dataload" / "ingestion" -> handler { (req: Request) =>
       for {
         body <- req.body.asChunk
@@ -97,10 +111,9 @@ object BenchmarkServer extends ZIOApp {
       val offset = req.queryParam("offset").filterNot(_.isEmpty)
       val limit = req.queryParamToOrElse[Long]("limit", FetchSize)
 
-      CQRSPersistence.atomically {
+      atomically {
 
-        IngestionService
-          .loadMany(offset = offset.map(Key.apply), limit) map { ids =>
+        IngestionService.loadMany(offset = offset.map(Key.apply), limit) map { ids =>
           val bytes = String(summon[BinaryCodec[Chunk[Key]]].encode(ids).toArray, StandardCharsets.UTF_8.name)
 
           val nextOffset =
@@ -149,6 +162,21 @@ object BenchmarkServer extends ZIOApp {
       } yield resp
 
     },
+    Method.GET / "ingestion" / string("id") / "validate" -> handler { (id: String, req: Request) =>
+      val numFiles = req.queryParamTo[Long]("numFiles")
+
+      numFiles match {
+        case Left(_) => ZIO.succeed(Response.notFound)
+        case Right(n) =>
+          IngestionCQRS.load(id = Key.wrap(id)) map {
+            case None => Response.notFound
+            case Some(ingestion) =>
+              if ingestion.status.totalFiles.fold(false)(_.size == n) then Response.ok else Response.notFound
+          }
+
+      }
+
+    },
     Method.POST / "ingestion" -> handler {
 
       for {
@@ -157,6 +185,14 @@ object BenchmarkServer extends ZIOApp {
         timestamp <- Timestamp.now
 
         _ <- IngestionCQRS.add(id, IngestionCommand.StartIngestion(Ingestion.Id(id), timestamp))
+
+        opt <- IngestionCQRS.load(id)
+
+        _ <- opt.fold(ZIO.unit) { ingestion =>
+          atomically {
+            IngestionService.save(ingestion)
+          }
+        }
 
       } yield Response.json(s"""{"id":"$id"}""")
 
@@ -168,7 +204,7 @@ object BenchmarkServer extends ZIOApp {
       for {
         config <- ZIO.config[DatabaseConfig]
         _ <- Migration.run(config)
-        _ <- Server.serve(routes).onError(e => ZIO.logErrorCause(e))
+        _ <- Server.serve(routes)
       } yield ()
     ).exitCode
 

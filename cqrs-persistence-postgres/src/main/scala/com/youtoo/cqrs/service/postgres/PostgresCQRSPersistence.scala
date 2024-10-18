@@ -18,24 +18,20 @@ object PostgresCQRSPersistence {
   def live(): ZLayer[Any, Throwable, CQRSPersistence] =
     ZLayer.succeed {
       new CQRSPersistence {
-        def atomically[R, T](fa: ZIO[R & ZConnection, Throwable, T]): ZIO[R & ZConnectionPool, Throwable, T] =
-          val layer = ZLayer.makeSome[R & ZConnectionPool, R & ZConnection](transaction)
-          fa.provideLayer(layer)
-
-        def readEvents[Event: BinaryCodec](
+        def readEvents[Event: BinaryCodec: Tag](
           id: Key,
           discriminator: Discriminator,
         ): RIO[ZConnection, Chunk[Change[Event]]] =
           Queries.READ_EVENTS(id, discriminator).selectAll
 
-        def readEvents[Event: BinaryCodec](
+        def readEvents[Event: BinaryCodec: Tag](
           id: Key,
           discriminator: Discriminator,
           snapshotVersion: Version,
         ): RIO[ZConnection, Chunk[Change[Event]]] =
           Queries.READ_EVENTS(id, discriminator, snapshotVersion).selectAll
 
-        def saveEvent[Event: BinaryCodec](
+        def saveEvent[Event: BinaryCodec: Tag](
           id: Key,
           discriminator: Discriminator,
           event: Change[Event],

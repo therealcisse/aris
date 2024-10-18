@@ -6,21 +6,17 @@ import com.youtoo.cqrs.example.model.*
 
 import zio.*
 
-import zio.jdbc.*
 import com.youtoo.cqrs.service.*
-import com.youtoo.cqrs.store.*
 
 trait IngestionCheckpointer extends Checkpointer[Ingestion] {}
 
 object IngestionCheckpointer {
+  inline def save(o: Ingestion): RIO[IngestionCheckpointer, Unit] = ZIO.serviceWithZIO(_.save(o))
 
-  def live(): ZLayer[CQRSPersistence & IngestionService & ZConnectionPool, Throwable, IngestionCheckpointer] =
-    ZLayer.fromFunction { (persistence: CQRSPersistence, service: IngestionService, pool: ZConnectionPool) =>
+  def live(): ZLayer[IngestionService, Throwable, IngestionCheckpointer] =
+    ZLayer.fromFunction { (service: IngestionService) =>
       new IngestionCheckpointer {
-        def save(o: Ingestion): Task[Unit] = persistence.atomically {
-          service.save(o) as ()
-
-        }.provideEnvironment(ZEnvironment(pool))
+        def save(o: Ingestion): Task[Unit] = service.save(o) as ()
 
       }
     }

@@ -1,13 +1,10 @@
 package com.youtoo.cqrs
 package store
 
-import com.youtoo.cqrs.domain.*
-
 import zio.mock.*
+import zio.jdbc.*
 
 import zio.*
-import zio.jdbc.*
-import zio.prelude.*
 
 object MockSnapshotStore extends Mock[SnapshotStore] {
   object ReadSnapshot extends Effect[Key, Throwable, Option[Version]]
@@ -18,10 +15,10 @@ object MockSnapshotStore extends Mock[SnapshotStore] {
       for {
         proxy <- ZIO.service[Proxy]
       } yield new SnapshotStore {
-        def readSnapshot(id: Key): Task[Option[Version]] =
+        def readSnapshot(id: Key): RIO[ZConnection, Option[Version]] =
           proxy(ReadSnapshot, id)
 
-        def saveSnapshot(id: Key, version: Version): Task[Long] =
+        def save(id: Key, version: Version): RIO[ZConnection, Long] =
           proxy(SaveSnapshot, id, version)
       }
     }

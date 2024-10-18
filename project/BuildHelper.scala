@@ -1,4 +1,4 @@
-import de.heikoseeberger.sbtheader.HeaderPlugin.autoImport.{HeaderLicense, headerLicense}
+import de.heikoseeberger.sbtheader.HeaderPlugin.autoImport.{headerLicense, HeaderLicense}
 import sbt.*
 import sbt.Keys.*
 import sbtbuildinfo.*

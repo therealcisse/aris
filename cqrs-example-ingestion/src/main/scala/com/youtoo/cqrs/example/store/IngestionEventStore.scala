@@ -1,6 +1,6 @@
 package com.youtoo.cqrs
 package example
-package service
+package store
 
 import com.youtoo.cqrs.example.model.*
 

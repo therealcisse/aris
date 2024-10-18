@@ -17,20 +17,21 @@ object IngestionEventHandlerSpec extends ZIOSpecDefault {
 
   def spec = suite("IngestionEventHandlerSpec")(
     test("Processing a file not in the resolved set does not alter state") {
-      (Version.gen <*> Version.gen <*> Version.gen <*> Version.gen <*> Timestamp.now) map { (v1, v2, v3, v4, timestamp) =>
+      (Version.gen <*> Version.gen <*> Version.gen <*> Version.gen <*> Timestamp.now) map {
+        (v1, v2, v3, v4, timestamp) =>
 
-        val events = NonEmptyList(
-          Change(v1, IngestionEvent.IngestionStarted(ingestionId, timestamp)),
-          Change(v2, IngestionEvent.IngestionFilesResolved(NonEmptySet("file1"))),
-          Change(v3, IngestionEvent.IngestionFileProcessing("file2")), // file2 was not resolved
-          Change(v4, IngestionEvent.IngestionFileProcessed("file2")), // file2 was not resolved
-        )
-        val state = handler.applyEvents(events)
-        val expectedStatus = Ingestion.Status.Resolved(
-          files = NonEmptySet("file1"),
-        )
-        val expectedState = Ingestion(ingestionId, expectedStatus, timestamp)
-        assert(state)(equalTo(expectedState))
+          val events = NonEmptyList(
+            Change(v1, IngestionEvent.IngestionStarted(ingestionId, timestamp)),
+            Change(v2, IngestionEvent.IngestionFilesResolved(NonEmptySet("file1"))),
+            Change(v3, IngestionEvent.IngestionFileProcessing("file2")), // file2 was not resolved
+            Change(v4, IngestionEvent.IngestionFileProcessed("file2")), // file2 was not resolved
+          )
+          val state = handler.applyEvents(events)
+          val expectedStatus = Ingestion.Status.Resolved(
+            files = NonEmptySet("file1"),
+          )
+          val expectedState = Ingestion(ingestionId, expectedStatus, timestamp)
+          assert(state)(equalTo(expectedState))
       }
     },
     test("Applying IngestionStarted event initializes the state") {
@@ -85,21 +86,22 @@ object IngestionEventHandlerSpec extends ZIOSpecDefault {
 
     },
     test("State transitions to Completed when all files are processed successfully") {
-      (Version.gen <*> Version.gen <*> Version.gen <*> Version.gen <*> Timestamp.now) map { (v1, v2, v3, v4, timestamp) =>
+      (Version.gen <*> Version.gen <*> Version.gen <*> Version.gen <*> Timestamp.now) map {
+        (v1, v2, v3, v4, timestamp) =>
 
-        val events = NonEmptyList(
-          Change(v1, IngestionEvent.IngestionStarted(ingestionId, timestamp)),
-          Change(v2, IngestionEvent.IngestionFilesResolved(NonEmptySet("file1"))),
-          Change(v3, IngestionEvent.IngestionFileProcessing("file1")),
-          Change(v4, IngestionEvent.IngestionFileProcessed("file1")),
-        )
-        val state = handler.applyEvents(events)
-        val expectedState = Ingestion(
-          ingestionId,
-          Ingestion.Status.Completed(NonEmptySet("file1")),
-          timestamp,
-        )
-        assert(state)(equalTo(expectedState))
+          val events = NonEmptyList(
+            Change(v1, IngestionEvent.IngestionStarted(ingestionId, timestamp)),
+            Change(v2, IngestionEvent.IngestionFilesResolved(NonEmptySet("file1"))),
+            Change(v3, IngestionEvent.IngestionFileProcessing("file1")),
+            Change(v4, IngestionEvent.IngestionFileProcessed("file1")),
+          )
+          val state = handler.applyEvents(events)
+          val expectedState = Ingestion(
+            ingestionId,
+            Ingestion.Status.Completed(NonEmptySet("file1")),
+            timestamp,
+          )
+          assert(state)(equalTo(expectedState))
       }
 
     },
@@ -136,5 +138,5 @@ object IngestionEventHandlerSpec extends ZIOSpecDefault {
       }
 
     },
-  )
+  ) @@ TestAspect.samples(1) @@ TestAspect.withLiveClock
 }

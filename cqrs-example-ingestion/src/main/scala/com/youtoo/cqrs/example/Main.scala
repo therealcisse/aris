@@ -42,7 +42,7 @@ object Main extends ZIOApp {
       //
       service <- ZIO.service[CQRSPersistence]
       //
-      // _ <- CQRSPersistence.atomically {
+      // _ <- atomically {
       //   for {
       //     _ <- service.saveAggregate(agg)
       //
@@ -59,14 +59,14 @@ object Main extends ZIOApp {
       version1 <- Version.gen
       e1 = IngestionEvent.IngestionFilesResolved(files = NonEmptySet("1", (2 to 100).map(_.toString)*))
 
-      _ <- service.atomically(
+      _ <- atomically(
         service.saveEvent(id.asKey, IngestionEvent.discriminator, Change(version = version0, payload = e0)),
       )
-      _ <- service.atomically(
+      _ <- atomically(
         service.saveEvent(id.asKey, IngestionEvent.discriminator, Change(version = version1, payload = e1)),
       )
 
-      events <- service.atomically(service.readEvents[IngestionEvent](id.asKey, IngestionEvent.discriminator))
+      events <- atomically(service.readEvents[IngestionEvent](id.asKey, IngestionEvent.discriminator))
 
       _ = println(events.mkString("[\n", ",\n ", "\n]"))
 
@@ -81,13 +81,13 @@ object Main extends ZIOApp {
 
       }
 
-      _ <- service.atomically {
+      _ <- atomically {
         ZIO.foreachDiscard(events) { e =>
           service.saveEvent(id.asKey, IngestionEvent.discriminator, e)
         }
       }
 
-      es1 <- service.atomically(
+      es1 <- atomically(
         service.readEvents[IngestionEvent](id.asKey, IngestionEvent.discriminator),
       )
 

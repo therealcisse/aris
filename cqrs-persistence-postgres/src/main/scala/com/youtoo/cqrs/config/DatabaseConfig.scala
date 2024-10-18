@@ -19,10 +19,10 @@ object DatabaseConfig {
   import scala.util.matching.Regex
 
   object JDBCUrlExtractor {
-    val pattern: Regex = "jdbc:\\w+://([\\w.-]+):(\\d+)/\\w+".r
+    val pattern: Regex = "jdbc:\\w+://([\\w.-]+):(\\d+)/(\\w+)".r
 
-    inline def unapply(string: String): Option[(String, Int)] = string match {
-      case pattern(host, port) => Some((host, port.toInt))
+    inline def unapply(string: String): Option[(String, Int, String)] = string match {
+      case pattern(host, port, name) => Some((host, port.toInt, name))
       case _ => None
     }
   }
@@ -38,7 +38,7 @@ object DatabaseConfig {
         )
 
         pool = config.jdbcUrl match {
-          case JDBCUrlExtractor(host, port) => ZConnectionPool.postgres(host, port, "cqrs", props)
+          case JDBCUrlExtractor(host, port, name) => ZConnectionPool.postgres(host, port, name, props)
           case _ => ZConnectionPool.postgres("localhost", 5432, "cqrs", props)
         }
 

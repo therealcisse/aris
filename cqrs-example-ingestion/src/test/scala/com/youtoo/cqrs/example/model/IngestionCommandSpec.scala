@@ -67,5 +67,5 @@ object IngestionCommandHandlerSpec extends ZIOSpecDefault {
       }
 
     },
-  )
+  ) @@ TestAspect.withLiveClock
 }

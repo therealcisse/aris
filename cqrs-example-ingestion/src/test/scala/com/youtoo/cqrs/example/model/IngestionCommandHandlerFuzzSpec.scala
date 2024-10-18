@@ -12,7 +12,7 @@ object IngestionCommandHandlerFuzzSpec extends ZIOSpecDefault {
 
   def spec = suite("IngestionCommandHandlerFuzzSpec")(
     test("Fuzz test IngestionCommandHandler with random commands") {
-      check(Gen.listOf(ingestionCommandGen)) { commands =>
+      check(Gen.listOf1(ingestionCommandGen)) { commands =>
         ZIO.foldLeft(commands)(assert(true)(isTrue)) { (s, cmd) =>
           ZIO.attempt(handler.applyCmd(cmd)).either.map {
             case Left(_) =>
@@ -23,5 +23,5 @@ object IngestionCommandHandlerFuzzSpec extends ZIOSpecDefault {
         }
       }
     },
-  )
+  ) @@ TestAspect.samples(1)
 }

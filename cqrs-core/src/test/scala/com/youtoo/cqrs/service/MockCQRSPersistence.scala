@@ -10,8 +10,13 @@ import zio.jdbc.*
 import zio.schema.codec.*
 
 object MockCQRSPersistence extends Mock[CQRSPersistence] {
-  case class ReadEvents[T: izumi.reflect.Tag]() extends Effect[(Key, Discriminator), Throwable, Chunk[Change[T]]]
-  case class SaveEvent[T: izumi.reflect.Tag]() extends Effect[(Key, Discriminator, Change[T]), Throwable, Long]
+  object ReadEvents {
+    object Full extends Poly.Effect.Output[(Key, Discriminator), Throwable]
+    object Snapshot extends Poly.Effect.Output[(Key, Discriminator, Version), Throwable]
+  }
+
+  object SaveEvent extends Poly.Effect.InputOutput[Throwable]
+
   object ReadSnapshot extends Effect[Key, Throwable, Option[Version]]
   object SaveSnapshot extends Effect[(Key, Version), Throwable, Long]
 
@@ -20,30 +25,25 @@ object MockCQRSPersistence extends Mock[CQRSPersistence] {
       for {
         proxy <- ZIO.service[Proxy]
       } yield new CQRSPersistence {
-        def atomically[T](fa: ZIO[ZConnection, Throwable, T]): ZIO[ZConnectionPool, Throwable, T] =
-          ???
-
-        def readEvents[Event: BinaryCodec](
+        def readEvents[Event: BinaryCodec: Tag](
           id: Key,
           discriminator: Discriminator,
           snapshotVersion: Version,
         ): ZIO[ZConnection, Throwable, Chunk[Change[Event]]] =
-          ???
+          proxy(ReadEvents.Snapshot.of[Chunk[Change[Event]]], id, discriminator, snapshotVersion)
 
-        def readEvents[Event: BinaryCodec](
+        def readEvents[Event: BinaryCodec: Tag](
           id: Key,
           discriminator: Discriminator,
         ): ZIO[ZConnection, Throwable, Chunk[Change[Event]]] =
-          ???
-          // proxy(ReadEvents[Event](), id, discriminator)
+          proxy(ReadEvents.Full.of[Chunk[Change[Event]]], id, discriminator)
 
-        def saveEvent[Event: BinaryCodec](
+        def saveEvent[Event: BinaryCodec: Tag](
           id: Key,
           discriminator: Discriminator,
           event: Change[Event],
         ): ZIO[ZConnection, Throwable, Long] =
-          ???
-          // proxy(SaveEvent[Event](), id, discriminator, event)
+          proxy(SaveEvent.of[(Key, Discriminator, Change[Event]), Long], id, discriminator, event)
 
         def readSnapshot(id: Key): ZIO[ZConnection, Throwable, Option[Version]] =
           proxy(ReadSnapshot, id)

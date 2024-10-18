@@ -11,16 +11,18 @@ import com.youtoo.cqrs.example.model.*
 import java.nio.charset.StandardCharsets
 import com.youtoo.cqrs.example.BenchmarkServer
 
+import zio.prelude.*
+
 class IngestionLoadTest extends Simulation {
   val port: Int = Integer.getInteger("port", 8181)
 
   val baseUrl = s"http://localhost:$port"
 
   val numIngestions: Int = Integer.getInteger("numIngestions", 100)
-  val minNumCommandsPerIngestion: Int = Integer.getInteger("minNumCommandsPerIngestion", 5)
-  val maxNumCommandsPerIngestion: Int = Integer.getInteger("maxNumCommandsPerIngestion", 15)
-  val concurrentUsers: Int = Integer.getInteger("concurrentUsers", 10)
-  val testDuration: Int = Integer.getInteger("testDuration", 10)
+  val minNumCommandsPerIngestion: Int = Integer.getInteger("minNumCommandsPerIngestion", 10)
+  val maxNumCommandsPerIngestion: Int = Integer.getInteger("maxNumCommandsPerIngestion", 100)
+  val concurrentUsers: Int = Integer.getInteger("concurrentUsers", 4)
+  val testDuration: Int = Integer.getInteger("testDuration", 5)
 
   val httpProtocol = http
     .baseUrl(baseUrl)
@@ -50,7 +52,7 @@ class IngestionLoadTest extends Simulation {
       exec { session =>
         val numCommands = Random.between(minNumCommandsPerIngestion, maxNumCommandsPerIngestion)
         val data = summon[BinaryCodec[IngestionCommand]].encode(
-          IngestionCommand.SetFiles(Set((1 to numCommands).map(_.toString).toSeq*)),
+          IngestionCommand.SetFiles(NonEmptySet("1", (2 to numCommands).map(_.toString).toSeq*)),
         )
         session.setAll(
           "data" -> String(data.toArray, StandardCharsets.UTF_8.name),
@@ -79,6 +81,12 @@ class IngestionLoadTest extends Simulation {
               .check(status.is(200)),
           )
         }
+        .exec(
+          http("GET /ingestion/{id}/validate - Verify state")
+            .get("/ingestion/#{ingestionId}/validate")
+            .queryParam("numFiles", session => session("numCommandsPerIngestion").as[Int])
+            .check(status.is(200)),
+        )
     }
     .exec { session =>
       session.set("offset", "")

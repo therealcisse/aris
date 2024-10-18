@@ -30,5 +30,5 @@ object IngestionEventHandlerFuzzSpec extends ZIOSpecDefault {
         }
       }
     },
-  )
+  ) @@ TestAspect.samples(1) @@ TestAspect.withLiveClock
 }

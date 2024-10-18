@@ -21,6 +21,8 @@ object Ingestion {
 
     def gen: Task[Id] = Key.gen.map(wrap)
 
+    def apply(value: String): Id = Id(Key(value))
+
     extension (a: Id) inline def asKey: Key = Id.unwrap(a)
 
     given Schema[Id] = Schema
@@ -66,6 +68,19 @@ object Ingestion {
     }
 
   }
+
+  extension (status: Status)
+    def totalFiles: Option[NonEmptySet[String]] =
+      status match {
+        case Status.Initial() => None
+        case Status.Completed(files) => files.some
+        case Status.Failed(done, failed) => NonEmptySet.fromIterableOption(done ++ failed)
+        case Status.Processing(remaining, processing, processed, failed) =>
+          NonEmptySet.fromIterableOption(remaining ++ processing ++ processed ++ failed)
+        case Status.Resolved(files) => files.some
+        case Status.Stopped(processing: Ingestion.Status, _) => processing.totalFiles
+
+      }
 
   object Status {
     inline def empty: Status = Status.Initial()
