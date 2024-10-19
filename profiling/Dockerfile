@@ -13,7 +13,7 @@ ENV DATABASE_USERNAME=${DATABASE_USERNAME}
 ENV DATABASE_PASSWORD=${DATABASE_PASSWORD}
 
 ARG ARCH
-ENV RUN_SERVER="java -agentpath:/usr/local/YourKit-JavaProfiler-2024.9/bin/${ARCH}/libyjpagent.so=port=10001,listen=all -Xms2G -Xmx2G -server -jar /cqrs-example-ingestion/target/scala-3.5.1/cqrs-example-ingestion-assembly-1.0.0.jar"
+ENV RUN_SERVER="java -agentpath:/usr/local/YourKit-JavaProfiler-2024.9/bin/${ARCH}/libyjpagent.so=port=10001,listen=all -Xms2G -Xmx4G -server -jar /cqrs-example-ingestion/target/scala-3.5.1/cqrs-example-ingestion-assembly-1.0.0.jar"
 
 ENV JAVA_OPTS="-agentpath:/usr/local/YourKit-JavaProfiler-2024.9/bin/${ARCH}/libyjpagent.so=port=10001,listen=all"
 

@@ -21,7 +21,7 @@ trait JdbcCodecs {
     JdbcDecoder[Array[Byte]].map(array =>
       summon[BinaryCodec[T]]
         .decode(Chunk(array*))
-        .getOrElse(throw IllegalArgumentException(s"""Can't decode array: ${new String(array)}""")),
+        .getOrElse(throw IllegalArgumentException("""Can't decode array""")),
     )
 
   given [T: BinaryCodec]: JdbcEncoder[T] =

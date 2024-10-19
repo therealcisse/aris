@@ -44,7 +44,7 @@ extension (sql: SqlFragment)
               case param: SqlFragment.Segment.Param =>
                 param.setter.setValue(statement, paramIndex, param.value)
                 paramIndex += (param.value match {
-                  case iterable: Iterable[_] => iterable.size
+                  case iterable: Iterable[?] => iterable.size
                   case _ => 1
                 })
 
