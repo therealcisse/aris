@@ -4,7 +4,6 @@ import io.gatling.core.Predef.*
 import io.gatling.http.Predef.*
 import scala.concurrent.duration.*
 import io.gatling.core.structure.ScenarioBuilder
-import scala.util.Random
 import zio.schema.codec.*
 import com.youtoo.cqrs.Codecs.json.given
 import com.youtoo.cqrs.example.model.*
@@ -18,8 +17,7 @@ class IngestionLoadTest extends Simulation {
 
   val baseUrl = s"http://localhost:$port"
 
-  val minNumCommandsPerIngestion: Int = Integer.getInteger("minNumCommandsPerIngestion", 10)
-  val maxNumCommandsPerIngestion: Int = Integer.getInteger("maxNumCommandsPerIngestion", 100)
+  val numCommandsPerIngestion: Int = Integer.getInteger("numCommandsPerIngestion", 10)
   val concurrentUsers: Int = Integer.getInteger("concurrentUsers", 10)
   val testDuration: Int = Integer.getInteger("testDuration", 5)
 
@@ -39,7 +37,7 @@ class IngestionLoadTest extends Simulation {
     )
     .exec { session =>
       val numCommands =
-        minNumCommandsPerIngestion // Random.between(minNumCommandsPerIngestion, maxNumCommandsPerIngestion)
+        numCommandsPerIngestion
       val data = summon[BinaryCodec[IngestionCommand]].encode(
         IngestionCommand.SetFiles(NonEmptySet("1", (2 to numCommands).map(_.toString).toSeq*)),
       )
@@ -156,8 +154,8 @@ class IngestionLoadTest extends Simulation {
     }
 
   setUp(
-    process.inject(constantConcurrentUsers(concurrentUsers) during (testDuration.minutes)),
-    fetch.inject(constantConcurrentUsers(concurrentUsers) during (testDuration.minutes)),
+    process.inject(constantUsersPerSec(concurrentUsers) during (testDuration.minutes)),
+    fetch.inject(constantUsersPerSec(concurrentUsers) during (testDuration.minutes)),
   ).protocols(httpProtocol)
 
 }
