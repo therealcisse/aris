@@ -54,6 +54,9 @@ trait ScalaSettings {
     "-Wunused:imports",
     "-Wunused:all",
     "-Wunused:unsafe-warn-patvars",
+    "-Yexplicit-nulls",
+    "-Wsafe-init",
+    "-language:experimental.modularity",
   )
 
 }

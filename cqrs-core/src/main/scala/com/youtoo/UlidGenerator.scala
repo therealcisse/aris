@@ -7,4 +7,7 @@ object UlidGenerator {
 
   export ulidGenerator.next as monotonic
 
+  export Ulid.isValid
+  export Ulid.unixTime
+
 }

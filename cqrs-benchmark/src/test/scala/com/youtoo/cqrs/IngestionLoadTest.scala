@@ -18,10 +18,9 @@ class IngestionLoadTest extends Simulation {
 
   val baseUrl = s"http://localhost:$port"
 
-  val numIngestions: Int = Integer.getInteger("numIngestions", 100)
   val minNumCommandsPerIngestion: Int = Integer.getInteger("minNumCommandsPerIngestion", 10)
   val maxNumCommandsPerIngestion: Int = Integer.getInteger("maxNumCommandsPerIngestion", 100)
-  val concurrentUsers: Int = Integer.getInteger("concurrentUsers", 4)
+  val concurrentUsers: Int = Integer.getInteger("concurrentUsers", 10)
   val testDuration: Int = Integer.getInteger("testDuration", 5)
 
   val httpProtocol = http
@@ -29,68 +28,91 @@ class IngestionLoadTest extends Simulation {
     .acceptHeader("application/json")
     .contentTypeHeader("application/json")
 
-  var ingestionIds = List[String]()
-  var allIds = Vector[String]()
+  var allIds = Set[String]()
 
-  val scn: ScenarioBuilder = scenario("Process Ingestion")
-    .repeat(numIngestions) {
-      exec(
-        http("POST /ingestion")
-          .post("/ingestion")
-          .check(status.is(200))
-          .check(jsonPath("$.id").saveAs("ingestionId")),
-      ).exec { session =>
-        val ingestionId = session("ingestionId").as[String]
-        ingestionIds = ingestionId :: ingestionIds
-        session
-      }
-    }
+  val process: ScenarioBuilder = scenario("Process Ingestion")
+    .exec(
+      http("POST /ingestion")
+        .post("/ingestion")
+        .check(status.is(200))
+        .check(jsonPath("$.id").saveAs("ingestionId")),
+    )
     .exec { session =>
-      session.set("ingestionIds", ingestionIds)
+      val numCommands =
+        minNumCommandsPerIngestion // Random.between(minNumCommandsPerIngestion, maxNumCommandsPerIngestion)
+      val data = summon[BinaryCodec[IngestionCommand]].encode(
+        IngestionCommand.SetFiles(NonEmptySet("1", (2 to numCommands).map(_.toString).toSeq*)),
+      )
+      session.setAll(
+        "data" -> String(data.toArray, StandardCharsets.UTF_8.name),
+        "numCommandsPerIngestion" -> numCommands,
+      )
     }
-    .foreach("#{ingestionIds}", "ingestionId") {
+    .exec(
+      http("PUT /ingestion/{id} - Setup")
+        .put("/ingestion/#{ingestionId}")
+        .body(StringBody("""#{data}"""))
+        .check(status.is(200)),
+    )
+    .exec(
+      http("GET /ingestion/{id}/validate - Verify state resolved")
+        .get("/ingestion/#{ingestionId}/validate")
+        .queryParam("numFiles", session => session("numCommandsPerIngestion").as[Int])
+        .queryParam("status", _ => "resolved")
+        .check(status.is(200)),
+    )
+    .repeat(session => session("numCommandsPerIngestion").as[Int], "index") {
       exec { session =>
-        val numCommands = Random.between(minNumCommandsPerIngestion, maxNumCommandsPerIngestion)
-        val data = summon[BinaryCodec[IngestionCommand]].encode(
-          IngestionCommand.SetFiles(NonEmptySet("1", (2 to numCommands).map(_.toString).toSeq*)),
-        )
-        session.setAll(
-          "data" -> String(data.toArray, StandardCharsets.UTF_8.name),
-          "numCommandsPerIngestion" -> numCommands,
-        )
-      }
-        .exec(
-          http("PUT /ingestion/{id} - Setup")
-            .put("/ingestion/#{ingestionId}")
-            .body(StringBody("""#{data}"""))
-            .check(status.is(200)),
-        )
-        .repeat(session => session("numCommandsPerIngestion").as[Int], "index") {
-          exec { session =>
-            val index = session("index").as[Int]
-            val data = summon[BinaryCodec[IngestionCommand]].encode(IngestionCommand.FileProcessed(s"${index + 1}"))
-            session.set("command", String(data.toArray, StandardCharsets.UTF_8.name))
-          }.exec(
-            http("PUT /ingestion/{id} - Process")
-              .put("/ingestion/#{ingestionId}")
-              .body(StringBody("""#{command}"""))
-              .check(status.is(200)),
-          ).exec(
-            http("GET /ingestion/{id}")
-              .get("/ingestion/#{ingestionId}")
-              .check(status.is(200)),
-          )
-        }
-        .exec(
-          http("GET /ingestion/{id}/validate - Verify state")
-            .get("/ingestion/#{ingestionId}/validate")
-            .queryParam("numFiles", session => session("numCommandsPerIngestion").as[Int])
-            .check(status.is(200)),
-        )
+        val index = session("index").as[Int]
+        val data = summon[BinaryCodec[IngestionCommand]].encode(IngestionCommand.FileProcessing(s"${index + 1}"))
+        session.set("command", String(data.toArray, StandardCharsets.UTF_8.name))
+      }.exec(
+        http("PUT /ingestion/{id} - Processing")
+          .put("/ingestion/#{ingestionId}")
+          .body(StringBody("""#{command}"""))
+          .check(status.is(200)),
+      ).exec(
+        http("GET /ingestion/{id}")
+          .get("/ingestion/#{ingestionId}")
+          .check(jsonPath("$.id").saveAs("ingestionId"))
+          .check(status.is(200)),
+      )
     }
-    .exec { session =>
-      session.set("offset", "")
+    .exec(
+      http("GET /ingestion/{id}/validate - Verify state processing")
+        .get("/ingestion/#{ingestionId}/validate")
+        .queryParam("numFiles", session => session("numCommandsPerIngestion").as[Int])
+        .queryParam("status", _ => "processing")
+        .check(status.is(200)),
+    )
+    .repeat(session => session("numCommandsPerIngestion").as[Int], "index") {
+      exec { session =>
+        val index = session("index").as[Int]
+        val data = summon[BinaryCodec[IngestionCommand]].encode(IngestionCommand.FileProcessed(s"${index + 1}"))
+        session.set("command", String(data.toArray, StandardCharsets.UTF_8.name))
+      }.exec(
+        http("PUT /ingestion/{id} - Processed")
+          .put("/ingestion/#{ingestionId}")
+          .body(StringBody("""#{command}"""))
+          .check(status.is(200)),
+      ).exec(
+        http("GET /ingestion/{id}")
+          .get("/ingestion/#{ingestionId}")
+          .check(jsonPath("$.id").saveAs("ingestionId"))
+          .check(status.is(200)),
+      )
     }
+    .exec(
+      http("GET /ingestion/{id}/validate - Verify state processed")
+        .get("/ingestion/#{ingestionId}/validate")
+        .queryParam("numFiles", session => session("numCommandsPerIngestion").as[Int])
+        .queryParam("status", _ => "completed")
+        .check(status.is(200)),
+    )
+
+  val fetch: ScenarioBuilder = scenario("Load Ingestions").exec { session =>
+    session.set("offset", "")
+  }
     .asLongAs(session => session("offset").as[String] != "end") {
       exec(
         http("GET /ingestion (fetch ids)")
@@ -120,10 +142,10 @@ class IngestionLoadTest extends Simulation {
     }
     .foreach("#{allIds}", "ids") {
       exec { session =>
-        val data = session("ids").as[Vector[String]]
+        val data = session("ids").as[Set[String]]
         session.set(
           "data",
-          String(summon[BinaryCodec[Vector[String]]].encode(data).toArray, StandardCharsets.UTF_8.name),
+          String(summon[BinaryCodec[Set[String]]].encode(data).toArray, StandardCharsets.UTF_8.name),
         )
       }.exec(
         http("POST /dataload/ingestion (fetch objects)")
@@ -134,7 +156,8 @@ class IngestionLoadTest extends Simulation {
     }
 
   setUp(
-    scn.inject(rampUsers(concurrentUsers) during testDuration.minutes),
+    process.inject(constantConcurrentUsers(concurrentUsers) during (testDuration.minutes)),
+    fetch.inject(constantConcurrentUsers(concurrentUsers) during (testDuration.minutes)),
   ).protocols(httpProtocol)
 
 }

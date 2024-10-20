@@ -38,7 +38,7 @@ object BenchmarkServer extends ZIOApp {
   val jvmMetricsLayer = zio.metrics.jvm.DefaultJvmMetrics.live
 
   type Environment =
-    Migration & ZConnectionPool & CQRSPersistence & SnapshotStore & IngestionEventStore & IngestionCQRS & IngestionProvider & IngestionCheckpointer & Server & Server.Config & NettyConfig & IngestionService & IngestionRepository & PrometheusPublisher & MetricsConfig
+    Migration & ZConnectionPool & CQRSPersistence & SnapshotStore & IngestionEventStore & IngestionCQRS & IngestionProvider & IngestionCheckpointer & Server & Server.Config & NettyConfig & IngestionService & IngestionRepository & PrometheusPublisher & MetricsConfig & SnapshotStrategy.Factory
 
   given environmentTag: EnvironmentTag[Environment] = EnvironmentTag[Environment]
 
@@ -71,40 +71,35 @@ object BenchmarkServer extends ZIOApp {
           prometheus.publisherLayer,
           prometheus.prometheusLayer,
           ZLayer.succeed(MetricsConfig(interval = Duration(5L, TimeUnit.SECONDS))),
+          SnapshotStrategy.live(),
         )
         .orDie ++ Runtime.setConfigProvider(ConfigProvider.envProvider)
 
   val routes: Routes[Environment, Response] = Routes(
     Method.GET / "metrics" -> handler(ZIO.serviceWithZIO[PrometheusPublisher](_.get.map(Response.text))),
     Method.POST / "dataload" / "ingestion" -> handler { (req: Request) =>
-      for {
-        body <- req.body.asChunk
+      req.body.fromBody[List[Key]] foldZIO (
+        failure = _ => ZIO.succeed(Response.notFound),
+        success = ids =>
+          for {
+            ingestions <- ZIO.foreachPar(ids) { key =>
+              IngestionCQRS.load(key)
+            }
 
-        resp <- summon[BinaryCodec[List[Key]]].decode(body) match {
-          case Left(_) => ZIO.succeed(Response.status(Status.NotFound))
-          case Right(ids) =>
-            for {
-              ingestions <- ZIO.foreachPar(ids) { key =>
-                IngestionCQRS.load(key)
-              }
+            ins = ingestions.mapFilter(identity)
 
-              ins = ingestions.mapFilter(identity)
+            bytes = ins
+              .map(in => String(summon[BinaryCodec[Ingestion]].encode(in).toArray, StandardCharsets.UTF_8.name))
+              .mkString("[", ",", "]")
 
-              bytes = ins
-                .map(in => String(summon[BinaryCodec[Ingestion]].encode(in).toArray, StandardCharsets.UTF_8.name))
-                .mkString("[", ",", "]")
+            resp = Response(
+              Status.Ok,
+              Headers(Header.ContentType(MediaType.application.json).untyped),
+              Body.fromCharSequence(s"""{"ingestions":$bytes}"""),
+            )
 
-              resp = Response(
-                Status.Ok,
-                Headers(Header.ContentType(MediaType.application.json).untyped),
-                Body.fromCharSequence(s"""{"ingestions":$bytes}"""),
-              )
-
-            } yield resp
-
-        }
-
-      } yield resp
+          } yield resp,
+      )
 
     },
     Method.GET / "ingestion" -> handler { (req: Request) =>
@@ -143,27 +138,22 @@ object BenchmarkServer extends ZIOApp {
             Body.fromChunk(bytes),
           )
 
-        case None => Response.status(Status.NotFound)
+        case None => Response.notFound
       }
 
     },
     Method.PUT / "ingestion" / string("id") -> handler { (id: String, req: Request) =>
       val key = Key.wrap(id)
 
-      for {
-        body <- req.body.asChunk
-
-        resp <- summon[BinaryCodec[IngestionCommand]].decode(body) match {
-          case Left(_) => ZIO.succeed(Response.status(Status.NotFound))
-          case Right(cmd) => IngestionCQRS.add(key, cmd) `as` Response.ok
-
-        }
-
-      } yield resp
+      req.body.fromBody[IngestionCommand] foldZIO (
+        failure = _ => ZIO.succeed(Response.notFound),
+        success = cmd => IngestionCQRS.add(key, cmd) `as` Response.ok
+      )
 
     },
     Method.GET / "ingestion" / string("id") / "validate" -> handler { (id: String, req: Request) =>
       val numFiles = req.queryParamTo[Long]("numFiles")
+      val status = req.queryParamToOrElse[String]("status", "initial")
 
       numFiles match {
         case Left(_) => ZIO.succeed(Response.notFound)
@@ -171,7 +161,8 @@ object BenchmarkServer extends ZIOApp {
           IngestionCQRS.load(id = Key.wrap(id)) map {
             case None => Response.notFound
             case Some(ingestion) =>
-              if ingestion.status.totalFiles.fold(false)(_.size == n) then Response.ok else Response.notFound
+              if ingestion.status.totalFiles.fold(false)(_.size == n) && (ingestion.status is status) then Response.ok
+              else Response.notFound
           }
 
       }

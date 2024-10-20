@@ -31,7 +31,7 @@ object PostgresCQRSPersistence {
         ): RIO[ZConnection, Chunk[Change[Event]]] =
           Queries.READ_EVENTS(id, discriminator, snapshotVersion).selectAll
 
-        def saveEvent[Event: BinaryCodec: Tag](
+        def saveEvent[Event: BinaryCodec: MetaInfo: Tag](
           id: Key,
           discriminator: Discriminator,
           event: Change[Event],
@@ -74,7 +74,7 @@ object PostgresCQRSPersistence {
       ORDER BY version ASC
       """.query[(Version, Event)].map(Change.apply)
 
-    def SAVE_EVENT[Event: BinaryCodec](
+    def SAVE_EVENT[Event: BinaryCodec: MetaInfo](
       id: Key,
       discriminator: Discriminator,
       event: Change[Event],
@@ -82,11 +82,12 @@ object PostgresCQRSPersistence {
       val payload = java.util.Base64.getEncoder.encodeToString(summon[BinaryCodec[Event]].encode(event.payload).toArray)
 
       sql"""
-      INSERT INTO events (version, aggregate_id, discriminator, payload)
+      INSERT INTO events (version, aggregate_id, discriminator, namespace, payload)
       VALUES (
         ${event.version},
         ${id},
         ${discriminator},
+        ${event.payload.namespace},
         decode(${payload}, 'base64')
       )
       """

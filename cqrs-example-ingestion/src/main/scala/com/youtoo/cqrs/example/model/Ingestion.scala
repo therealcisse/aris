@@ -82,6 +82,19 @@ object Ingestion {
 
       }
 
+  extension (status: Status)
+    infix def is(s: String): Boolean =
+      status match {
+        case Status.Initial() => s == "initial"
+        case Status.Completed(_) => s == "completed"
+        case Status.Failed(_, _) => s == "failed"
+        case Status.Processing(_, _, _, _) =>
+          s == "processing"
+        case Status.Resolved(_) => s == "resolved"
+        case Status.Stopped(_, _) => s == "processing"
+
+      }
+
   object Status {
     inline def empty: Status = Status.Initial()
 

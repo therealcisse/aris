@@ -25,6 +25,19 @@ object IngestionEvent {
 
   given Schema[IngestionEvent] = DeriveSchema.gen
 
+  given MetaInfo[IngestionEvent] with {
+    extension (self: IngestionEvent)
+      def namespace: Namespace = self match {
+        case IngestionEvent.IngestionStarted(_, _) => Namespace(0)
+        case IngestionEvent.IngestionFilesResolved(_) => Namespace(1)
+        case IngestionEvent.IngestionFileProcessing(_) => Namespace(2)
+        case IngestionEvent.IngestionFileProcessed(_) => Namespace(3)
+        case IngestionEvent.IngestionFileFailed(_) => Namespace(4)
+        case IngestionEvent.IngestionCompleted(_) => Namespace(5)
+
+      }
+  }
+
   given IngestionEventHandler with {
 
     def applyEvents(events: NonEmptyList[Change[IngestionEvent]]): Ingestion =

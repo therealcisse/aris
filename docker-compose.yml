@@ -41,7 +41,7 @@ services:
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
     ports:
-      - "9091:9090" # Prometheus server port (mapped to 9091 to avoid conflict)
+      - "9191:9090" # Prometheus server port (mapped to 9091 to avoid conflict)
     networks:
       - app-network
 

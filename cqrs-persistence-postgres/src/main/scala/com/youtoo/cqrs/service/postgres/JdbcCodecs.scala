@@ -16,6 +16,7 @@ trait JdbcCodecs {
   given SqlFragment.Setter[Version] = SqlFragment.Setter[String].contramap(_.value)
   given SqlFragment.Setter[Timestamp] = SqlFragment.Setter[Long].contramap(_.value)
   given SqlFragment.Setter[Discriminator] = SqlFragment.Setter[String].contramap(_.value)
+  given SqlFragment.Setter[Namespace] = SqlFragment.Setter[Int].contramap(_.value)
 
   inline def byteArrayDecoder[T: BinaryCodec]: JdbcDecoder[T] =
     JdbcDecoder[Array[Byte]].map(array =>

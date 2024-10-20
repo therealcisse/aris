@@ -13,6 +13,8 @@ object Version extends Newtype[String] {
   def gen: Task[Version] = ZIO.attempt(Version(UlidGenerator.monotonic()))
 
   extension (a: Version) inline def value: String = Version.unwrap(a)
+  extension (a: Version) inline def timestamp: Timestamp = Timestamp(UlidGenerator.unixTime(a.value))
+  extension (a: Version) inline def isValid: Boolean = UlidGenerator.isValid(a.value)
 
   given Schema[Version] = Schema
     .primitive[String]
