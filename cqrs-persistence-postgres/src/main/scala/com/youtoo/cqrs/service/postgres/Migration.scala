@@ -19,7 +19,9 @@ object Migration {
     ZLayer.succeed {
       new Migration {
         def run(config: DatabaseConfig): Task[Unit] =
-          runMigration(config)
+          runMigration(config).tapErrorCause { e =>
+            ZIO.logErrorCause("Migration failed", e)
+          }
 
       }
     }

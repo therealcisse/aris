@@ -1,6 +1,8 @@
 package com.youtoo.cqrs
 package example
 
+import scala.language.future
+
 import zio.*
 import zio.jdbc.*
 import zio.logging.*

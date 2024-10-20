@@ -15,13 +15,11 @@ fi
 
 mkdir -p src/main/scala
 
-rm -f ./src/main/scala/com/youtoo/cqrs/example/Main.scala 2>/dev/null
-rm -f ./src/main/resources/migrations/V1__cqrs.sql 2>/dev/null
-rm -f ./src/main/resources/migrations/V2__ingestions.sql 2>/dev/null
+rm -f ./src/main/scala/com/youtoo/cqrs/example/Main.scala
+
+mkdir -p ./src/main/scala/com/youtoo/cqrs/example/
 
 cp ../cqrs-example-ingestion/src/main/scala/com/youtoo/cqrs/example/BenchmarkServer.scala ./src/main/scala/com/youtoo/cqrs/example/Main.scala
-cp ../cqrs-persistence-postgres/src/main/resources/migrations/V1__cqrs.sql ./src/main/resources/migrations/V1__cqrs.sql
-cp ../cqrs-example-ingestion/src/main/resources/migrations/V2__ingestions.sql ./src/main/resources/migrations/V2__ingestions.sql
 
 cd "$(dirname "$0")/../"
 docker build -f ./profiling/Dockerfile --build-arg ARCH=$ARCH -t $TAG .

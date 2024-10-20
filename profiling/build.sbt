@@ -11,15 +11,8 @@ lazy val root = (project in file("."))
   .settings(
     name := "cqrs-profiling",
     fork := true,
-    testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
-    Compile / mainClass := Some("com.youtoo.cqrs.example.BenchmarkServer"),
   )
   .enablePlugins(JavaAppPackaging)
-  .aggregate(
-    core,
-    postgres,
-    exampleIngestion,
-  )
   .dependsOn(
     core,
     postgres,

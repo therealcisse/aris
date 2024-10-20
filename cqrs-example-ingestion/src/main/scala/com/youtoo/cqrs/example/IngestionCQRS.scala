@@ -16,26 +16,39 @@ import com.youtoo.cqrs.example.model.*
 import com.youtoo.cqrs.service.*
 import com.youtoo.cqrs.example.service.*
 import com.youtoo.cqrs.example.store.*
-import zio.metrics.Metric
+
+import zio.metrics.*
+
+import java.time.temporal.ChronoUnit
 
 trait IngestionCQRS extends CQRS[Ingestion, IngestionEvent, IngestionCommand] {}
 
 object IngestionCQRS {
 
   object metrics {
-    val adds = Metric.counter("Ingestion.additions").fromConst(1)
-    val loads = Metric.counter("Ingestion.loads").fromConst(1)
+    val addition = Metric.timer(
+      "Ingestion_addition_duration",
+      chronoUnit = ChronoUnit.MILLIS,
+      boundaries = Chunk.iterate(1.0, 10)(_ + 1.0),
+    )
+
+    val load = Metric.timer(
+      "Ingestion_load_duration",
+      chronoUnit = ChronoUnit.MILLIS,
+      boundaries = Chunk.iterate(1.0, 10)(_ + 1.0),
+
+    )
 
   }
 
   inline def add(id: Key, cmd: IngestionCommand)(using
     Cmd: IngestionCommandHandler,
-  ): RIO[IngestionCQRS, Unit] = ZIO.serviceWithZIO[IngestionCQRS](_.add(id, cmd)) @@ metrics.adds
+  ): RIO[IngestionCQRS, Unit] = ZIO.serviceWithZIO[IngestionCQRS](_.add(id, cmd)) @@ metrics.addition.trackDuration
 
   inline def load(id: Key)(using
     Evt: IngestionEventHandler,
   ): RIO[IngestionCQRS, Option[Ingestion]] =
-    ZIO.serviceWithZIO[IngestionCQRS](_.load(id)) @@ metrics.loads
+    ZIO.serviceWithZIO[IngestionCQRS](_.load(id)) @@ metrics.load.trackDuration
 
   def live(): ZLayer[
     ZConnectionPool & IngestionCheckpointer & IngestionProvider & IngestionEventStore & SnapshotStore &
