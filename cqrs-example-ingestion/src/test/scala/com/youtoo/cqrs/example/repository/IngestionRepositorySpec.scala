@@ -15,7 +15,7 @@ import zio.jdbc.*
 
 object IngestionRepositorySpec extends PgSpec {
 
-  def spec: Spec[ZConnectionPool & DatabaseConfig & Migration & TestEnvironment & Scope, Any] =
+  def spec: Spec[ZConnectionPool & DatabaseConfig & FlywayMigration & TestEnvironment & Scope, Any] =
     suite("IngestionRepositorySpec")(
       test("load ingestion is optimized") {
         check(ingestionIdGen) { case (id) =>
@@ -95,7 +95,7 @@ object IngestionRepositorySpec extends PgSpec {
     ) @@ TestAspect.sequential @@ TestAspect.withLiveClock @@ TestAspect.beforeAll {
       for {
         config <- ZIO.service[DatabaseConfig]
-        _ <- Migration.run(config)
+        _ <- FlywayFlywayMigration.run(config)
 
       } yield ()
 

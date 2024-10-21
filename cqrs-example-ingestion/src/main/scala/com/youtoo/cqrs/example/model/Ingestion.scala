@@ -34,15 +34,6 @@ object Ingestion {
 
   }
 
-  def empty(id: Ingestion.Id): Task[Ingestion] =
-    Timestamp.now map { timestamp =>
-      Ingestion(
-        id = id,
-        status = Ingestion.Status.Initial(),
-        timestamp = timestamp,
-      )
-    }
-
   enum Status {
     case Initial()
     case Resolved(files: NonEmptySet[String])

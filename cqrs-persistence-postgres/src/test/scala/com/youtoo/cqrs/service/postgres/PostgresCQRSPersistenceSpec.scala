@@ -25,7 +25,12 @@ object PostgresCQRSPersistenceSpec extends PgSpec {
     val discriminator = Discriminator("DummyEvent")
   }
 
-  def spec: Spec[ZConnectionPool & DatabaseConfig & Migration & TestEnvironment & Scope, Any] =
+  given MetaInfo[DummyEvent] with {
+    extension (self: DummyEvent) def namespace: Namespace = Namespace(0)
+
+  }
+
+  def spec: Spec[ZConnectionPool & DatabaseConfig & FlywayMigration & TestEnvironment & Scope, Any] =
     suite("PostgresCQRSPersistenceSpec")(
       test("should save and retrieve events correctly") {
         for {
@@ -201,7 +206,7 @@ object PostgresCQRSPersistenceSpec extends PgSpec {
     ) @@ TestAspect.sequential @@ TestAspect.withLiveClock @@ TestAspect.beforeAll {
       for {
         config <- ZIO.service[DatabaseConfig]
-        _ <- Migration.run(config)
+        _ <- FlywayMigration.run(config)
 
       } yield ()
 

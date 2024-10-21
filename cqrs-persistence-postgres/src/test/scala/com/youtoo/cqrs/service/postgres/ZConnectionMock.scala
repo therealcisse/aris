@@ -11,7 +11,7 @@ object ZConnectionMock {
 
   def pool(): ULayer[ZConnectionPool] =
     ZLayer.succeed {
-      val conn = Mockito.mock(classOf[ZConnection])
+      val conn: ZConnection = Mockito.mock(classOf[ZConnection])
 
       new ZConnectionPool {
         def transaction = ZLayer.succeed(conn)

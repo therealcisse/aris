@@ -38,7 +38,7 @@ object MockCQRSPersistence extends Mock[CQRSPersistence] {
         ): ZIO[ZConnection, Throwable, Chunk[Change[Event]]] =
           proxy(ReadEvents.Full.of[Chunk[Change[Event]]], id, discriminator)
 
-        def saveEvent[Event: BinaryCodec: Tag](
+        def saveEvent[Event: BinaryCodec: MetaInfo: Tag](
           id: Key,
           discriminator: Discriminator,
           event: Change[Event],

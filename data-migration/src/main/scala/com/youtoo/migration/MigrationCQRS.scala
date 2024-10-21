@@ -1,5 +1,5 @@
 package com.youtoo.cqrs
-package example
+package migration
 
 import zio.*
 
@@ -12,68 +12,68 @@ import com.youtoo.cqrs.Codecs.*
 
 import com.youtoo.cqrs.store.*
 import com.youtoo.cqrs.domain.*
-import com.youtoo.cqrs.example.model.*
+import com.youtoo.cqrs.migration.model.*
 import com.youtoo.cqrs.service.*
-import com.youtoo.cqrs.example.service.*
-import com.youtoo.cqrs.example.store.*
+import com.youtoo.cqrs.migration.service.*
+import com.youtoo.cqrs.migration.store.*
 
 import zio.metrics.*
 
 import java.time.temporal.ChronoUnit
 
-trait IngestionCQRS extends CQRS[Ingestion, IngestionEvent, IngestionCommand] {}
+trait MigrationCQRS extends CQRS[Migration, MigrationEvent, MigrationCommand] {}
 
-object IngestionCQRS {
+object MigrationCQRS {
 
   object metrics {
     val addition = Metric.timer(
-      "Ingestion_addition_duration",
+      "Migration_addition_duration",
       chronoUnit = ChronoUnit.MILLIS,
       boundaries = Chunk.iterate(1.0, 10)(_ + 1.0),
     )
 
     val load = Metric.timer(
-      "Ingestion_load_duration",
+      "Migration_load_duration",
       chronoUnit = ChronoUnit.MILLIS,
       boundaries = Chunk.iterate(1.0, 10)(_ + 1.0),
     )
 
   }
 
-  inline def add(id: Key, cmd: IngestionCommand)(using
-    Cmd: IngestionCommandHandler,
-  ): RIO[IngestionCQRS, Unit] = ZIO.serviceWithZIO[IngestionCQRS](_.add(id, cmd)) @@ metrics.addition.trackDuration
+  inline def add(id: Key, cmd: MigrationCommand)(using
+    Cmd: MigrationCommandHandler,
+  ): RIO[MigrationCQRS, Unit] = ZIO.serviceWithZIO[MigrationCQRS](_.add(id, cmd)) @@ metrics.addition.trackDuration
 
   inline def load(id: Key)(using
-    Evt: IngestionEventHandler,
-  ): RIO[IngestionCQRS, Option[Ingestion]] =
-    ZIO.serviceWithZIO[IngestionCQRS](_.load(id)) @@ metrics.load.trackDuration
+    Evt: MigrationEventHandler,
+  ): RIO[MigrationCQRS, Option[Migration]] =
+    ZIO.serviceWithZIO[MigrationCQRS](_.load(id)) @@ metrics.load.trackDuration
 
   def live(): ZLayer[
-    ZConnectionPool & IngestionCheckpointer & IngestionProvider & IngestionEventStore & SnapshotStore &
+    ZConnectionPool & MigrationCheckpointer & MigrationProvider & MigrationEventStore & SnapshotStore &
       SnapshotStrategy.Factory,
     Throwable,
-    IngestionCQRS,
+    MigrationCQRS,
   ] =
     ZLayer.fromFunction {
       (
         factory: SnapshotStrategy.Factory,
-        checkpointer: IngestionCheckpointer,
-        provider: IngestionProvider,
-        eventStore: IngestionEventStore,
+        checkpointer: MigrationCheckpointer,
+        provider: MigrationProvider,
+        eventStore: MigrationEventStore,
         snapshotStore: SnapshotStore,
         pool: ZConnectionPool,
       ) =>
         ZLayer {
 
           for {
-            strategy <- factory.create(IngestionEvent.discriminator)
+            strategy <- factory.create(MigrationEvent.discriminator)
 
-          } yield new IngestionCQRS {
-            private val Cmd = summon[CmdHandler[IngestionCommand, IngestionEvent]]
-            private val Evt = summon[EventHandler[IngestionEvent, Ingestion]]
+          } yield new MigrationCQRS {
+            private val Cmd = summon[CmdHandler[MigrationCommand, MigrationEvent]]
+            private val Evt = summon[EventHandler[MigrationEvent, Migration]]
 
-            def add(id: Key, cmd: IngestionCommand): Task[Unit] =
+            def add(id: Key, cmd: MigrationCommand): Task[Unit] =
               atomically {
                 val evnts = Cmd.applyCmd(cmd)
 
@@ -86,7 +86,7 @@ object IngestionCQRS {
                 }
               }.provideEnvironment(ZEnvironment(pool))
 
-            def load(id: Key): Task[Option[Ingestion]] =
+            def load(id: Key): Task[Option[Migration]] =
               atomically {
                 val deps = (
                   provider.load(id) <&> snapshotStore.readSnapshot(id)

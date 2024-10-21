@@ -10,7 +10,7 @@ import zio.jdbc.*
 import com.dimafeng.testcontainers.PostgreSQLContainer
 import org.testcontainers.utility.DockerImageName
 
-abstract class PgSpec extends ZIOSpec[ZConnectionPool & DatabaseConfig & Migration] {
+abstract class PgSpec extends ZIOSpec[ZConnectionPool & DatabaseConfig & FlywayMigration] {
   def config(): ZLayer[PostgreSQLContainer, Throwable, DatabaseConfig] =
     ZLayer.fromFunction { (container: PostgreSQLContainer) =>
       DatabaseConfig(
@@ -49,11 +49,11 @@ abstract class PgSpec extends ZIOSpec[ZConnectionPool & DatabaseConfig & Migrati
 
     }
 
-  def bootstrap: ZLayer[Any, Throwable, ZConnectionPool & DatabaseConfig & Migration] =
-    container() >>> ZLayer.makeSome[PostgreSQLContainer, ZConnectionPool & DatabaseConfig & Migration](
+  def bootstrap: ZLayer[Any, Throwable, ZConnectionPool & DatabaseConfig & FlywayMigration] =
+    container() >>> ZLayer.makeSome[PostgreSQLContainer, ZConnectionPool & DatabaseConfig & FlywayMigration](
       postgres(),
       config(),
-      Migration.live(),
+      FlywayMigration.live(),
     )
 
 }

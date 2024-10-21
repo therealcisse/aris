@@ -72,4 +72,6 @@ object Dependencies {
     "org.scala-lang.modules" %% "scala-collection-compat" % "2.12.0" cross CrossVersion.for3Use2_13
 
   val mockito = "org.mockito" % "mockito-core" % "5.14.2" % Test
+
+  val pprint = "com.lihaoyi" %% "pprint" % "0.9.0"
 }

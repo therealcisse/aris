@@ -6,18 +6,18 @@ import com.youtoo.cqrs.config.*
 
 import zio.*
 
-trait Migration {
+trait FlywayMigration {
   def run(config: DatabaseConfig): Task[Unit]
 
 }
 
-object Migration {
-  inline def run(config: DatabaseConfig): RIO[Migration, Unit] =
+object FlywayMigration {
+  inline def run(config: DatabaseConfig): RIO[FlywayMigration, Unit] =
     ZIO.serviceWithZIO(_.run(config))
 
-  def live(): ZLayer[Any, Throwable, Migration] =
+  def live(): ZLayer[Any, Throwable, FlywayMigration] =
     ZLayer.succeed {
-      new Migration {
+      new FlywayMigration {
         def run(config: DatabaseConfig): Task[Unit] =
           runMigration(config).tapErrorCause { e =>
             ZIO.logErrorCause("Migration failed", e)

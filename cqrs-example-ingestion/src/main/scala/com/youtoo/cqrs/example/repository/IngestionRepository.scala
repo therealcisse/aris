@@ -75,6 +75,7 @@ object IngestionRepository {
           SELECT id
           FROM ingestions
           ORDER BY id DESC
+          LIMIT $limit
           """.query[Key]
 
         case Some(key) =>
@@ -94,9 +95,9 @@ object IngestionRepository {
 
       sql"""
       INSERT INTO ingestions (id, status, timestamp)
-      VALUES (${o.id}, decode(${payload}, 'base64'), ${o.timestamp.value})
+      VALUES (${o.id}, decode(${payload}, 'base64'), ${o.timestamp})
       ON CONFLICT (id) DO UPDATE
-      SET status = decode(${payload}, 'base64'), timestamp = ${o.timestamp.value}
+      SET status = decode(${payload}, 'base64')
       """
   }
 }

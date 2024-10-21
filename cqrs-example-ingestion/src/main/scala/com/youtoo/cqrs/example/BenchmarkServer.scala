@@ -40,7 +40,7 @@ object BenchmarkServer extends ZIOApp {
   val jvmMetricsLayer = zio.metrics.jvm.DefaultJvmMetrics.live
 
   type Environment =
-    Migration & ZConnectionPool & CQRSPersistence & SnapshotStore & IngestionEventStore & IngestionCQRS & IngestionProvider & IngestionCheckpointer & Server & Server.Config & NettyConfig & IngestionService & IngestionRepository & PrometheusPublisher & MetricsConfig & SnapshotStrategy.Factory
+    FlywayMigration & ZConnectionPool & CQRSPersistence & SnapshotStore & IngestionEventStore & IngestionCQRS & IngestionProvider & IngestionCheckpointer & Server & Server.Config & NettyConfig & IngestionService & IngestionRepository & PrometheusPublisher & MetricsConfig & SnapshotStrategy.Factory
 
   given environmentTag: EnvironmentTag[Environment] = EnvironmentTag[Environment]
 
@@ -59,7 +59,7 @@ object BenchmarkServer extends ZIOApp {
         .make[Environment](
           DatabaseConfig.pool,
           PostgresCQRSPersistence.live(),
-          Migration.live(),
+          FlywayMigration.live(),
           SnapshotStore.live(),
           IngestionProvider.live(),
           IngestionEventStore.live(),
@@ -196,7 +196,7 @@ object BenchmarkServer extends ZIOApp {
     (
       for {
         config <- ZIO.config[DatabaseConfig]
-        _ <- Migration.run(config)
+        _ <- FlywayFlywayMigration.run(config)
         _ <- Server.serve(routes)
       } yield ()
     ).exitCode
