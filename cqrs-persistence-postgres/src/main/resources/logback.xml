@@ -2,7 +2,9 @@
 <configuration>
 
     <!-- Define the pattern for the log output -->
-    <property name="LOG_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"/>
+    <property name="LOG_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg [%X{migration_id}]%n"/>
+    <!-- <property name="LOG_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"/> -->
+    <!-- <property name="LOG_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level [%fiberId] %logger{36} %name:%line - %msg %cause [%kvp]%n"/> -->
 
     <!-- Define the log file location -->
     <property name="LOG_FILE" value="logs/application.log"/>

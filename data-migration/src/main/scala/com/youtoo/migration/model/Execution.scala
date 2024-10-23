@@ -16,6 +16,18 @@ enum Execution {
   case Finished(processing: Execution.Processing, timestamp: Timestamp)
   case Processing(id: Execution.Id, stats: Stats, timestamp: Timestamp)
 
+  def keys: Set[Key] = this match {
+    case processing: Execution.Processing => processing.stats.processed
+    case stopped: Execution.Stopped => stopped.processing.stats.processed
+    case finished: Execution.Finished => finished.processing.stats.processed
+  }
+
+  def totalProcessed: Long = this match {
+    case processing: Execution.Processing => processing.stats.processed.size
+    case stopped: Execution.Stopped => stopped.processing.stats.processed.size
+    case finished: Execution.Finished => finished.processing.stats.processed.size
+  }
+
   def startTime: Timestamp = this match {
     case processing: Execution.Processing => processing.timestamp
     case stopped: Execution.Stopped => stopped.timestamp
@@ -33,6 +45,13 @@ enum Execution {
     case _: Execution.Stopped => ExecutionStatus.stopped
     case finished: Execution.Finished =>
       if finished.processing.stats.failed.nonEmpty then ExecutionStatus.failed else ExecutionStatus.success
+  }
+
+  def key: Execution.Id = this match {
+    case processing: Execution.Processing => processing.id
+    case stopped: Execution.Stopped => stopped.processing.id
+    case finished: Execution.Finished => finished.processing.id
+
   }
 
 }

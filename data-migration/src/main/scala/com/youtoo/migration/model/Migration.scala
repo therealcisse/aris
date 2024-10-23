@@ -32,6 +32,11 @@ object Migration {
 
   }
 
+  extension (migration: Migration)
+    def totalProcessed: Long = migration.state.executions.values.foldLeft(0L)((l, n) => l + n.totalProcessed)
+  extension (migration: Migration)
+    def keys: Set[Key] = migration.state.executions.values.foldLeft(Set.empty)((l, n) => l ++ n.keys)
+
   case class State(executions: Map[Execution.Id, Execution]) {
 
     val lastExecution: Option[Execution] =

@@ -196,7 +196,7 @@ object BenchmarkServer extends ZIOApp {
     (
       for {
         config <- ZIO.config[DatabaseConfig]
-        _ <- FlywayFlywayMigration.run(config)
+        _ <- FlywayMigration.run(config)
         _ <- Server.serve(routes)
       } yield ()
     ).exitCode

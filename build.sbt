@@ -42,7 +42,8 @@ lazy val core = (project in file("cqrs-core"))
     libraryDependencies ++= Seq(
       // pprint,
       `zio-logging`,
-      `zio-logging-slf4j`,
+      // `zio-logging-slf4j`,
+      `zio-logging-slf4j2`,
       logback,
       `zio-jdbc`,
       `zio-schema-protobuf`,
@@ -155,6 +156,7 @@ lazy val dataMigration = (project in file("data-migration"))
   .settings(
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
     libraryDependencies ++= Seq(
+      // `zio-config-typesafe`,
       `zio-metrics`,
       `zio-metrics-connectors-prometheus`,
       `testcontainers-scala-postgresql`,

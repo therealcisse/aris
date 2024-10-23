@@ -63,6 +63,7 @@ object Dependencies {
   val `zio-http` = "dev.zio" %% "zio-http" % "3.0.1"
   val `zio-logging` = "dev.zio" %% "zio-logging" % "2.3.2"
   val `zio-logging-slf4j` = "dev.zio" %% "zio-logging-slf4j" % "2.3.1"
+  val `zio-logging-slf4j2` = "dev.zio" %% "zio-logging-slf4j2" % "2.3.2"
   val logback = "ch.qos.logback" % "logback-classic" % "1.5.11"
 
   val `gatling-charts-highcharts` = "io.gatling.highcharts" % "gatling-charts-highcharts" % GatlingVersion % Test

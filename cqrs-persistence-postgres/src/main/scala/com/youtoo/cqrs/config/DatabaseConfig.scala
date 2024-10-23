@@ -35,6 +35,10 @@ object DatabaseConfig {
         props = Map(
           "user" -> config.username,
           "password" -> config.password,
+          "prepareThreshold" -> "3",
+          "binaryTransfer" -> "true",
+          "loggerLevel" -> "OFF",
+          "tcpKeepAlive" -> "true",
         )
 
         pool = config.jdbcUrl match {
