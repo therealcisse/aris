@@ -3,9 +3,9 @@ ThisBuild / scalaVersion := "3.5.1"
 ThisBuild / organization := "com.youtoo"
 ThisBuild / organizationName := "cqrs"
 
-lazy val core = ProjectRef(file("/cqrs-example-ingestion/cqrs-example-ingestion-src"), "core")
-lazy val postgres = ProjectRef(file("/cqrs-example-ingestion/cqrs-example-ingestion-src"), "postgres")
-lazy val exampleIngestion = ProjectRef(file("/cqrs-example-ingestion/cqrs-example-ingestion-src"), "exampleIngestion")
+lazy val core = ProjectRef(file("/ingestion/ingestion-src"), "core")
+lazy val postgres = ProjectRef(file("/ingestion/ingestion-src"), "postgres")
+lazy val ingestion = ProjectRef(file("/ingestion/ingestion-src"), "ingestion")
 
 lazy val root = (project in file("."))
   .settings(
@@ -16,5 +16,5 @@ lazy val root = (project in file("."))
   .dependsOn(
     core,
     postgres,
-    exampleIngestion,
+    ingestion,
   )

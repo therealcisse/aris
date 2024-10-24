@@ -86,9 +86,9 @@ object BuildHelper extends ScalaSettings {
        |import com.youtoo.cqrs.store.*
        |import com.youtoo.cqrs.service.*
        |
-       |import com.youtoo.cqrs.example.model.*
-       |import com.youtoo.cqrs.example.service.*
-       |import com.youtoo.cqrs.example.repository.*
+       |import com.youtoo.ingestion.model.*
+       |import com.youtoo.ingestion.service.*
+       |import com.youtoo.ingestion.repository.*
        |import com.youtoo.cqrs.service.postgres.*
        |import com.youtoo.cqrs.config.*
        |

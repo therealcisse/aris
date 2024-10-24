@@ -17,7 +17,7 @@ lazy val aggregatedProjects: Seq[ProjectReference] =
   Seq(
     core,
     postgres,
-    exampleIngestion,
+    ingestion,
     benchmark,
     dataMigration,
   )
@@ -81,8 +81,8 @@ lazy val postgres = (project in file("cqrs-persistence-postgres"))
   )
   .dependsOn(core)
 
-lazy val exampleIngestion = (project in file("cqrs-example-ingestion"))
-  .settings(stdSettings("cqrs-example-ingestion"))
+lazy val ingestion = (project in file("ingestion"))
+  .settings(stdSettings("ingestion"))
   // .settings(publishSetting(false))
   // .settings(
   //   dockerBaseImage := "openjdk:11",
@@ -104,7 +104,7 @@ lazy val exampleIngestion = (project in file("cqrs-example-ingestion"))
   //     Cmd("RUN", "rm /tmp/YourKit-JavaProfiler-2024.9-docker.zip"),
   //   ),
   //
-  //   dockerEntrypoint := Seq("./bin/cqrs-example-ingestion"),
+  //   dockerEntrypoint := Seq("./bin/ingestion"),
   //
   //   bashScriptExtraDefines += s"""addJava "-agentpath:/usr/local/YourKit-JavaProfiler-2024.9/bin/${sys.props.getOrElse("ARCH", "linux-arm-64")}/libyjpagent.so=port=10001,listen=all,sampling -Xms2G -Xmx4G -server"""",
   // )
@@ -148,7 +148,7 @@ lazy val dataMigration = (project in file("data-migration"))
   //     Cmd("RUN", "rm /tmp/YourKit-JavaProfiler-2024.9-docker.zip"),
   //   ),
   //
-  //   dockerEntrypoint := Seq("./bin/cqrs-example-ingestion"),
+  //   dockerEntrypoint := Seq("./bin/ingestion"),
   //
   //   bashScriptExtraDefines += s"""addJava "-agentpath:/usr/local/YourKit-JavaProfiler-2024.9/bin/${sys.props.getOrElse("ARCH", "linux-arm-64")}/libyjpagent.so=port=10001,listen=all,sampling -Xms2G -Xmx4G -server"""",
   // )
@@ -182,4 +182,4 @@ lazy val benchmark = (project in file("cqrs-benchmark"))
       `gatling-test-framework`,
     ),
   )
-  .dependsOn(exampleIngestion)
+  .dependsOn(ingestion)

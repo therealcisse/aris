@@ -6,9 +6,9 @@ import scala.concurrent.duration.*
 import io.gatling.core.structure.ScenarioBuilder
 import zio.schema.codec.*
 import com.youtoo.cqrs.Codecs.json.given
-import com.youtoo.cqrs.example.model.*
+import com.youtoo.ingestion.model.*
 import java.nio.charset.StandardCharsets
-import com.youtoo.cqrs.example.BenchmarkServer
+import com.youtoo.ingestion.BenchmarkServer
 
 import zio.prelude.*
 

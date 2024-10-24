@@ -15,11 +15,11 @@ fi
 
 mkdir -p src/main/scala
 
-rm -f ./src/main/scala/com/youtoo/cqrs/example/Main.scala
+rm -f ./src/main/scala/com/youtoo/ingestion/Main.scala
 
-mkdir -p ./src/main/scala/com/youtoo/cqrs/example/
+mkdir -p ./src/main/scala/com/youtoo/ingestion/
 
-cp ../cqrs-example-ingestion/src/main/scala/com/youtoo/cqrs/example/BenchmarkServer.scala ./src/main/scala/com/youtoo/cqrs/example/Main.scala
+cp ../ingestion-ingestion/src/main/scala/com/youtoo/ingestion/BenchmarkServer.scala ./src/main/scala/com/youtoo/ingestion/Main.scala
 
 cd "$(dirname "$0")/../"
 docker build -f ./profiling/Dockerfile --build-arg ARCH=$ARCH -t $TAG .
