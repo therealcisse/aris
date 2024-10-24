@@ -1,11 +1,11 @@
-package com.youtoo.cqrs
+package com.youtoo
 package migration
 
 import zio.*
 
 import zio.stream.*
 
-import com.youtoo.cqrs.migration.model.*
+import com.youtoo.migration.model.*
 
 trait DataMigration {
   def run(id: Migration.Id): ZIO[DataMigration.Processor & MigrationCQRS, Throwable, Unit]

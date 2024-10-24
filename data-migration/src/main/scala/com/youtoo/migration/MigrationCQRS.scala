@@ -1,4 +1,4 @@
-package com.youtoo.cqrs
+package com.youtoo
 package migration
 
 import zio.*
@@ -12,10 +12,11 @@ import com.youtoo.cqrs.Codecs.*
 
 import com.youtoo.cqrs.store.*
 import com.youtoo.cqrs.domain.*
-import com.youtoo.cqrs.migration.model.*
+import com.youtoo.migration.model.*
+import com.youtoo.cqrs.*
 import com.youtoo.cqrs.service.*
-import com.youtoo.cqrs.migration.service.*
-import com.youtoo.cqrs.migration.store.*
+import com.youtoo.migration.service.*
+import com.youtoo.migration.store.*
 
 import zio.metrics.*
 

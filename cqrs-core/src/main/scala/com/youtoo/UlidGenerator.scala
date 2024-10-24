@@ -1,4 +1,4 @@
-package com.youtoo.cqrs
+package com.youtoo
 
 import ulid4j.Ulid
 

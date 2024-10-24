@@ -1,7 +1,8 @@
-package com.youtoo.cqrs
+package com.youtoo
 package ingestion
 package model
 
+import com.youtoo.cqrs.*
 import com.youtoo.cqrs.domain.*
 
 import cats.implicits.*

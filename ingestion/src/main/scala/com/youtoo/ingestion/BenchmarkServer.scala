@@ -16,6 +16,7 @@ import zio.metrics.connectors.prometheus
 
 import cats.implicits.*
 
+import com.youtoo.cqrs.*
 import com.youtoo.cqrs.store.*
 import com.youtoo.cqrs.service.*
 

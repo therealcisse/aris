@@ -5,6 +5,7 @@ import zio.*
 import zio.test.*
 import zio.prelude.*
 
+import com.youtoo.cqrs.*
 import com.youtoo.cqrs.domain.*
 
 import com.youtoo.ingestion.model.*

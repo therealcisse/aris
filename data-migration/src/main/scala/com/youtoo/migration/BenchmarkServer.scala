@@ -1,4 +1,4 @@
-package com.youtoo.cqrs
+package com.youtoo
 package migration
 
 import scala.language.future
@@ -17,14 +17,15 @@ import zio.metrics.connectors.prometheus
 
 import cats.implicits.*
 
+import com.youtoo.cqrs.*
 import com.youtoo.cqrs.store.*
 import com.youtoo.cqrs.service.*
 
-import com.youtoo.cqrs.migration.model.*
-import com.youtoo.cqrs.migration.service.*
-import com.youtoo.cqrs.migration.repository.*
+import com.youtoo.migration.model.*
+import com.youtoo.migration.service.*
+import com.youtoo.migration.repository.*
 import com.youtoo.cqrs.service.postgres.*
-import com.youtoo.cqrs.migration.store.*
+import com.youtoo.migration.store.*
 import com.youtoo.cqrs.config.*
 
 import zio.http.{Version as _, *}

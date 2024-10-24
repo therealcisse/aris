@@ -1,9 +1,10 @@
-package com.youtoo.cqrs
+package com.youtoo
 package ingestion
 package store
 
 import com.youtoo.ingestion.model.*
 
+import com.youtoo.cqrs.*
 import com.youtoo.cqrs.domain.*
 import com.youtoo.cqrs.store.*
 

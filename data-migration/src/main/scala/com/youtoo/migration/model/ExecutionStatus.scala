@@ -1,4 +1,4 @@
-package com.youtoo.cqrs
+package com.youtoo
 package migration
 package model
 

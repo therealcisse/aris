@@ -1,4 +1,4 @@
-package com.youtoo.cqrs
+package com.youtoo
 package ingestion
 
 import zio.*
@@ -10,6 +10,7 @@ import zio.prelude.*
 
 import com.youtoo.cqrs.Codecs.*
 
+import com.youtoo.cqrs.*
 import com.youtoo.cqrs.store.*
 import com.youtoo.cqrs.domain.*
 import com.youtoo.ingestion.model.*

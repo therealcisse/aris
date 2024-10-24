@@ -1,8 +1,10 @@
-package com.youtoo.cqrs
+package com.youtoo
 package migration
 package model
 
 import zio.*
+
+import com.youtoo.cqrs.*
 
 import zio.prelude.*
 import zio.schema.*

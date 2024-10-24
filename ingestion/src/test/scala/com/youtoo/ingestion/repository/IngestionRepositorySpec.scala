@@ -2,6 +2,7 @@ package com.youtoo
 package ingestion
 package repository
 
+import com.youtoo.cqrs.*
 import com.youtoo.ingestion.model.*
 import com.youtoo.cqrs.service.postgres.*
 import com.youtoo.cqrs.config.*
@@ -95,7 +96,7 @@ object IngestionRepositorySpec extends PgSpec {
     ) @@ TestAspect.sequential @@ TestAspect.withLiveClock @@ TestAspect.beforeAll {
       for {
         config <- ZIO.service[DatabaseConfig]
-        _ <- FlywayFlywayMigration.run(config)
+        _ <- FlywayMigration.run(config)
 
       } yield ()
 

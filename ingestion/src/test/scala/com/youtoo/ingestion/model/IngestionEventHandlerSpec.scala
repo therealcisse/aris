@@ -9,6 +9,7 @@ import zio.test.Assertion.*
 import zio.prelude.*
 import zio.*
 
+import com.youtoo.cqrs.*
 import com.youtoo.cqrs.domain.*
 
 object IngestionEventHandlerSpec extends ZIOSpecDefault {

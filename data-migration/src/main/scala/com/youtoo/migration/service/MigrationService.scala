@@ -1,11 +1,12 @@
-package com.youtoo.cqrs
+package com.youtoo
 package migration
 package service
 
 import com.youtoo.cqrs.service.*
 
-import com.youtoo.cqrs.migration.model.*
-import com.youtoo.cqrs.migration.repository.*
+import com.youtoo.migration.model.*
+import com.youtoo.migration.repository.*
+import com.youtoo.cqrs.*
 
 import zio.*
 

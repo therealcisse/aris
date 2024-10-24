@@ -1,7 +1,9 @@
-package com.youtoo.cqrs
+package com.youtoo
 package migration
 package model
 
+import com.youtoo.cqrs.*
+import com.youtoo.migration.model.*
 import com.youtoo.cqrs.domain.*
 
 import cats.implicits.*
@@ -37,6 +39,7 @@ object MigrationEvent {
         case MigrationEvent.ProcessingFailed(_, _) => Namespace(4)
         case MigrationEvent.ExecutionStopped(_, _) => Namespace(5)
         case MigrationEvent.ExecutionFinished(_, _) => Namespace(6)
+        case MigrationEvent.ExecutionFailed(_, _) => Namespace(7)
       }
   }
 

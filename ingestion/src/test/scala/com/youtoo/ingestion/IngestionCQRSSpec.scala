@@ -10,6 +10,7 @@ import zio.mock.Expectation.*
 import zio.*
 import zio.jdbc.*
 
+import com.youtoo.cqrs.*
 import com.youtoo.ingestion.model.*
 import com.youtoo.ingestion.service.*
 import com.youtoo.ingestion.store.*
@@ -37,7 +38,7 @@ object IngestionCQRSSpec extends ZIOSpecDefault {
         } yield assertCompletes).provide(
           (
             eventStoreEnv.toLayer ++ ZConnectionMock
-              .pool() ++ IngestionCheckpointerMock.empty ++ IngestionProviderMock.empty ++ MockSnapshotStore.empty
+              .pool() ++ IngestionCheckpointerMock.empty ++ IngestionProviderMock.empty ++ MockSnapshotStore.empty ++ SnapshotStrategy.live()
           ) >>> IngestionCQRS.live(),
         )
       }
@@ -52,7 +53,7 @@ object IngestionCQRSSpec extends ZIOSpecDefault {
         Gen.int(0, 12),
       ) { case (id, ingestion, version, events, amount) =>
         val chs = NonEmptyList(events.head, events.tail.take(amount)*)
-        val sendSnapshot = chs.size >= IngestionCQRS.Threshold
+        val sendSnapshot = chs.size >= 10
         val maxChange = chs.maxBy(_.version)
 
         val (key, deps) = (ingestion, version).tupled match {
@@ -166,7 +167,7 @@ object IngestionCQRSSpec extends ZIOSpecDefault {
 
           _ <- IngestionCQRS.load(key)
 
-        } yield assertCompletes).provide((deps ++ ZConnectionMock.pool()) >>> IngestionCQRS.live())
+        } yield assertCompletes).provide((deps ++ ZConnectionMock.pool() ++ SnapshotStrategy.live()) >>> IngestionCQRS.live())
       }
 
     },

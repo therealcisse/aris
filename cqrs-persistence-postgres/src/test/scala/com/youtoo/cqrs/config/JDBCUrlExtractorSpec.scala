@@ -1,4 +1,5 @@
-package com.youtoo.cqrs
+package com.youtoo
+package cqrs
 package config
 
 import zio.test.*

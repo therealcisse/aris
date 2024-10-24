@@ -1,4 +1,5 @@
-package com.youtoo.cqrs
+package com.youtoo
+package cqrs
 package service
 package postgres
 
@@ -83,7 +84,7 @@ object PostgresCQRSPersistenceSpec extends PgSpec {
           persistence <- ZIO.service[CQRSPersistence]
 
           events <- ZIO.collectAll {
-            (0 to 100).map { i =>
+            (1 to 100).map { i =>
               for {
                 version <- Version.gen
                 ch = Change(version = version, payload = DummyEvent(s"$i"))

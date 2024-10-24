@@ -1,4 +1,4 @@
-package com.youtoo.cqrs
+package com.youtoo
 
 import zio.*
 import zio.prelude.*

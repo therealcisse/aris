@@ -1,8 +1,9 @@
-package com.youtoo.cqrs
+package com.youtoo
 package migration
 package repository
 
-import com.youtoo.cqrs.migration.model.*
+import com.youtoo.migration.model.*
+
 import com.youtoo.cqrs.service.postgres.*
 
 import zio.*
@@ -10,6 +11,8 @@ import zio.schema.*
 import zio.schema.codec.*
 
 import zio.jdbc.*
+
+import com.youtoo.cqrs.*
 import com.youtoo.cqrs.service.*
 
 import com.youtoo.cqrs.Codecs.given

@@ -1,7 +1,7 @@
 package com.youtoo
+package ingestion
 package service
 
-import com.youtoo.ingestion.service.*
 import com.youtoo.ingestion.model.*
 
 import zio.mock.*

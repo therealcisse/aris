@@ -1,8 +1,9 @@
-package com.youtoo.cqrs
+package com.youtoo
 package migration
 package store
 
-import com.youtoo.cqrs.migration.model.*
+import com.youtoo.cqrs.*
+import com.youtoo.migration.model.*
 
 import com.youtoo.cqrs.domain.*
 import com.youtoo.cqrs.store.*
