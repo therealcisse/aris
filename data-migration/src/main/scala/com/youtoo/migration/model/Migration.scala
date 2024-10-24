@@ -39,10 +39,21 @@ object Migration {
 
   case class State(executions: Map[Execution.Id, Execution]) {
 
-    val lastExecution: Option[Execution] =
+    lazy val lastExecution: Option[Execution] =
       executions.keys.maxOption flatMap { key =>
         executions.get(key)
       }
+
+    def status: ExecutionStatus = lastExecution.fold(ExecutionStatus.registered) { execution =>
+      execution match {
+        case _: Execution.Processing => ExecutionStatus.running
+        case _: Execution.Stopped => ExecutionStatus.stopped
+        case finished: Execution.Finished =>
+          if finished.processing.stats.failed.nonEmpty then ExecutionStatus.failed else ExecutionStatus.success
+        case _: Execution.Failed =>
+          ExecutionStatus.execution_failed
+      }
+    }
 
     export executions.isEmpty
   }

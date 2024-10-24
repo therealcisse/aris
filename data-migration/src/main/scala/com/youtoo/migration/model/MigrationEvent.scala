@@ -17,6 +17,7 @@ enum MigrationEvent {
   case ProcessingFailed(id: Execution.Id, key: Key)
   case ExecutionStopped(id: Execution.Id, timestamp: Timestamp)
   case ExecutionFinished(id: Execution.Id, timestamp: Timestamp)
+  case ExecutionFailed(id: Execution.Id, timestamp: Timestamp)
 }
 
 type MigrationEventHandler = EventHandler[MigrationEvent, Migration]
@@ -184,6 +185,28 @@ object MigrationEvent {
                   timestamp = timestamp,
                 )
                 val newExecutions = state.state.executions + (id -> finishedExecution)
+                val newState = state.state.copy(executions = newExecutions)
+                state.copy(state = newState)
+
+              case _ =>
+                throw new IllegalArgumentException(s"Unexpected execution state for id $id")
+            }
+
+          case MigrationEvent.ExecutionFailed(id, timestamp) =>
+            // Transition execution to Finished state
+            val execution = state.state.executions
+              .get(id)
+              .getOrElse(
+                throw new IllegalArgumentException(s"Execution with id $id not found"),
+              )
+
+            execution match {
+              case processing: Execution.Processing =>
+                val failedExecution = Execution.Failed(
+                  processing = processing,
+                  timestamp = timestamp,
+                )
+                val newExecutions = state.state.executions + (id -> failedExecution)
                 val newState = state.state.copy(executions = newExecutions)
                 state.copy(state = newState)
 

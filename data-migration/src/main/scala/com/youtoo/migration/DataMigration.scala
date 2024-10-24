@@ -9,6 +9,7 @@ import com.youtoo.cqrs.migration.model.*
 
 trait DataMigration {
   def run(id: Migration.Id): ZIO[DataMigration.Processor & MigrationCQRS, Throwable, Unit]
+  def stop(id: Migration.Id): Task[Unit]
 
 }
 
@@ -71,7 +72,7 @@ object DataMigration {
 
                   ref <- Ref.Synchronized.make(State(remaining, keys = migration.keys))
 
-                  _ <- DataMigration
+                  op = DataMigration
                     .load()
                     .mapZIOParUnordered(n = BATCH_SIZE) { key =>
                       ref.getAndUpdateZIO { s =>
@@ -95,9 +96,25 @@ object DataMigration {
                     }
                     .runDrain
 
+                  timestamp <- Timestamp.now
+
+                  _ <- op foldZIO (
+                    success = _ =>
+                      logInfo(s"Migration succeeded") *> MigrationCQRS.add(
+                        id = migrationKey,
+                        cmd = MigrationCommand.FinishExecution(id = executionId, timestamp),
+                      ),
+                    failure = e =>
+                      logError(s"Migration failed", e) *> MigrationCQRS.add(
+                        id = migrationKey,
+                        cmd = MigrationCommand.FailExecution(id = executionId, timestamp),
+                      )
+                  )
+
                 } yield ()
           }
 
+        def stop(id: Migration.Id): Task[Unit] = ???
       }
     }
 

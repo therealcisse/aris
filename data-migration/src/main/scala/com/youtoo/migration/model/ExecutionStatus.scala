@@ -5,7 +5,7 @@ package model
 import zio.schema.*
 
 enum ExecutionStatus {
-  case running, failed, success, stopped
+  case registered, running, execution_failed, failed, success, stopped
 }
 
 object ExecutionStatus {

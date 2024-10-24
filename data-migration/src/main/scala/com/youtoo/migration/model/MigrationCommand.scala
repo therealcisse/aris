@@ -15,6 +15,7 @@ enum MigrationCommand {
   case FailKey(id: Execution.Id, key: Key)
   case StopExecution(id: Execution.Id, timestamp: Timestamp)
   case FinishExecution(id: Execution.Id, timestamp: Timestamp)
+  case FailExecution(id: Execution.Id, timestamp: Timestamp)
 
 }
 
@@ -46,6 +47,9 @@ object MigrationCommand {
 
         case MigrationCommand.FinishExecution(id, timestamp) =>
           NonEmptyList(MigrationEvent.ExecutionFinished(id = id, timestamp = timestamp))
+
+        case MigrationCommand.FailExecution(id, timestamp) =>
+          NonEmptyList(MigrationEvent.ExecutionFailed(id = id, timestamp = timestamp))
 
       }
   }

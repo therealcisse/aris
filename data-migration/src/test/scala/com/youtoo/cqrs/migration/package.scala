@@ -55,6 +55,7 @@ val validExecutionEventSequence: Gen[Any, List[Change[MigrationEvent]]] =
     endEvent <- Gen.oneOf(
       timestampGen.map(ts => MigrationEvent.ExecutionStopped(id, ts)),
       timestampGen.map(ts => MigrationEvent.ExecutionFinished(id, ts)),
+      timestampGen.map(ts => MigrationEvent.ExecutionFailed(id, ts)),
     )
 
     crashed <- Gen.boolean
@@ -92,6 +93,7 @@ val migrationCommandGen: Gen[Any, MigrationCommand] = Gen.oneOf(
   (executionIdGen <*> keyGen).map { case (id, key) => MigrationCommand.FailKey(id, key) },
   (executionIdGen <*> timestampGen).map { case (id, ts) => MigrationCommand.StopExecution(id, ts) },
   (executionIdGen <*> timestampGen).map { case (id, ts) => MigrationCommand.FinishExecution(id, ts) },
+  (executionIdGen <*> timestampGen).map { case (id, ts) => MigrationCommand.FailExecution(id, ts) },
 )
 
 val migrationEventGen: Gen[Any, MigrationEvent] = Gen.oneOf(
@@ -102,6 +104,7 @@ val migrationEventGen: Gen[Any, MigrationEvent] = Gen.oneOf(
   (executionIdGen <*> keyGen).map { case (id, key) => MigrationEvent.ProcessingFailed(id, key) },
   (executionIdGen <*> timestampGen).map { case (id, ts) => MigrationEvent.ExecutionStopped(id, ts) },
   (executionIdGen <*> timestampGen).map { case (id, ts) => MigrationEvent.ExecutionFinished(id, ts) },
+  (executionIdGen <*> timestampGen).map { case (id, ts) => MigrationEvent.ExecutionFailed(id, ts) },
 )
 
 val changeGen: Gen[Any, Change[MigrationEvent]] = (versionGen <*> migrationEventGen).map { case (v, e) => Change(v, e) }

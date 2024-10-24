@@ -19,7 +19,7 @@ object MigrationEventHandlerSpec extends ZIOSpecDefault {
         val event = Change(version, MigrationEvent.MigrationRegistered(id, timestamp))
         val state = handler.applyEvents(NonEmptyList(event))
         val expectedState = Migration(id, Migration.State(Map.empty), timestamp)
-        assert(state)(equalTo(expectedState))
+        assert(state)(equalTo(expectedState)) && assert(state.state.status)(equalTo(ExecutionStatus.registered))
       }
     },
     test("Applying ExecutionStarted event adds a new execution") {
@@ -36,7 +36,7 @@ object MigrationEventHandlerSpec extends ZIOSpecDefault {
             Migration.State(Map(executionId -> execution)),
             timestamp,
           )
-          assert(state)(equalTo(expectedState))
+          assert(state)(equalTo(expectedState)) && assert(state.state.status)(equalTo(ExecutionStatus.running))
       }
     },
     test("ProcessingStarted event updates the execution with processing key") {
@@ -55,7 +55,7 @@ object MigrationEventHandlerSpec extends ZIOSpecDefault {
             Migration.State(Map(executionId -> processingExecution)),
             timestamp,
           )
-          assert(state)(equalTo(expectedState))
+          assert(state)(equalTo(expectedState)) && assert(state.state.status)(equalTo(ExecutionStatus.running))
       }
     },
     test("KeyProcessed event moves key from processing to processed") {
@@ -75,7 +75,7 @@ object MigrationEventHandlerSpec extends ZIOSpecDefault {
             Migration.State(Map(executionId -> processingExecution)),
             timestamp,
           )
-          assert(state)(equalTo(expectedState))
+          assert(state)(equalTo(expectedState)) && assert(state.state.status)(equalTo(ExecutionStatus.running))
       }
     },
     test("ProcessingFailed event moves key from processing to failed") {
@@ -95,7 +95,7 @@ object MigrationEventHandlerSpec extends ZIOSpecDefault {
             Migration.State(Map(executionId -> processingExecution)),
             timestamp,
           )
-          assert(state)(equalTo(expectedState))
+          assert(state)(equalTo(expectedState)) && assert(state.state.status)(equalTo(ExecutionStatus.running))
       }
     },
     test("ExecutionStopped transitions execution to Stopped state") {
@@ -115,7 +115,7 @@ object MigrationEventHandlerSpec extends ZIOSpecDefault {
             Migration.State(Map(executionId -> stoppedExecution)),
             timestamp,
           )
-          assert(state)(equalTo(expectedState))
+          assert(state)(equalTo(expectedState)) && assert(state.state.status)(equalTo(ExecutionStatus.stopped))
       }
     },
     test("ExecutionFinished transitions execution to Finished state") {
@@ -135,7 +135,27 @@ object MigrationEventHandlerSpec extends ZIOSpecDefault {
             Migration.State(Map(executionId -> finishedExecution)),
             timestamp,
           )
-          assert(state)(equalTo(expectedState))
+          assert(state)(equalTo(expectedState)) && assert(state.state.status)(equalTo(ExecutionStatus.success))
+      }
+    },
+    test("ExecutionFailed transitions execution to Failed state") {
+      check(migrationIdGen, executionIdGen, timestampGen, versionGen, versionGen, versionGen) {
+        (migrationId, executionId, timestamp, v1, v2, v3) =>
+          val events = NonEmptyList(
+            Change(v1, MigrationEvent.MigrationRegistered(migrationId, timestamp)),
+            Change(v2, MigrationEvent.ExecutionStarted(executionId, timestamp)),
+            Change(v3, MigrationEvent.ExecutionFailed(executionId, timestamp)),
+          )
+          val processing: Execution.Processing =
+            Execution.Processing(executionId, Stats(Set.empty, Set.empty, Set.empty), timestamp)
+          val failedExecution = Execution.Failed(processing, timestamp)
+          val state = handler.applyEvents(events)
+          val expectedState = Migration(
+            migrationId,
+            Migration.State(Map(executionId -> failedExecution)),
+            timestamp,
+          )
+          assert(state)(equalTo(expectedState)) && assert(state.state.status)(equalTo(ExecutionStatus.execution_failed))
       }
     },
     test("Applying events out of order throws an exception") {
