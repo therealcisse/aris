@@ -53,7 +53,7 @@ object BenchmarkServer extends ZIOApp {
   val logger = Runtime.setConfigProvider(ConfigProvider.envProvider) >>> Runtime.removeDefaultLoggers >>> SLF4J.slf4j
 
   type Environment =
-    FlywayMigration & ZConnectionPool & CQRSPersistence & SnapshotStore & MigrationEventStore & MigrationCQRS & MigrationProvider & MigrationCheckpointer & Server & Server.Config & NettyConfig & MigrationService & MigrationRepository & PrometheusPublisher & MetricsConfig & SnapshotStrategy.Factory & DataMigration
+    FlywayMigration & ZConnectionPool & CQRSPersistence & SnapshotStore & MigrationEventStore & MigrationCQRS & MigrationProvider & MigrationCheckpointer & Server & Server.Config & NettyConfig & MigrationService & MigrationRepository & PrometheusPublisher & MetricsConfig & SnapshotStrategy.Factory & DataMigration & Interrupter
 
   given environmentTag: EnvironmentTag[Environment] = EnvironmentTag[Environment]
 
@@ -88,6 +88,7 @@ object BenchmarkServer extends ZIOApp {
           ZLayer.succeed(MetricsConfig(interval = Duration(5L, TimeUnit.SECONDS))),
           SnapshotStrategy.live(),
           DataMigration.live(),
+          Interrupter.live(),
         )
         .orDie
 
@@ -158,10 +159,6 @@ object BenchmarkServer extends ZIOApp {
       }
 
     },
-    Method.GET / "migration" / string("id") / "validate" -> handler { (id: String, req: Request) =>
-      ???
-
-    },
     Method.POST / "migration" -> handler {
 
       for {
@@ -183,12 +180,13 @@ object BenchmarkServer extends ZIOApp {
 
     },
     Method.POST / "migration" / string("id") / "run" -> handler { (id: String, req: Request) =>
+      val numKeys = req.queryParamToOrElse[Long]("numKeys", 10L)
 
       val processor: ZLayer[Any, Nothing, DataMigration.Processor] = ZLayer.succeed {
 
         new DataMigration.Processor {
-          def count(): Task[Long] = ZIO.succeed(10L)
-          def load(): ZStream[Any, Throwable, Key] = ZStream((0L to 10L).map(i => Key(s"$i"))*)
+          def count(): Task[Long] = ZIO.succeed(numKeys)
+          def load(): ZStream[Any, Throwable, Key] = ZStream((0L until numKeys).map(i => Key(s"$i"))*)
           def process(key: Key): Task[Unit] = ZIO.logInfo(s"Processed $key")
 
         }
@@ -198,6 +196,10 @@ object BenchmarkServer extends ZIOApp {
         DataMigration.run(id = Migration.Id(Key(id))).provideSomeLayer[MigrationCQRS & DataMigration & Scope](processor)
 
       op `as` Response.ok
+
+    },
+    Method.DELETE / "migration" / string("id") / "stop" -> handler { (id: String, req: Request) =>
+      Interrupter.interrupt(id = Key(id)) `as` Response.ok
 
     },
   ).sandbox

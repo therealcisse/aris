@@ -9,4 +9,4 @@ CREATE TABLE IF NOT EXISTS migrations (
 );
 
 -- Index for quick lookup of migrations by timestamp
-CREATE INDEX idx_ingestions_timestamp ON migrations (timestamp);
+CREATE INDEX idx_migrations_timestamp ON migrations (timestamp);
