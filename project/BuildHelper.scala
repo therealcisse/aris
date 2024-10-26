@@ -31,12 +31,12 @@ object BuildHelper extends ScalaSettings {
     }
 
   def settingsWithHeaderLicense =
-    headerLicense := Some(HeaderLicense.ALv2("2024", "YouToo Group."))
+    headerLicense := Some(HeaderLicense.ALv2("2023 - 2024", "YouToo Group."))
 
   def publishSetting(publishArtifacts: Boolean) = {
     val publishSettings = Seq(
       organization := "com.youtoo",
-      organizationName := "cqrs",
+      organizationName := "youtoo",
       licenses := Seq(),
       sonatypeCredentialHost := "oss.sonatype.org",
       sonatypeRepository := "https://oss.sonatype.org/service/local",
@@ -135,6 +135,14 @@ object BuildHelper extends ScalaSettings {
     ThisBuild / javaOptions := Seq(
       s"-DCQRSLogLevel=${Debug.CQRSLogLevel}",
     ),
+    Compile / run / javaOptions ++= Seq(
+      "--add-exports=java.base/jdk.internal.misc=ALL-UNNAMED",
+      "--add-exports=java.base/sun.nio.ch=ALL-UNNAMED",
+      "--add-exports=java.base/jdk.internal.ref=ALL-UNNAMED",
+      "--add-exports=java.base/sun.security.x509=ALL-UNNAMED",
+      "--add-exports=java.base/sun.security.util=ALL-UNNAMED",
+    ),
+    Test / javaOptions += "--add-exports=java.base/jdk.internal.misc=ALL-UNNAMED",
     ThisBuild / fork := true,
     semanticdbEnabled := scalaVersion.value != Scala3,
     semanticdbOptions += "-P:semanticdb:synthetics:on",

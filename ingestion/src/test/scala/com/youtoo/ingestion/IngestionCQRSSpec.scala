@@ -38,7 +38,8 @@ object IngestionCQRSSpec extends ZIOSpecDefault {
         } yield assertCompletes).provide(
           (
             eventStoreEnv.toLayer ++ ZConnectionMock
-              .pool() ++ IngestionCheckpointerMock.empty ++ IngestionProviderMock.empty ++ MockSnapshotStore.empty ++ SnapshotStrategy.live()
+              .pool() ++ IngestionCheckpointerMock.empty ++ IngestionProviderMock.empty ++ MockSnapshotStore.empty ++ SnapshotStrategy
+              .live()
           ) >>> IngestionCQRS.live(),
         )
       }
@@ -167,7 +168,8 @@ object IngestionCQRSSpec extends ZIOSpecDefault {
 
           _ <- IngestionCQRS.load(key)
 
-        } yield assertCompletes).provide((deps ++ ZConnectionMock.pool() ++ SnapshotStrategy.live()) >>> IngestionCQRS.live())
+        } yield assertCompletes)
+          .provide((deps ++ ZConnectionMock.pool() ++ SnapshotStrategy.live()) >>> IngestionCQRS.live())
       }
 
     } @@ TestAspect.ignore,

@@ -39,17 +39,6 @@ object BenchmarkServer extends ZIOApp {
 
   inline val FetchSize = 1_000L
 
-  val jvmMetricsLayer = zio.metrics.jvm.DefaultJvmMetrics.live
-
-  import LogFormat.*
-
-  val format: LogFormat =
-    timestamp.fixed(32) |-|
-      level |-|
-      fiberId |-|
-      quoted(line) +
-      (space + cause + space + annotation("migration_id")).filter(LogFilter.causeNonEmpty)
-
   val logger = Runtime.setConfigProvider(ConfigProvider.envProvider) >>> Runtime.removeDefaultLoggers >>> SLF4J.slf4j
 
   type Environment =
