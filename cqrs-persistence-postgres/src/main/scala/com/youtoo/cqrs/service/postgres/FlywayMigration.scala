@@ -28,7 +28,7 @@ object FlywayMigration {
     }
 
   def runMigration(config: DatabaseConfig): Task[Unit] =
-    ZIO.attemptBlocking {
+    ZIO.scoped {
       import org.flywaydb.core.Flyway
       import com.zaxxer.hikari.{HikariConfig, HikariDataSource}
 
@@ -39,16 +39,20 @@ object FlywayMigration {
       hikariConfig.setUsername(config.username)
       hikariConfig.setPassword(config.password)
 
-      val dataSource = HikariDataSource(hikariConfig)
+      ZIO.acquireRelease(ZIO.attemptBlocking(HikariDataSource(hikariConfig)))(ds => ZIO.attemptBlocking(ds.close()).ignoreLogged) flatMap { dataSource =>
+        ZIO.attemptBlocking {
 
-      val flyway = Flyway
-        .configure()
-        .dataSource(dataSource)
-        .locations(config.migrations)
-        .outOfOrder(true)
-        .load()
+          val flyway = Flyway
+            .configure()
+            .dataSource(dataSource)
+            .locations(config.migrations)
+            .load()
 
-      flyway.migrate()
+          flyway.migrate()
+        }
+
+      }
+
     }
 
 }
