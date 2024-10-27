@@ -14,7 +14,7 @@ import com.youtoo.cqrs.Codecs.given
 
 given keyGen: Gen[Any, Key] = Gen.fromZIO(Key.gen.orDie)
 given ingestionIdGen: Gen[Any, Ingestion.Id] = Gen.fromZIO(Ingestion.Id.gen.orDie)
-given timestampGen: Gen[Any, Timestamp] = Gen.fromZIO(Timestamp.now.orDie)
+given timestampGen: Gen[Any, Timestamp] = Gen.fromZIO(Timestamp.now)
 
 given ingestionGen: Gen[Any, Ingestion] =
   (ingestionIdGen <*> IngestionStatusGenerators.genStatus <*> timestampGen) map { case (id, status, timestamp) =>

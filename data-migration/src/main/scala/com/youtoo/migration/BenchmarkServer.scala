@@ -28,6 +28,8 @@ import com.youtoo.cqrs.service.postgres.*
 import com.youtoo.migration.store.*
 import com.youtoo.cqrs.config.*
 
+import com.youtoo.std.*
+
 import zio.http.{Version as _, *}
 import zio.http.netty.NettyConfig
 import zio.schema.codec.BinaryCodec
@@ -42,7 +44,7 @@ object BenchmarkServer extends ZIOApp {
   val logger = Runtime.setConfigProvider(ConfigProvider.envProvider) >>> Runtime.removeDefaultLoggers >>> SLF4J.slf4j
 
   type Environment =
-    FlywayMigration & ZConnectionPool & CQRSPersistence & SnapshotStore & MigrationEventStore & MigrationCQRS & MigrationProvider & MigrationCheckpointer & Server & Server.Config & NettyConfig & MigrationService & MigrationRepository & PrometheusPublisher & MetricsConfig & SnapshotStrategy.Factory & DataMigration & Interrupter
+    FlywayMigration & ZConnectionPool & CQRSPersistence & SnapshotStore & MigrationEventStore & MigrationCQRS & MigrationProvider & MigrationCheckpointer & Server & Server.Config & NettyConfig & MigrationService & MigrationRepository & PrometheusPublisher & MetricsConfig & SnapshotStrategy.Factory & DataMigration & Interrupter & Healthcheck
 
   given environmentTag: EnvironmentTag[Environment] = EnvironmentTag[Environment]
 
@@ -78,6 +80,7 @@ object BenchmarkServer extends ZIOApp {
           SnapshotStrategy.live(),
           DataMigration.live(),
           Interrupter.live(),
+          Healthcheck.live(),
         )
         .orDie
 

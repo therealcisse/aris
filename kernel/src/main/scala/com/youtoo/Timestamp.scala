@@ -11,7 +11,7 @@ object Timestamp extends Newtype[Long] {
 
   extension (a: Timestamp) inline def value: Long = Timestamp.unwrap(a)
 
-  def now: Task[Timestamp] = Clock.currentTime(ChronoUnit.MILLIS).map(Timestamp.wrap)
+  def now: UIO[Timestamp] = Clock.currentTime(ChronoUnit.MILLIS).map(Timestamp.wrap)
 
   given Schema[Timestamp] = Schema
     .primitive[Long]

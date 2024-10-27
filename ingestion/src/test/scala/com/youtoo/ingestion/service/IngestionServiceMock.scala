@@ -27,7 +27,7 @@ object IngestionServiceMock extends Mock[IngestionService] {
           proxy(Load, id)
 
         def loadMany(offset: Option[Key], limit: Long): Task[Chunk[Key]] =
-          proxy(LoadMany, offset, limit)
+          proxy(LoadMany, (offset, limit))
       }
     }
 }

@@ -1,5 +1,5 @@
 package com.youtoo
-package migration
+package std
 
 import zio.test.*
 import zio.test.Assertion.*

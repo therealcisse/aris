@@ -39,7 +39,9 @@ object FlywayMigration {
       hikariConfig.setUsername(config.username)
       hikariConfig.setPassword(config.password)
 
-      ZIO.acquireRelease(ZIO.attemptBlocking(HikariDataSource(hikariConfig)))(ds => ZIO.attemptBlocking(ds.close()).ignoreLogged) flatMap { dataSource =>
+      ZIO.acquireRelease(ZIO.attemptBlocking(HikariDataSource(hikariConfig)))(ds =>
+        ZIO.attemptBlocking(ds.close()).ignoreLogged,
+      ) flatMap { dataSource =>
         ZIO.attemptBlocking {
 
           val flyway = Flyway

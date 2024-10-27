@@ -8,16 +8,20 @@ import zio.test.Assertion.*
 import zio.mock.Expectation.*
 import zio.*
 
+import com.youtoo.std.*
+
 import com.youtoo.migration.model.*
 
 object DataMigrationSpec extends ZIOSpecDefault {
 
   def spec = suite("DataMigrationSpec")(
-    testExecutionRecordsCreation @@ TestAspect.ignore,
-    testSuccessfulMigrationExecution @@ TestAspect.ignore,
-    testIncompleteMigrationResumption @@ TestAspect.ignore,
+    testExecutionRecordsCreation,
+    testSuccessfulMigrationExecution,
+    testIncompleteMigrationResumption,
     testStopMigration,
-  ).provideLayerShared(Interrupter.live() >>> DataMigration.live()) @@ TestAspect.withLiveClock
+  ).provideLayerShared(
+    (Healthcheck.live() ++ Interrupter.live()) >+> DataMigration.live(),
+  ) @@ TestAspect.withLiveClock
 
   val testStopMigration = test("migration is stopped when Interrupter.interrupt is called") {
     for {
@@ -54,7 +58,9 @@ object DataMigrationSpec extends ZIOSpecDefault {
         }
       }
 
-      layer = (processor ++ ZLayer.succeed(new DataMigration.Live(interrupter, 1)) ++ migrationCQRS)
+      healthcheck <- ZIO.service[Healthcheck]
+
+      layer = (processor ++ ZLayer.succeed(new DataMigration.Live(interrupter, healthcheck, 1)) ++ migrationCQRS)
       fiber <- DataMigration.run(migrationId).fork.provideLayer(layer)
       _ <- processingStarted.await
       _ <- DataMigration.stop(migrationId).provideLayer(layer)
@@ -64,6 +70,7 @@ object DataMigrationSpec extends ZIOSpecDefault {
     } yield assert(c.headOption)(
       isSome(isSubtype[MigrationCommand.StopExecution](anything)),
     )
+
   }
 
   val testExecutionRecordsCreation = test("Execution Records Creation") {

@@ -44,7 +44,7 @@ object IngestionCQRSSpec extends ZIOSpecDefault {
         )
       }
 
-    } @@ TestAspect.ignore,
+    },
     test("should load ingestion") {
       check(
         keyGen,
@@ -172,6 +172,6 @@ object IngestionCQRSSpec extends ZIOSpecDefault {
           .provide((deps ++ ZConnectionMock.pool() ++ SnapshotStrategy.live()) >>> IngestionCQRS.live())
       }
 
-    } @@ TestAspect.ignore,
+    },
   ) @@ TestAspect.withLiveClock
 }

@@ -30,10 +30,10 @@ object MockIngestionEventStore extends Mock[IngestionEventStore] {
           proxy(ReadEvents.Full, id)
 
         def readEvents(id: Key, snapshotVersion: Version): Task[Option[NonEmptyList[Change[IngestionEvent]]]] =
-          proxy(ReadEvents.Snapshot, id, snapshotVersion)
+          proxy(ReadEvents.Snapshot, (id, snapshotVersion))
 
         def save(id: Key, event: Change[IngestionEvent]): Task[Long] =
-          proxy(Save, id, event)
+          proxy(Save, (id, event))
       }
 
     }

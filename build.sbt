@@ -15,7 +15,9 @@ val _ = sys.props += ("CQRSLogLevel" -> Debug.CQRSLogLevel)
 
 lazy val aggregatedProjects: Seq[ProjectReference] =
   Seq(
+    kernel,
     core,
+    std,
     postgres,
     ingestion,
     benchmark,
@@ -32,33 +34,65 @@ lazy val root = (project in file("."))
   .settings(meta)
   .aggregate(aggregatedProjects *)
 
-lazy val core = (project in file("cqrs-core"))
-  .settings(stdSettings("cqrs-core"))
+lazy val kernel = (project in file("kernel"))
+  .settings(stdSettings("kernel"))
   // .settings(publishSetting(false))
-  .settings(buildInfoSettings("cqrs"))
+  .settings(buildInfoSettings("youtoo"))
   .enablePlugins(BuildInfoPlugin)
   .settings(
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
     libraryDependencies ++= Seq(
       // pprint,
-      `zio-logging`,
-      // `zio-logging-slf4j`,
-      `zio-logging-slf4j2`,
-      logback,
-      `zio-jdbc`,
-      `zio-schema-protobuf`,
-      `zio-schema-json`,
-      cats,
-      ulid,
       zio,
+      cats,
       `zio-prelude`,
       `zio-schema`,
+      ulid,
+      zio,
       `zio-test`,
       `zio-test-sbt`,
       `zio-test-magnolia`,
       `zio-mock`,
     ),
   )
+
+lazy val core = (project in file("cqrs-core"))
+  .settings(stdSettings("cqrs-core"))
+  // .settings(publishSetting(false))
+  .settings(buildInfoSettings("youtoo"))
+  .enablePlugins(BuildInfoPlugin)
+  .settings(
+    testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
+    libraryDependencies ++= Seq(
+      // pprint,
+      `zio-logging`,
+      `zio-logging-slf4j2`,
+      logback,
+      `zio-jdbc`,
+      `zio-schema-protobuf`,
+      `zio-schema-json`,
+      ulid,
+      `zio-test`,
+      `zio-test-sbt`,
+      `zio-test-magnolia`,
+      `zio-mock`,
+    ),
+  ).dependsOn(kernel)
+
+lazy val std = (project in file("std"))
+  .settings(stdSettings("std"))
+  .settings(
+    testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
+    libraryDependencies ++= Seq(
+      cats,
+      zio,
+      `zio-prelude`,
+      `zio-test`,
+      `zio-test-sbt`,
+      `zio-test-magnolia`,
+      `zio-mock`,
+    ),
+  ).dependsOn(kernel)
 
 lazy val postgres = (project in file("cqrs-persistence-postgres"))
   .settings(stdSettings("cqrs-persistence-postgres"))
@@ -108,7 +142,7 @@ lazy val ingestion = (project in file("ingestion"))
   //
   //   bashScriptExtraDefines += s"""addJava "-agentpath:/usr/local/YourKit-JavaProfiler-2024.9/bin/${sys.props.getOrElse("ARCH", "linux-arm-64")}/libyjpagent.so=port=10001,listen=all,sampling -Xms2G -Xmx4G -server"""",
   // )
-  .enablePlugins(JavaAppPackaging, DockerPlugin)
+  // .enablePlugins(JavaAppPackaging, DockerPlugin)
   .settings(
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
     libraryDependencies ++= Seq(
@@ -152,7 +186,7 @@ lazy val dataMigration = (project in file("data-migration"))
   //
   //   bashScriptExtraDefines += s"""addJava "-agentpath:/usr/local/YourKit-JavaProfiler-2024.9/bin/${sys.props.getOrElse("ARCH", "linux-arm-64")}/libyjpagent.so=port=10001,listen=all,sampling -Xms2G -Xmx4G -server"""",
   // )
-  .enablePlugins(JavaAppPackaging, DockerPlugin)
+  // .enablePlugins(JavaAppPackaging, DockerPlugin)
   .settings(
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
     libraryDependencies ++= Seq(
@@ -168,7 +202,7 @@ lazy val dataMigration = (project in file("data-migration"))
       `zio-json`,
     ),
   )
-  .dependsOn(postgres % "compile->compile;test->test", core % "compile->compile;test->test")
+  .dependsOn(std % "compile->compile;test->test", postgres % "compile->compile;test->test", core % "compile->compile;test->test")
 
 lazy val benchmark = (project in file("cqrs-benchmark"))
   .settings(stdSettings("cqrs-benchmark"))

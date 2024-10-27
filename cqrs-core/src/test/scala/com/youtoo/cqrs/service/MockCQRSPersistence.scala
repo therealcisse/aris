@@ -31,26 +31,26 @@ object MockCQRSPersistence extends Mock[CQRSPersistence] {
           discriminator: Discriminator,
           snapshotVersion: Version,
         ): ZIO[ZConnection, Throwable, Chunk[Change[Event]]] =
-          proxy(ReadEvents.Snapshot.of[Chunk[Change[Event]]], id, discriminator, snapshotVersion)
+          proxy(ReadEvents.Snapshot.of[Chunk[Change[Event]]], (id, discriminator, snapshotVersion))
 
         def readEvents[Event: BinaryCodec: Tag](
           id: Key,
           discriminator: Discriminator,
         ): ZIO[ZConnection, Throwable, Chunk[Change[Event]]] =
-          proxy(ReadEvents.Full.of[Chunk[Change[Event]]], id, discriminator)
+          proxy(ReadEvents.Full.of[Chunk[Change[Event]]], (id, discriminator))
 
         def saveEvent[Event: BinaryCodec: MetaInfo: Tag](
           id: Key,
           discriminator: Discriminator,
           event: Change[Event],
         ): ZIO[ZConnection, Throwable, Long] =
-          proxy(SaveEvent.of[(Key, Discriminator, Change[Event]), Long], id, discriminator, event)
+          proxy(SaveEvent.of[(Key, Discriminator, Change[Event]), Long], (id, discriminator, event))
 
         def readSnapshot(id: Key): ZIO[ZConnection, Throwable, Option[Version]] =
           proxy(ReadSnapshot, id)
 
         def saveSnapshot(id: Key, version: Version): ZIO[ZConnection, Throwable, Long] =
-          proxy(SaveSnapshot, id, version)
+          proxy(SaveSnapshot, (id, version))
       }
     }
 }

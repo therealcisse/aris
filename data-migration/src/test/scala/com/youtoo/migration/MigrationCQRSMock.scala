@@ -16,7 +16,7 @@ object MigrationCQRSMock extends Mock[MigrationCQRS] {
       for {
         proxy <- ZIO.service[Proxy]
       } yield new MigrationCQRS {
-        def add(id: Key, cmd: MigrationCommand): Task[Unit] = proxy(Add, id, cmd)
+        def add(id: Key, cmd: MigrationCommand): Task[Unit] = proxy(Add, (id, cmd))
         def load(id: Key): Task[Option[Migration]] = proxy(Load, id)
       }
     }

@@ -20,7 +20,7 @@ object MockSnapshotStore extends Mock[SnapshotStore] {
           proxy(ReadSnapshot, id)
 
         def save(id: Key, version: Version): RIO[ZConnection, Long] =
-          proxy(SaveSnapshot, id, version)
+          proxy(SaveSnapshot, (id, version))
       }
     }
 }

@@ -4,6 +4,7 @@ ThisBuild / organization := "com.youtoo"
 ThisBuild / organizationName := "youtoo"
 
 lazy val core = ProjectRef(file("/youtoo/youtoo-src"), "core")
+lazy val std = ProjectRef(file("/youtoo/youtoo-src"), "std")
 lazy val postgres = ProjectRef(file("/youtoo/youtoo-src"), "postgres")
 lazy val ingestion = ProjectRef(file("/youtoo/youtoo-src"), "ingestion")
 lazy val migration = ProjectRef(file("/youtoo/youtoo-src"), "dataMigration")
@@ -25,6 +26,7 @@ lazy val root = (project in file("."))
   .enablePlugins(JavaAppPackaging)
   .dependsOn(
     core,
+    std,
     postgres,
     ingestion,
     migration,

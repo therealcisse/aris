@@ -30,10 +30,10 @@ object MockMigrationEventStore extends Mock[MigrationEventStore] {
           proxy(ReadEvents.Full, id)
 
         def readEvents(id: Key, snapshotVersion: Version): Task[Option[NonEmptyList[Change[MigrationEvent]]]] =
-          proxy(ReadEvents.Snapshot, id, snapshotVersion)
+          proxy(ReadEvents.Snapshot, (id, snapshotVersion))
 
         def save(id: Key, event: Change[MigrationEvent]): Task[Long] =
-          proxy(Save, id, event)
+          proxy(Save, (id, event))
       }
 
     }

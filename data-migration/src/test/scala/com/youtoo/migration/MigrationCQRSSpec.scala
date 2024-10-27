@@ -173,5 +173,5 @@ object MigrationCQRSSpec extends ZIOSpecDefault {
       }
 
     },
-  ) @@ TestAspect.withLiveClock @@ TestAspect.ignore
+  ) @@ TestAspect.withLiveClock
 }

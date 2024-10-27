@@ -7,8 +7,12 @@ import zio.stream.*
 
 import com.youtoo.migration.model.*
 
+import com.youtoo.std.*
+
 trait DataMigration {
+
   def run(id: Migration.Id): ZIO[DataMigration.Processor & MigrationCQRS, Throwable, Unit]
+
   def stop(id: Migration.Id): Task[Unit]
 
 }
@@ -43,12 +47,12 @@ object DataMigration {
 
   }
 
-  def live(): ZLayer[Interrupter, Throwable, DataMigration] =
-    ZLayer.fromFunction { (interrupter: Interrupter) =>
-      new DataMigration.Live(interrupter, batchSize = BATCH_SIZE)
+  def live(): ZLayer[Interrupter & Healthcheck, Throwable, DataMigration] =
+    ZLayer.fromFunction { (interrupter: Interrupter, healthcheck: Healthcheck) =>
+      new DataMigration.Live(interrupter, healthcheck, batchSize = BATCH_SIZE)
     }
 
-  class Live(interrupter: Interrupter, batchSize: Int) extends DataMigration {
+  class Live(interrupter: Interrupter, healthcheck: Healthcheck, batchSize: Int) extends DataMigration {
     def run(id: Migration.Id): ZIO[DataMigration.Processor & MigrationCQRS, Throwable, Unit] =
       val migrationKey = id.asKey
 
@@ -70,6 +74,8 @@ object DataMigration {
           else
             interrupter.watch(migrationKey) { p =>
               for {
+                h <- healthcheck.start(migrationKey, Schedule.spaced(5.seconds))
+
                 executionId <- ((Execution.Id.gen <&> Timestamp.now) flatMap ((executionId, timestamp) =>
                   MigrationCQRS.add(
                     id = migrationKey,
@@ -125,6 +131,8 @@ object DataMigration {
                 )
 
                 _ <- MigrationCQRS.add(id = migrationKey, cmd = cmd)
+
+                _ <- h.stop
 
               } yield ()
 

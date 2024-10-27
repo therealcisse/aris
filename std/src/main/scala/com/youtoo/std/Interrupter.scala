@@ -1,5 +1,5 @@
 package com.youtoo
-package migration
+package std
 
 import zio.*
 
@@ -27,30 +27,38 @@ object Interrupter {
   class Live(ref: Ref.Synchronized[Map[Key, Promise[Throwable, Unit]]]) extends Interrupter {
 
     def watch[R, A](id: Key)(f: Promise[Throwable, Unit] => ZIO[R, Throwable, A]): ZIO[R, Throwable, A] =
-      ref.modifyZIO { s =>
-        s.get(id) match {
-          case None =>
-            Promise.make[Throwable, Unit] map { p =>
-              f(p).ensuring(done(id)) -> (s + (id -> p))
-            }
+      ZIO.uninterruptibleMask { restore =>
+        ref.modifyZIO { s =>
+          s.get(id) match {
+            case None =>
+              Promise.make[Throwable, Unit] map { p =>
+                restore(f(p)).ensuring(done(id)) -> (s + (id -> p))
+              }
 
-          case Some(p) =>
-            ZIO.succeed(f(p).ensuring(done(id)) -> s)
-        }
+            case Some(p) =>
+              ZIO.succeed(restore(f(p)).ensuring(done(id)) -> s)
+          }
 
-      }.flatten
+        }.flatten
+      }
 
     def interrupt(id: Key): Task[Unit] =
-      ref.getAndUpdateZIO { s =>
-        (s.get(id) match {
-          case None => ZIO.unit
-          case Some(p) => p.succeed(())
+      ZIO.uninterruptible {
 
-        }) as (s - id)
-      } as ()
+        ref.getAndUpdateZIO { s =>
+          (s.get(id) match {
+            case None => ZIO.unit
+            case Some(p) => p.succeed(())
+
+          }) as (s - id)
+        } as ()
+      }
 
     private def done(id: Key): UIO[Unit] =
-      ref.update(_ - id)
+      ZIO.uninterruptible {
+        ref.update(_ - id)
+
+      }
 
   }
 
