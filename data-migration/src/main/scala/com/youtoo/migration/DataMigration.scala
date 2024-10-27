@@ -25,7 +25,7 @@ object DataMigration {
   inline def process(key: Key): RIO[DataMigration.Processor, Unit] = ZIO.serviceWithZIO(_.process(key))
 
   inline def run(id: Migration.Id): RIO[DataMigration & MigrationCQRS & DataMigration.Processor, Unit] =
-    ZIO.serviceWithZIO[DataMigration](_.run(id))
+    ZIO.serviceWithZIO[DataMigration](_.run(id)) @@ ZIOAspect.annotated("migration_id", id.asKey.value)
 
   inline def stop(id: Migration.Id): RIO[DataMigration, Unit] =
     ZIO.serviceWithZIO(_.stop(id))
@@ -57,9 +57,9 @@ object DataMigration {
       val migrationKey = id.asKey
 
       inline def logInfo(msg: => String): Task[Unit] =
-        ZIO.logInfo(msg) @@ ZIOAspect.annotated("migration_id", migrationKey.value)
+        ZIO.logInfo(msg)
       inline def logError(msg: => String, e: => Throwable): Task[Unit] =
-        ZIO.logErrorCause(msg, Cause.die(e)) @@ ZIOAspect.annotated("migration_id", migrationKey.value)
+        ZIO.logErrorCause(msg, Cause.die(e))
 
       (DataMigration.count() <&> MigrationCQRS.load(id = migrationKey)) flatMap {
         case (_, None) => ZIO.fail(IllegalArgumentException("Migration not found"))

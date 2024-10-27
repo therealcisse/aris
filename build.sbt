@@ -11,7 +11,7 @@ ThisBuild / resolvers ++= Resolver.sonatypeOssRepos("snapshots")
 ThisBuild / version := "0.1.0-SNAPSHOT"
 
 // Setting default log level to INFO
-val _ = sys.props += ("CQRSLogLevel" -> Debug.CQRSLogLevel)
+val _ = sys.props += ("YouTooLogLevel" -> Debug.LogLevel)
 
 lazy val aggregatedProjects: Seq[ProjectReference] =
   Seq(

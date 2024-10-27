@@ -40,13 +40,13 @@
     </appender>
 
     <!-- Root Logger Configuration -->
-    <root level="${CQRSLogLevel}">
+    <root level="${YouTooLogLevel:-DEBUG}">
         <appender-ref ref="CONSOLE"/>
         <appender-ref ref="ROLLING_FILE"/>
     </root>
 
     <!-- Logger for your application packages -->
-    <logger name="com.youtoo.cqrs" level="INFO" additivity="false">
+    <logger name="com.youtoo" level="INFO" additivity="false">
         <appender-ref ref="CONSOLE"/>
         <appender-ref ref="FILE"/>
     </logger>

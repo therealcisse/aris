@@ -10,6 +10,6 @@ object Debug {
    *
    * Possible Values: DEBUG, ERROR, INFO, TRACE, WARN
    */
-  val CQRSLogLevel = "INFO"
+  val LogLevel = "DEBUG"
 
 }
