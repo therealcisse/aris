@@ -40,7 +40,7 @@
     </appender>
 
     <!-- Root Logger Configuration -->
-    <root level="${YouTooLogLevel:-DEBUG}">
+    <root level="${YOUTOO_LOG_LEVEL:-DEBUG}">
         <appender-ref ref="CONSOLE"/>
         <appender-ref ref="ROLLING_FILE"/>
     </root>

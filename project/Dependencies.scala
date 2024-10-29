@@ -75,4 +75,6 @@ object Dependencies {
   val mockito = "org.mockito" % "mockito-core" % "5.14.2" % Test
 
   val pprint = "com.lihaoyi" %% "pprint" % "0.9.0"
+
+  val `scala-collection-contrib` = "org.scala-lang.modules" %% "scala-collection-contrib" % "0.4.0"
 }

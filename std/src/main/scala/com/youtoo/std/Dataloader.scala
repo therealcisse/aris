@@ -3,9 +3,10 @@ package std
 
 import cats.implicits.*
 
+import scala.collection.mutable.MultiDict as MultiMap
+
 import zio.*
 import java.time.temporal.ChronoUnit
-import scala.collection.immutable.TreeMap
 
 trait Dataloader[T] {
   def fetch(id: Key): Task[Option[T]]
@@ -15,18 +16,29 @@ trait Dataloader[T] {
 object Dataloader {
   inline val INTERVAL = 15L
 
-  case class State[A](backlog: Map[Key, Promise[Throwable, Option[A]]])
+  case class State[A](backlog: MultiMap[Key, Promise[Throwable, Option[A]]])
 
   object State {
-    inline def empty[A]: State[A] = State(TreeMap.empty)
+    inline def empty[A]: State[A] = State(MultiMap.empty[Key, Promise[Throwable, Option[A]]])
 
     extension [A](s: State[A])
-      inline def addRequest(id: Key, promise: Promise[Throwable, Option[A]]): State[A] = State(
-        s.backlog + (id -> promise),
-      )
-    extension [A](s: State[A]) inline def removeRequest(id: Key): State[A] = State(s.backlog - id)
-    extension [A](s: State[A]) inline def getRequest(batchSize: Int): Iterable[Key] = s.backlog.take(batchSize).keys
-    extension [A](s: State[A]) inline def done(keys: Iterable[Key]): State[A] = State(s.backlog -- keys)
+      inline def addRequest(id: Key, promise: Promise[Throwable, Option[A]]): State[A] =
+        s.backlog += (id -> promise)
+        s
+
+    extension [A](s: State[A])
+      inline def removeRequest(id: Key, promise: Promise[Throwable, Option[A]]): State[A] =
+        s.backlog -= (id -> promise)
+        s
+
+    extension [A](s: State[A])
+      inline def getRequest(batchSize: Int): Iterable[Key] = s.backlog.sets.take(batchSize).keys
+
+    extension [A](s: State[A])
+      inline def done(keys: Iterable[Key]): State[A] =
+        keys.foreach(key => s.backlog -*= key)
+        s
+
   }
 
   trait Factory {
@@ -55,8 +67,6 @@ object Dataloader {
       Ref.Synchronized.make(State.empty[A]) flatMap { ref =>
         def setup: ZIO[Scope, Throwable, ?] =
           for {
-            _ <- ZIO.logInfo("Fetch")
-
             started <- Clock.currentTime(ChronoUnit.MILLIS)
 
             keys <- ref.get.map(_.getRequest(batchSize))
@@ -66,11 +76,17 @@ object Dataloader {
               case Some(nec) => loader.loadMany(nec).map(_.map(e => (e.id, e)).toMap)
             }
 
-            _ <- ZIO.foreachParDiscard(keys) { case (key) =>
-              ref.get.flatMap(_.backlog.get(key) match {
-                case None => ZIO.logInfo(s"Not found: $key")
-                case Some(p) => ZIO.logInfo(s"Complete: $key: ${response.get(key)}") *> p.succeed(response.get(key))
-              })
+            _ <- ref.get.flatMap { s =>
+              ZIO.foreachParDiscard(keys) { case (key) =>
+                val value = response.get(key)
+
+                ZIO.collectAllParDiscard {
+
+                  s.backlog.get(key) map (
+                    _.succeed(value)
+                  )
+                }
+              }
 
             }
 
@@ -79,12 +95,8 @@ object Dataloader {
             completed <- Clock.currentTime(ChronoUnit.MILLIS)
 
             wait = INTERVAL - (completed - started)
-            _ = println(s"Elapsed: ${completed - started}")
-            _ = println(s"WAIT: ${wait}")
 
             _ <- if wait <= 0L then ZIO.unit else ZIO.sleep(wait.millisecond)
-
-            _ <- ZIO.logInfo("Done")
 
             _ <- ZIO.yieldNow
 
@@ -92,24 +104,17 @@ object Dataloader {
 
           } yield ()
 
-        def cancelled(id: Key): UIO[Unit] =
-          ZIO.logInfo(s"Cancelled $id") *> ZIO.uninterruptible(ref.update(_.removeRequest(id)))
+        def cancelled(id: Key, promise: Promise[Throwable, Option[A]]): UIO[Unit] =
+          ZIO.uninterruptible(ref.update(_.removeRequest(id, promise)))
 
         setup.forkScoped `as` new Dataloader[A] {
 
           def fetch(id: Key): Task[Option[A]] =
             ZIO.uninterruptibleMask { restore =>
-              (ref.modifyZIO { s =>
-                s.backlog.get(id) match {
-                  case None =>
-                    Promise.make[Throwable, Option[A]] map { p =>
-                      restore(p.await).onInterrupt(cancelled(id)) -> s.addRequest(id, p)
-                    }
+              Promise.make[Throwable, Option[A]] flatMap { p =>
+                ref.update(_.addRequest(id, p)) *> restore(p.await).onInterrupt(cancelled(id, p))
 
-                  case Some(p) => ZIO.succeed(restore(p.await) -> s)
-                }
-
-              }).flatten
+              }
 
             }
 

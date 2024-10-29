@@ -1,4 +1,5 @@
-package com.youtoo.cqrs
+package com.youtoo
+package cqrs
 
 import io.gatling.core.Predef.*
 import io.gatling.http.Predef.*

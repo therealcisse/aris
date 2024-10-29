@@ -1,8 +1,8 @@
 import BuildHelper.*
 import Dependencies.*
 
-// import com.typesafe.sbt.packager.docker.DockerPlugin.autoImport.*
-// import com.typesafe.sbt.packager.docker.*
+import com.typesafe.sbt.packager.docker.DockerPlugin.autoImport.*
+import com.typesafe.sbt.packager.docker.*
 
 import sbt.Keys.*
 
@@ -11,7 +11,7 @@ ThisBuild / resolvers ++= Resolver.sonatypeOssRepos("snapshots")
 ThisBuild / version := "0.1.0-SNAPSHOT"
 
 // Setting default log level to INFO
-val _ = sys.props += ("YouTooLogLevel" -> Debug.LogLevel)
+val _ = sys.props += ("YOUTOO_LOG_LEVEL" -> Debug.LogLevel)
 
 lazy val aggregatedProjects: Seq[ProjectReference] =
   Seq(
@@ -20,16 +20,15 @@ lazy val aggregatedProjects: Seq[ProjectReference] =
     std,
     postgres,
     ingestion,
-    benchmark,
     dataMigration,
+    loadtests,
+    benchmarks,
   )
 
-inThisBuild(
-  replSettings,
-)
+inThisBuild(replSettings)
 
 lazy val root = (project in file("."))
-  .settings(stdSettings("cqrs-root"))
+  .settings(stdSettings("youtoo-root"))
   // .settings(publishSetting(false))
   .settings(meta)
   .aggregate(aggregatedProjects *)
@@ -42,6 +41,7 @@ lazy val kernel = (project in file("kernel"))
   .settings(
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
     libraryDependencies ++= Seq(
+      `scala-collection-contrib`,
       // pprint,
       zio,
       cats,
@@ -57,6 +57,7 @@ lazy val kernel = (project in file("kernel"))
   )
 
 lazy val core = (project in file("cqrs-core"))
+  .dependsOn(kernel)
   .settings(stdSettings("cqrs-core"))
   // .settings(publishSetting(false))
   .settings(buildInfoSettings("youtoo"))
@@ -77,9 +78,11 @@ lazy val core = (project in file("cqrs-core"))
       `zio-test-magnolia`,
       `zio-mock`,
     ),
-  ).dependsOn(kernel)
+  )
+  .dependsOn(kernel)
 
 lazy val std = (project in file("std"))
+  .dependsOn(kernel)
   .settings(stdSettings("std"))
   .settings(
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
@@ -92,9 +95,10 @@ lazy val std = (project in file("std"))
       `zio-test-magnolia`,
       `zio-mock`,
     ),
-  ).dependsOn(kernel)
+  )
 
 lazy val postgres = (project in file("cqrs-persistence-postgres"))
+  .dependsOn(core)
   .settings(stdSettings("cqrs-persistence-postgres"))
   // .settings(publishSetting(false))
   .settings(
@@ -113,9 +117,9 @@ lazy val postgres = (project in file("cqrs-persistence-postgres"))
       mockito,
     ),
   )
-  .dependsOn(core)
 
 lazy val ingestion = (project in file("ingestion"))
+  .dependsOn(postgres % "compile->compile;test->test", core % "compile->compile;test->test")
   .settings(stdSettings("ingestion"))
   // .settings(publishSetting(false))
   // .settings(
@@ -157,9 +161,13 @@ lazy val ingestion = (project in file("ingestion"))
       `zio-json`,
     ),
   )
-  .dependsOn(postgres % "compile->compile;test->test", core % "compile->compile;test->test")
 
 lazy val dataMigration = (project in file("data-migration"))
+  .dependsOn(
+    std % "compile->compile;test->test",
+    postgres % "compile->compile;test->test",
+    core % "compile->compile;test->test",
+  )
   .settings(stdSettings("data-migration"))
   // .settings(publishSetting(false))
   // .settings(
@@ -202,11 +210,10 @@ lazy val dataMigration = (project in file("data-migration"))
       `zio-json`,
     ),
   )
-  .dependsOn(std % "compile->compile;test->test", postgres % "compile->compile;test->test", core % "compile->compile;test->test")
 
-lazy val benchmark = (project in file("cqrs-benchmark"))
-  .settings(stdSettings("cqrs-benchmark"))
-  // .settings(publishSetting(false))
+lazy val loadtests = (project in file("loadtests"))
+  .dependsOn(ingestion)
+  .settings(stdSettings("loadtests"))
   .settings(Gatling / javaOptions := overrideDefaultJavaOptions("-Xms1G", "-Xmx4G"))
   .enablePlugins(GatlingPlugin)
   .settings(
@@ -216,4 +223,15 @@ lazy val benchmark = (project in file("cqrs-benchmark"))
       `gatling-test-framework`,
     ),
   )
-  .dependsOn(ingestion)
+
+lazy val benchmarks = (project in file("benchmarks"))
+  .dependsOn(std % "compile->compile;test->test", kernel % "compile->compile;test->test")
+  .settings(stdSettings("benchmarks"))
+  .enablePlugins(JmhPlugin)
+  .settings(
+    libraryDependencies += "dev.zio" %% "zio-profiling" % "0.3.2",
+    libraryDependencies += "dev.zio" %% "zio-profiling-jmh" % "0.3.2",
+    libraryDependencies += compilerPlugin("dev.zio" %% "zio-profiling-tagging-plugin" % "0.3.2"),
+    libraryDependencies += `scala-collection-contrib`,
+  )
+

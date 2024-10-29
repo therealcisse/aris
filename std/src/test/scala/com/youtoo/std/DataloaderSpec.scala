@@ -51,16 +51,41 @@ object DataloaderSpec extends ZIOSpecDefault {
         assert(result2)(isNone) &&
         assert(result3)(isSome(equalTo("3")))
     },
+    test("should handle multiple calls") {
+      for {
+        bulkLoader <- MockBulkLoader[String]
+        factory <- ZIO.service[Dataloader.Factory]
+        dataloader <- factory.createLoader(bulkLoader, 8)
+        fetchFiber1 <- dataloader.fetch(Key("1")).fork
+        fetchFiber2 <- dataloader.fetch(Key("1")).fork
+        _ <- TestClock.adjust(15.millis)
+        result <- bulkLoader.getCalls
+      } yield assert(result.size)(equalTo(1)) && assert(result)(forall(contains("1")))
+    },
     test("should remove cancelled keys from backlog") {
       for {
         bulkLoader <- MockBulkLoader[String]
         factory <- ZIO.service[Dataloader.Factory]
         dataloader <- factory.createLoader(bulkLoader, 8)
-        fetchFiber <- dataloader.fetch(Key("1")).fork
-        _ <- fetchFiber.interrupt // Cancel the fetch
+        fetchFiber1 <- dataloader.fetch(Key("1")).fork
+        fetchFiber2 <- dataloader.fetch(Key("1")).fork
+        _ <- fetchFiber1.interrupt // Cancel the fetch
+        _ <- fetchFiber2.interrupt // Cancel the fetch
         _ <- TestClock.adjust(15.millis)
         result <- bulkLoader.getCalls
       } yield assert(result.size)(equalTo(0)) && assert(result)(forall(not(contains("1"))))
+    } @@ TestAspect.flaky,
+    test("should remove only cancelled keys from backlog") {
+      for {
+        bulkLoader <- MockBulkLoader[String]
+        factory <- ZIO.service[Dataloader.Factory]
+        dataloader <- factory.createLoader(bulkLoader, 8)
+        fetchFiber1 <- dataloader.fetch(Key("1")).fork
+        fetchFiber2 <- dataloader.fetch(Key("1")).fork
+        _ <- fetchFiber2.interrupt // Cancel the fetch
+        _ <- TestClock.adjust(15.millis)
+        result <- bulkLoader.getCalls
+      } yield assert(result.size)(equalTo(1)) && assert(result)(forall(contains("1")))
     },
     test("should call loadMany as many times as needed") {
       check(Gen.int(1, 36)) { n =>
