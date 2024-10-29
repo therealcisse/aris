@@ -225,7 +225,11 @@ lazy val loadtests = (project in file("loadtests"))
   )
 
 lazy val benchmarks = (project in file("benchmarks"))
-  .dependsOn(std % "compile->compile;test->test", kernel % "compile->compile;test->test")
+  .dependsOn(
+    std % "compile->compile;test->test",
+    kernel % "compile->compile;test->test",
+    dataMigration % "compile->compile;test->test",
+  )
   .settings(stdSettings("benchmarks"))
   .enablePlugins(JmhPlugin)
   .settings(
@@ -234,4 +238,3 @@ lazy val benchmarks = (project in file("benchmarks"))
     libraryDependencies += compilerPlugin("dev.zio" %% "zio-profiling-tagging-plugin" % "0.3.2"),
     libraryDependencies += `scala-collection-contrib`,
   )
-
