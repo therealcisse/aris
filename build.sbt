@@ -11,7 +11,7 @@ ThisBuild / resolvers ++= Resolver.sonatypeOssRepos("snapshots")
 ThisBuild / version := "0.1.0-SNAPSHOT"
 
 // Setting default log level to INFO
-val _ = sys.props += ("YOUTOO_LOG_LEVEL" -> Debug.LogLevel)
+val _ = sys.props += ("YOUTOO_LOG_LEVEL" -> sys.env.getOrElse("YOUTOO_LOG_LEVEL", Debug.LogLevel))
 
 lazy val aggregatedProjects: Seq[ProjectReference] =
   Seq(

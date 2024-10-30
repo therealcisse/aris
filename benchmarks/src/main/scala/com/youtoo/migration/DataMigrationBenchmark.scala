@@ -31,88 +31,149 @@ import zio.profiling.jmh.BenchmarkUtils
 class DataMigrationBenchmark {
   import DataMigrationBenchmark.*
 
-  var runtime: Runtime.Scoped[DataMigration] = scala.compiletime.uninitialized
-
   var id: Migration.Id = scala.compiletime.uninitialized
+  var table: String = scala.compiletime.uninitialized
 
   @Setup(Level.Trial)
-  def setup(): Unit =
-    runtime = Unsafe.unsafe { implicit unsafe =>
-      Runtime.unsafe.fromLayer(migrationLayer)
-    }
-
-    id = Unsafe.unsafe { implicit unsafe =>
-      runtime.unsafe.run(init).getOrThrowFiberFailure()
-    }
-
-  @TearDown(Level.Trial)
-  def tearDown(): Unit =
+  def setupDatabase(): Unit =
     Unsafe.unsafe { implicit unsafe =>
-      runtime.unsafe.shutdown()
+      Runtime.default.unsafe.run(createDatabase).getOrThrowFiberFailure()
     }
 
-  @Param(Array("10", "100", "1000", "10000", "1000000"))
+  @Setup(Level.Invocation)
+  def setupInvocation(): Unit =
+
+    val result = Unsafe.unsafe { implicit unsafe =>
+      Runtime.default.unsafe.run(createMigration).getOrThrowFiberFailure()
+    }
+
+    id = result._1
+    table = result._2
+
+  @TearDown(Level.Invocation)
+  def tearDownInvocation(): Unit =
+    Unsafe.unsafe { implicit unsafe =>
+      Runtime.default.unsafe.run(dropTable(table)).getOrThrowFiberFailure()
+    }
+
+  @Param(
+    Array(
+      "10",
+      "100",
+      "1000",
+      "10000",
+      "1000000",
+    ),
+  )
   var numRows: Long = scala.compiletime.uninitialized
 
   @Benchmark
   def benchmarkDataMigrationFetch(): Unit = execute {
-    val l = runtime.environment.get[DataMigration]
-
-    DataMigration.run(id).provide(ZLayer.succeed(new MockProcessor(numRows)), ZLayer.succeed(l), deps)
+    val layer = deps >+> MockProcessor(table, numRows) ++ migrationLayer
+    DataMigration.run(id).provideLayer(layer)
   }
 
 }
 
 object DataMigrationBenchmark {
-  val deps: ZLayer[Any, Throwable, MigrationCQRS] = ZLayer.make[MigrationCQRS](
-    SnapshotStrategy.live(),
-    DatabaseConfig.pool,
-    MigrationCheckpointer.live(),
-    SnapshotStore.live(),
-    MigrationEventStore.live(),
-    MigrationRepository.live(),
-    MigrationService.live(),
-    MigrationProvider.live(),
-    MigrationCQRS.live(),
-    PostgresCQRSPersistence.live(),
-  )
+  import zio.logging.*
+  import zio.logging.backend.*
 
-  val init: Task[Migration.Id] =
+  val deps =
+    Runtime.removeDefaultLoggers >>> SLF4J.slf4j ++ ZLayer.make[MigrationCQRS & FlywayMigration & ZConnectionPool](
+      SnapshotStrategy.live(),
+      DatabaseConfig.pool,
+      MigrationCheckpointer.live(),
+      SnapshotStore.live(),
+      MigrationEventStore.live(),
+      MigrationRepository.live(),
+      MigrationService.live(),
+      MigrationProvider.live(),
+      MigrationCQRS.live(),
+      PostgresCQRSPersistence.live(),
+      FlywayMigration.live(),
+    )
+
+  val createMigration: Task[(Migration.Id, String)] =
     for {
       config <- ZIO.config[DatabaseConfig]
 
-      id <- Migration.Id.gen
+      id <- Key.gen
+
+      tableName <- Key.gen
 
       timestamp <- Timestamp.now
 
-      migration =
-        Migration(id = id, state = Migration.State.empty, timestamp = timestamp)
+      cmd =
+        MigrationCommand.RegisterMigration(id = Migration.Id(id), timestamp = timestamp)
 
-      layer = ZLayer.make[MigrationService & FlywayMigration & ZConnectionPool](
-        DatabaseConfig.pool,
-        MigrationRepository.live(),
-        MigrationService.live(),
-        FlywayMigration.live(),
-      )
-
-      op = (atomically {
+      op0 = (atomically {
 
         transaction {
-          MigrationService.save(migration)
+          MigrationCQRS.add(id, cmd)
         }
 
       })
 
-      _ <- (FlywayMigration.run(config) *> op).provideLayer(layer)
+      op1 = (atomically {
 
-    } yield id
+        transaction {
+          (s"CREATE TABLE DMB_${tableName.value}" ++ sql"(id TEXT NOT NULL PRIMARY KEY, body TEXT NOT NULL, timestamp BIGINT NOT NULL)").execute
 
-  class MockProcessor(rows: Long) extends DataMigration.Processor {
-    def count(): Task[Long] = ZIO.succeed(rows)
-    def load(): ZStream[Any, Throwable, Key] = ZStream.fromIterable((1L to rows).map(a => Key(s"$a")))
-    def process(key: Key): Task[Unit] = ZIO.unit
+        }
 
-  }
+      })
+
+      _ <- (op0 <&> op1).provideLayer(deps)
+
+    } yield (Migration.Id(id), tableName.value)
+
+  def dropTable(name: String): Task[Unit] =
+    val op = (atomically {
+
+      transaction {
+        (sql"drop table " ++ s"DMB_$name").execute
+
+      }
+
+    })
+
+    op.provideLayer(deps)
+
+  val createDatabase: Task[Unit] =
+    for {
+      config <- ZIO.config[DatabaseConfig]
+
+      _ <- FlywayMigration.run(config).provideLayer(deps)
+
+    } yield ()
+
+  def MockProcessor(tableName: String, rows: Long): ZLayer[ZConnectionPool, Throwable, DataMigration.Processor] =
+    ZLayer.fromFunction { (pool: ZConnectionPool) =>
+      new DataMigration.Processor {
+        def count(): Task[Long] = ZIO.succeed(rows)
+
+        def load(): ZStream[Any, Throwable, Key] = ZStream.fromIterable((1L to rows).map(a => Key(s"$a")))
+
+        def process(key: Key): Task[Unit] =
+          (Timestamp.now <&> zio.Random.nextString(length = 256)) flatMap { case (timestamp, body) =>
+            (atomically {
+
+              transaction {
+                SqlFragment
+                  .insertInto(s"DMB_$tableName")("id", "body", "timestamp")
+                  .values((key.value, body, timestamp.value))
+                  .insert
+                  .unit
+
+              }
+
+            }).provideEnvironment(ZEnvironment(pool))
+          }
+
+      }
+
+    }
 
   class MockInterrupter() extends Interrupter {
     def watch[R, A](id: Key)(f: Promise[Throwable, Unit] => ZIO[R, Throwable, A]): ZIO[R, Throwable, A] =
@@ -138,6 +199,6 @@ object DataMigrationBenchmark {
       DataMigration.Live(interrupter = new MockInterrupter(), healthcheck = new MockHealthcheck(), 8)
     }
 
-  def execute(query: ZIO[Any, Throwable, ?]): Unit = BenchmarkUtils.unsafeRun(query.fork)
+  def execute(query: ZIO[Any, Throwable, ?]): Unit = BenchmarkUtils.unsafeRun(query)
 
 }

@@ -25,7 +25,7 @@ object DataMigration {
   inline def process(key: Key): RIO[DataMigration.Processor, Unit] = ZIO.serviceWithZIO(_.process(key))
 
   inline def run(id: Migration.Id): RIO[DataMigration & MigrationCQRS & DataMigration.Processor, Unit] =
-    ZIO.serviceWithZIO[DataMigration](_.run(id)) @@ ZIOAspect.annotated("migration_id", id.asKey.value)
+    ZIO.serviceWithZIO[DataMigration](_.run(id) @@ ZIOAspect.annotated("migration_id", id.asKey.value))
 
   inline def stop(id: Migration.Id): RIO[DataMigration, Unit] =
     ZIO.serviceWithZIO(_.stop(id))
@@ -90,20 +90,26 @@ object DataMigration {
                   .interruptWhen(p)
                   .mapZIOParUnordered(n = batchSize) { key =>
                     ref.getAndUpdateZIO { s =>
-                      if s.isProcessed(key) then ZIO.succeed(s)
+                      inline def process = DataMigration.process(key)
+                      inline def onError =
+                        MigrationCQRS.add(id = migrationKey, cmd = MigrationCommand.FailKey(id = executionId, key))
+                      inline def onCancelled = MigrationCQRS
+                        .add(id = migrationKey, cmd = MigrationCommand.FailKey(id = executionId, key))
+                        .ignoreLogged
+                      inline def onSuccess =
+                        MigrationCQRS.add(id = migrationKey, cmd = MigrationCommand.ProcessKey(id = executionId, key))
+
+                      if s.isProcessed(key) then logInfo(s"Already processed key: $key") `as` s
                       else
-                        DataMigration.process(key) foldZIO (
-                          success = _ =>
-                            logInfo(s"Processed key: $key") *> MigrationCQRS.add(
-                              id = migrationKey,
-                              cmd = MigrationCommand.ProcessKey(id = executionId, key),
-                            ) `as` s.addProcessed(key),
-                          failure = e =>
-                            logError(s"Processing failed: $key", e) *> MigrationCQRS.add(
-                              id = migrationKey,
-                              cmd = MigrationCommand.FailKey(id = executionId, key),
-                            ) `as` s.addFailed(key)
-                        )
+                        ZIO.uninterruptibleMask { restore =>
+                          restore(process).onInterrupt(onCancelled) `foldZIO` (
+                            success =
+                              _ => logInfo(s"Processed key: $key") *> restore(onSuccess) `as` s.addProcessed(key),
+                            failure =
+                              e => logError(s"Processing failed: $key", e) *> restore(onError) `as` s.addFailed(key)
+                          )
+
+                        }
 
                     }
 

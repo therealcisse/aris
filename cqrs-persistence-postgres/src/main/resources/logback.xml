@@ -1,10 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
+    <property name="LOG_LEVEL" value="${YOUTOO_LOG_LEVEL:-${env:YOUTOO_LOG_LEVEL:-DEBUG}}" />
 
     <!-- Define the pattern for the log output -->
-    <property name="LOG_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg [%X{migration_id}]%n"/>
-    <!-- <property name="LOG_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"/> -->
-    <!-- <property name="LOG_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level [%fiberId] %logger{36} %name:%line - %msg %cause [%kvp]%n"/> -->
+    <property name="LOG_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"/>
 
     <!-- Define the log file location -->
     <property name="LOG_FILE" value="logs/application.log"/>
@@ -40,16 +39,17 @@
     </appender>
 
     <!-- Root Logger Configuration -->
-    <root level="${YOUTOO_LOG_LEVEL:-DEBUG}">
+    <!-- <root level="${YOUTOO_LOG_LEVEL:-DEBUG}"> -->
+    <root level="${LOG_LEVEL}">
         <appender-ref ref="CONSOLE"/>
-        <appender-ref ref="ROLLING_FILE"/>
+        <!-- <appender-ref ref="ROLLING_FILE"/> -->
     </root>
 
     <!-- Logger for your application packages -->
-    <logger name="com.youtoo" level="INFO" additivity="false">
-        <appender-ref ref="CONSOLE"/>
-        <appender-ref ref="FILE"/>
-    </logger>
+    <!-- <logger name="com.youtoo" level="INFO" additivity="false"> -->
+    <!--     <appender-ref ref="CONSOLE"/> -->
+    <!--     <appender-ref ref="FILE"/> -->
+    <!-- </logger> -->
 
 </configuration>
 

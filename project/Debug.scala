@@ -10,6 +10,6 @@ object Debug {
    *
    * Possible Values: DEBUG, ERROR, INFO, TRACE, WARN
    */
-  val LogLevel = "DEBUG"
+  val LogLevel = "INFO"
 
 }
