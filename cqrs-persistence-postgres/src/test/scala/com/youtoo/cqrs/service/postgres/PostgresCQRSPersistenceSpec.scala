@@ -43,10 +43,34 @@ object PostgresCQRSPersistenceSpec extends PgSpec {
 
           saveResult <- atomically(persistence.saveEvent(key, DummyEvent.discriminator, event))
 
-          a <- assert(saveResult)(equalTo(1L))
+          a = assert(saveResult)(equalTo(1L))
 
           events <- atomically(persistence.readEvents[DummyEvent](key, DummyEvent.discriminator))
-          b <- assert(events)(isNonEmpty)
+          b = assert(events)(isNonEmpty)
+
+        } yield a && b
+      },
+      test("should save and retrieve events by namespace correctly") {
+        for {
+          persistence <- ZIO.service[CQRSPersistence]
+
+          version <- Version.gen
+          event = Change(version = version, DummyEvent("test"))
+          key <- Key.gen
+
+          saveResult <- atomically(persistence.saveEvent(key, DummyEvent.discriminator, event))
+
+          a = assert(saveResult)(equalTo(1L))
+
+          events0 <- atomically(
+            persistence.readEvents[DummyEvent](key, DummyEvent.discriminator, ns = NonEmptyChunk(Namespace(0))),
+          )
+          b = assert(events0)(isNonEmpty)
+
+          events1 <- atomically(
+            persistence.readEvents[DummyEvent](key, DummyEvent.discriminator, ns = NonEmptyChunk(Namespace(1))),
+          )
+          c = assert(events1)(isEmpty)
 
         } yield a && b
       },
@@ -75,7 +99,7 @@ object PostgresCQRSPersistenceSpec extends PgSpec {
 
           es <- atomically(persistence.readEvents[DummyEvent](key, DummyEvent.discriminator))
 
-          a <- assert(es)(equalTo(es.sortBy(_.version)))
+          a = assert(es)(equalTo(es.sorted)) && assert(es)(equalTo(events.sorted))
 
         } yield a
       },
@@ -104,7 +128,7 @@ object PostgresCQRSPersistenceSpec extends PgSpec {
 
           es <- atomically(persistence.readEvents[DummyEvent](key, DummyEvent.discriminator))
 
-          a <- assert(es)(equalTo(events))
+          a = assert((es))(equalTo((events.sorted)))
 
           max = es.maxBy(_.version)
 
@@ -112,7 +136,7 @@ object PostgresCQRSPersistenceSpec extends PgSpec {
             persistence.readEvents[DummyEvent](key, DummyEvent.discriminator, snapshotVersion = max.version),
           )
 
-          b <- assert(es1)(isEmpty)
+          b = assert(es1)(isEmpty)
 
           events1 <- ZIO.collectAll {
             (1 to 100).map { i =>
@@ -135,13 +159,13 @@ object PostgresCQRSPersistenceSpec extends PgSpec {
             persistence.readEvents[DummyEvent](key, DummyEvent.discriminator, snapshotVersion = max.version),
           )
 
-          c <- assert(es2)(equalTo(events1))
+          c = assert(es2)(equalTo(events1.sorted))
 
           max1 = es2.maxBy(_.version)
           es3 <- atomically(
             persistence.readEvents[DummyEvent](key, DummyEvent.discriminator, snapshotVersion = max1.version),
           )
-          d <- assert(es3)(isEmpty)
+          d = assert(es3)(isEmpty)
         } yield a && b && c && d
       },
       test("should handle snapshot storage correctly") {
@@ -151,10 +175,10 @@ object PostgresCQRSPersistenceSpec extends PgSpec {
           version <- Version.gen
 
           saveSnapshotResult <- atomically(persistence.saveSnapshot(key, version))
-          a <- assert(saveSnapshotResult)(equalTo(1L))
+          a = assert(saveSnapshotResult)(equalTo(1L))
 
           snapshot <- atomically(persistence.readSnapshot(key))
-          b <- assert(snapshot)(isSome(equalTo(version)))
+          b = assert(snapshot)(isSome(equalTo(version)))
 
         } yield a && b
       },
@@ -202,6 +226,35 @@ object PostgresCQRSPersistenceSpec extends PgSpec {
           } yield planAssertion && timeAssertion
         }
       },
+      test("read all events by namespace is optimized") {
+        check(keyGen, namespacesGen) { case (key, ns) =>
+          val query = PostgresCQRSPersistence.Queries.READ_EVENTS[DummyEvent](key, DummyEvent.discriminator, ns)
+          for {
+
+            executionTime <- atomically(query.selectAll).timed.map(_._1)
+            timeAssertion = assert(executionTime.toMillis)(isLessThanEqualTo(100L))
+
+            executionPlan <- atomically(query.sql.getExecutionPlan)
+            planAssertion = assert(executionPlan)(containsString("Index Scan") || containsString("Index Only Scan"))
+
+          } yield planAssertion && timeAssertion
+        }
+      },
+      test("read snapshot events by namespace is optimized") {
+        check(keyGen, versionGen, namespacesGen) { case (key, version, ns) =>
+          val query =
+            PostgresCQRSPersistence.Queries.READ_EVENTS[DummyEvent](key, DummyEvent.discriminator, version, ns)
+          for {
+
+            executionTime <- atomically(query.selectAll).timed.map(_._1)
+            timeAssertion = assert(executionTime.toMillis)(isLessThanEqualTo(100L))
+
+            executionPlan <- atomically(query.sql.getExecutionPlan)
+            planAssertion = assert(executionPlan)(containsString("Index Scan"))
+
+          } yield planAssertion && timeAssertion
+        }
+      },
     ).provideSomeLayerShared(
       PostgresCQRSPersistence.live(),
     ) @@ TestAspect.sequential @@ TestAspect.withLiveClock @@ TestAspect.beforeAll {
@@ -216,4 +269,13 @@ object PostgresCQRSPersistenceSpec extends PgSpec {
   val keyGen: Gen[Any, Key] = Gen.fromZIO(Key.gen.orDie)
   val versionGen: Gen[Any, Version] = Gen.fromZIO(Version.gen.orDie)
 
+  val namespacesGen: Gen[Any, NonEmptyChunk[Namespace]] =
+    Gen
+      .setOfBounded(1, 8)(Gen.int)
+      .map(s =>
+        NonEmptyChunk.fromIterableOption(s) match {
+          case None => throw IllegalArgumentException("empty")
+          case Some(nes) => nes.map(Namespace.apply)
+        },
+      )
 }

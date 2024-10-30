@@ -32,6 +32,21 @@ object PostgresCQRSPersistence {
         ): RIO[ZConnection, Chunk[Change[Event]]] =
           Queries.READ_EVENTS(id, discriminator, snapshotVersion).selectAll
 
+        def readEvents[Event: BinaryCodec: Tag](
+          id: Key,
+          discriminator: Discriminator,
+          ns: NonEmptyChunk[Namespace],
+        ): RIO[ZConnection, Chunk[Change[Event]]] =
+          Queries.READ_EVENTS(id, discriminator, ns).selectAll
+
+        def readEvents[Event: BinaryCodec: Tag](
+          id: Key,
+          discriminator: Discriminator,
+          snapshotVersion: Version,
+          ns: NonEmptyChunk[Namespace],
+        ): RIO[ZConnection, Chunk[Change[Event]]] =
+          Queries.READ_EVENTS(id, discriminator, snapshotVersion, ns).selectAll
+
         def saveEvent[Event: BinaryCodec: MetaInfo: Tag](
           id: Key,
           discriminator: Discriminator,
@@ -74,6 +89,38 @@ object PostgresCQRSPersistence {
       WHERE aggregate_id = $id AND discriminator = $discriminator AND version > $snapshotVersion
       ORDER BY version ASC
       """.query[(Version, Event)].map(Change.apply)
+
+    def READ_EVENTS[Event: BinaryCodec](
+      id: Key,
+      discriminator: Discriminator,
+      ns: NonEmptyChunk[Namespace],
+    ): Query[Change[Event]] =
+      (sql"""
+      SELECT
+        version,
+        payload
+      FROM events
+      WHERE aggregate_id = $id
+        AND discriminator = $discriminator
+        AND namespace IN (${ns.toChunk})
+      ORDER BY version ASC""").query[(Version, Event)].map(Change.apply)
+
+    def READ_EVENTS[Event: BinaryCodec](
+      id: Key,
+      discriminator: Discriminator,
+      snapshotVersion: Version,
+      ns: NonEmptyChunk[Namespace],
+    ): Query[Change[Event]] =
+      (sql"""
+      SELECT
+        version,
+        payload
+      FROM events
+      WHERE aggregate_id = $id
+        AND discriminator = $discriminator
+        AND version > $snapshotVersion
+        AND namespace IN (${ns.toChunk})
+      ORDER BY version ASC""").query[(Version, Event)].map(Change.apply)
 
     def SAVE_EVENT[Event: BinaryCodec: MetaInfo](
       id: Key,

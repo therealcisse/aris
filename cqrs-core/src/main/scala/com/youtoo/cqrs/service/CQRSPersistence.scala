@@ -15,6 +15,18 @@ trait CQRSPersistence {
     discriminator: Discriminator,
     snapshotVersion: Version,
   ): RIO[ZConnection, Chunk[Change[Event]]]
+  def readEvents[Event: BinaryCodec: Tag](
+    id: Key,
+    discriminator: Discriminator,
+    ns: NonEmptyChunk[Namespace],
+  ): RIO[ZConnection, Chunk[Change[Event]]]
+  def readEvents[Event: BinaryCodec: Tag](
+    id: Key,
+    discriminator: Discriminator,
+    snapshotVersion: Version,
+    ns: NonEmptyChunk[Namespace],
+  ): RIO[ZConnection, Chunk[Change[Event]]]
+
   def saveEvent[Event: BinaryCodec: MetaInfo: Tag](
     id: Key,
     discriminator: Discriminator,

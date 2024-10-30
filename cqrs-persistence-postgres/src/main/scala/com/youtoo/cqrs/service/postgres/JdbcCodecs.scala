@@ -11,8 +11,6 @@ import zio.jdbc.*
 
 trait JdbcCodecs {
 
-  // given [T: Schema]: JdbcDecoder[T] = JdbcDecoder.fromSchema[T]
-
   given SqlFragment.Setter[Key] = SqlFragment.Setter[String].contramap(_.value.toString)
   given SqlFragment.Setter[Version] = SqlFragment.Setter[String].contramap(_.value)
   given SqlFragment.Setter[Timestamp] = SqlFragment.Setter[Long].contramap(_.value)
