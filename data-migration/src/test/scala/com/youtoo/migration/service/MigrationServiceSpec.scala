@@ -9,6 +9,7 @@ import zio.test.Assertion.*
 import zio.mock.Expectation.*
 import zio.*
 import zio.jdbc.*
+import zio.mock.*
 
 import com.youtoo.cqrs.service.*
 import com.youtoo.cqrs.service.postgres.*
@@ -20,11 +21,8 @@ import com.youtoo.migration.store.MigrationEventStore
 import com.youtoo.cqrs.store.SnapshotStore
 import com.youtoo.cqrs.SnapshotStrategy
 
-object MigrationServiceSpec extends ZIOSpecDefault {
+object MigrationServiceSpec extends MockSpecDefault {
   def spec = suite("MigrationServiceSpec")(
-    test("empty") {
-      assertCompletesZIO
-    },
     test("load returns expected migration using MigrationRepository") {
       check(migrationGen) { case expectedMigration =>
         val migrationId = expectedMigration.id

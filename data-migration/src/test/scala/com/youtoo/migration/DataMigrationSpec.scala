@@ -6,6 +6,7 @@ import zio.stream.*
 import zio.test.*
 import zio.test.Assertion.*
 import zio.mock.Expectation.*
+import zio.mock.*
 import zio.*
 
 import com.youtoo.std.*
@@ -13,7 +14,7 @@ import com.youtoo.std.*
 import com.youtoo.migration.model.*
 import com.youtoo.migration.service.*
 
-object DataMigrationSpec extends ZIOSpecDefault {
+object DataMigrationSpec extends MockSpecDefault {
 
   def spec = suite("DataMigrationSpec")(
     testExecutionRecordsCreation,

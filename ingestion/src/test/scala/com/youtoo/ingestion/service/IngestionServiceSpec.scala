@@ -6,6 +6,7 @@ import cats.implicits.*
 
 import zio.test.*
 import zio.prelude.*
+import zio.mock.*
 import zio.test.Assertion.*
 import zio.mock.Expectation.*
 import zio.*
@@ -21,7 +22,7 @@ import com.youtoo.cqrs.*
 import com.youtoo.ingestion.store.*
 import com.youtoo.cqrs.store.*
 
-object IngestionServiceSpec extends ZIOSpecDefault {
+object IngestionServiceSpec extends MockSpecDefault {
   def spec = suite("IngestionServiceSpec")(
     test("should load ingestion") {
       check(

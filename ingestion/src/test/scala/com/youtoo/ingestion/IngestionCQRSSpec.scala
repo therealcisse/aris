@@ -6,6 +6,7 @@ import zio.test.Assertion.*
 import zio.mock.Expectation.*
 import zio.*
 import zio.jdbc.*
+import zio.mock.*
 
 import com.youtoo.cqrs.*
 import com.youtoo.ingestion.model.*
@@ -16,7 +17,7 @@ import com.youtoo.cqrs.store.*
 
 import com.youtoo.cqrs.service.postgres.*
 
-object IngestionCQRSSpec extends ZIOSpecDefault {
+object IngestionCQRSSpec extends MockSpecDefault {
 
   def spec = suite("IngestionCQRSSpec")(
     test("should add command") {
