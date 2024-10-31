@@ -146,8 +146,6 @@ Use PostgresCQRSPersistence, IngestionEventStore, and IngestionService to manage
 
 ```scala
 val cqrsLayer = ZLayer.make[IngestionCQRS](
-  IngestionCheckpointer.live(),
-  IngestionProvider.live(),
   IngestionEventStore.live(),
   SnapshotStore.live(),
   PostgresCQRSPersistence.live()

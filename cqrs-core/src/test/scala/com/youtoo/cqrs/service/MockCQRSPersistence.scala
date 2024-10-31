@@ -14,6 +14,14 @@ object MockCQRSPersistence extends Mock[CQRSPersistence] {
   object ReadEvents {
     object Full extends Poly.Effect.Output[(Key, Discriminator), Throwable]
     object Snapshot extends Poly.Effect.Output[(Key, Discriminator, Version), Throwable]
+
+    object FullArgs
+        extends Poly.Effect.Output[(Key, Discriminator, Option[NonEmptyChunk[Namespace]], Option[Hierarchy]), Throwable]
+    object SnapshotArgs
+        extends Poly.Effect.Output[
+          (Key, Discriminator, Version, Option[NonEmptyChunk[Namespace]], Option[Hierarchy]),
+          Throwable,
+        ]
   }
 
   object SaveEvent extends Poly.Effect.InputOutput[Throwable]
@@ -38,6 +46,23 @@ object MockCQRSPersistence extends Mock[CQRSPersistence] {
           discriminator: Discriminator,
         ): ZIO[ZConnection, Throwable, Chunk[Change[Event]]] =
           proxy(ReadEvents.Full.of[Chunk[Change[Event]]], (id, discriminator))
+
+        def readEvents[Event: BinaryCodec: Tag](
+          id: Key,
+          discriminator: Discriminator,
+          snapshotVersion: Version,
+          ns: Option[NonEmptyChunk[Namespace]],
+          hierarchy: Option[Hierarchy],
+        ): ZIO[ZConnection, Throwable, Chunk[Change[Event]]] =
+          proxy(ReadEvents.SnapshotArgs.of[Chunk[Change[Event]]], (id, discriminator, snapshotVersion, ns, hierarchy))
+
+        def readEvents[Event: BinaryCodec: Tag](
+          id: Key,
+          discriminator: Discriminator,
+          ns: Option[NonEmptyChunk[Namespace]],
+          hierarchy: Option[Hierarchy],
+        ): ZIO[ZConnection, Throwable, Chunk[Change[Event]]] =
+          proxy(ReadEvents.FullArgs.of[Chunk[Change[Event]]], (id, discriminator, ns, hierarchy))
 
         def saveEvent[Event: BinaryCodec: MetaInfo: Tag](
           id: Key,

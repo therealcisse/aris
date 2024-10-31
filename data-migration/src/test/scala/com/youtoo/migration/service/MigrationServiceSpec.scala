@@ -16,9 +16,15 @@ import com.youtoo.cqrs.service.postgres.*
 import com.youtoo.migration.repository.*
 
 import com.youtoo.migration.model.*
+import com.youtoo.migration.store.MigrationEventStore
+import com.youtoo.cqrs.store.SnapshotStore
+import com.youtoo.cqrs.SnapshotStrategy
 
 object MigrationServiceSpec extends ZIOSpecDefault {
   def spec = suite("MigrationServiceSpec")(
+    test("empty") {
+      assertCompletesZIO
+    },
     test("load returns expected migration using MigrationRepository") {
       check(migrationGen) { case expectedMigration =>
         val migrationId = expectedMigration.id
@@ -31,7 +37,15 @@ object MigrationServiceSpec extends ZIOSpecDefault {
         (for {
           effect <- atomically(MigrationService.load(migrationId))
           testResult = assert(effect)(equalTo(expectedMigration.some))
-        } yield testResult).provideSomeLayer[ZConnectionPool](mockEnv.toLayer >>> MigrationService.live())
+        } yield testResult).provideSomeLayer[ZConnectionPool](
+          mockEnv.toLayer >>> ZLayer.makeSome[MigrationRepository & ZConnectionPool, MigrationService](
+            PostgresCQRSPersistence.live(),
+            MigrationEventStore.live(),
+            SnapshotStore.live(),
+            SnapshotStrategy.live(),
+            MigrationService.live(),
+          ),
+        )
 
       }
     } @@ TestAspect.samples(1),
@@ -47,7 +61,15 @@ object MigrationServiceSpec extends ZIOSpecDefault {
         (for {
           effect <- atomically(MigrationService.save(migration))
           testResult = assert(effect)(equalTo(expected))
-        } yield testResult).provideSomeLayer[ZConnectionPool](mockEnv.toLayer >>> MigrationService.live())
+        } yield testResult).provideSomeLayer[ZConnectionPool](
+          mockEnv.toLayer >>> ZLayer.makeSome[MigrationRepository & ZConnectionPool, MigrationService](
+            PostgresCQRSPersistence.live(),
+            MigrationEventStore.live(),
+            SnapshotStore.live(),
+            SnapshotStrategy.live(),
+            MigrationService.live(),
+          ),
+        )
 
       }
     } @@ TestAspect.samples(1),
@@ -63,7 +85,15 @@ object MigrationServiceSpec extends ZIOSpecDefault {
         (for {
           effect <- atomically(MigrationService.loadMany(offset = key, limit = limit))
           testResult = assert(effect)(equalTo(expected))
-        } yield testResult).provideSomeLayer[ZConnectionPool](mockEnv.toLayer >>> MigrationService.live())
+        } yield testResult).provideSomeLayer[ZConnectionPool](
+          mockEnv.toLayer >>> ZLayer.makeSome[MigrationRepository & ZConnectionPool, MigrationService](
+            PostgresCQRSPersistence.live(),
+            MigrationEventStore.live(),
+            SnapshotStore.live(),
+            SnapshotStrategy.live(),
+            MigrationService.live(),
+          ),
+        )
 
       }
     } @@ TestAspect.samples(1),

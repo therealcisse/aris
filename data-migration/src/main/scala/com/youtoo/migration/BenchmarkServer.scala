@@ -44,7 +44,7 @@ object BenchmarkServer extends ZIOApp {
   val logger = Runtime.setConfigProvider(ConfigProvider.envProvider) >>> Runtime.removeDefaultLoggers >>> SLF4J.slf4j
 
   type Environment =
-    FlywayMigration & ZConnectionPool & CQRSPersistence & SnapshotStore & MigrationEventStore & MigrationCQRS & MigrationProvider & MigrationCheckpointer & Server & Server.Config & NettyConfig & MigrationService & MigrationRepository & PrometheusPublisher & MetricsConfig & SnapshotStrategy.Factory & DataMigration & Interrupter & Healthcheck
+    FlywayMigration & ZConnectionPool & CQRSPersistence & SnapshotStore & MigrationEventStore & MigrationCQRS & Server & Server.Config & NettyConfig & MigrationService & MigrationRepository & PrometheusPublisher & MetricsConfig & SnapshotStrategy.Factory & DataMigration & Interrupter & Healthcheck
 
   given environmentTag: EnvironmentTag[Environment] = EnvironmentTag[Environment]
 
@@ -65,9 +65,7 @@ object BenchmarkServer extends ZIOApp {
           PostgresCQRSPersistence.live(),
           FlywayMigration.live(),
           SnapshotStore.live(),
-          MigrationProvider.live(),
           MigrationEventStore.live(),
-          MigrationCheckpointer.live(),
           MigrationService.live(),
           MigrationRepository.live(),
           MigrationCQRS.live(),
@@ -92,7 +90,7 @@ object BenchmarkServer extends ZIOApp {
         success = ids =>
           for {
             ingestions <- ZIO.foreachPar(ids) { key =>
-              MigrationCQRS.load(key)
+              MigrationService.load(Migration.Id(key))
             }
 
             ins = ingestions.mapFilter(identity)
@@ -137,7 +135,7 @@ object BenchmarkServer extends ZIOApp {
     Method.GET / "migration" / string("id") -> handler { (id: String, req: Request) =>
       val key = Key.wrap(id)
 
-      MigrationCQRS.load(key) map {
+      MigrationService.load(Migration.Id(key)) map {
         case Some(migration) =>
           val bytes = summon[BinaryCodec[Migration]].encode(migration)
 
@@ -160,7 +158,7 @@ object BenchmarkServer extends ZIOApp {
 
         _ <- MigrationCQRS.add(id, MigrationCommand.RegisterMigration(Migration.Id(id), timestamp))
 
-        opt <- MigrationCQRS.load(id)
+        opt <- MigrationService.load(Migration.Id(id))
 
         _ <- opt.fold(ZIO.unit) { migration =>
           atomically {
@@ -185,7 +183,9 @@ object BenchmarkServer extends ZIOApp {
       }
 
       val op =
-        DataMigration.run(id = Migration.Id(Key(id))).provideSomeLayer[MigrationCQRS & DataMigration & Scope](processor)
+        DataMigration
+          .run(id = Migration.Id(Key(id)))
+          .provideSomeLayer[MigrationCQRS & DataMigration & MigrationService & Scope](processor)
 
       op `as` Response.ok
 

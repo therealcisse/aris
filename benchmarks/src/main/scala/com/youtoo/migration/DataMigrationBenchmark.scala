@@ -80,19 +80,18 @@ object DataMigrationBenchmark {
   import zio.logging.backend.*
 
   val deps =
-    Runtime.removeDefaultLoggers >>> SLF4J.slf4j ++ ZLayer.make[MigrationCQRS & FlywayMigration & ZConnectionPool](
-      SnapshotStrategy.live(),
-      DatabaseConfig.pool,
-      MigrationCheckpointer.live(),
-      SnapshotStore.live(),
-      MigrationEventStore.live(),
-      MigrationRepository.live(),
-      MigrationService.live(),
-      MigrationProvider.live(),
-      MigrationCQRS.live(),
-      PostgresCQRSPersistence.live(),
-      FlywayMigration.live(),
-    )
+    Runtime.removeDefaultLoggers >>> SLF4J.slf4j ++ ZLayer
+      .make[MigrationCQRS & FlywayMigration & MigrationService & ZConnectionPool](
+        SnapshotStrategy.live(),
+        DatabaseConfig.pool,
+        SnapshotStore.live(),
+        MigrationEventStore.live(),
+        MigrationRepository.live(),
+        MigrationService.live(),
+        MigrationCQRS.live(),
+        PostgresCQRSPersistence.live(),
+        FlywayMigration.live(),
+      )
 
   val createMigration: Task[(Migration.Id, String)] =
     for {

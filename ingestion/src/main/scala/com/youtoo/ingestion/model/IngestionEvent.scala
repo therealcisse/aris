@@ -27,6 +27,7 @@ object IngestionEvent {
   given Schema[IngestionEvent] = DeriveSchema.gen
 
   given MetaInfo[IngestionEvent] with {
+
     extension (self: IngestionEvent)
       def namespace: Namespace = self match {
         case IngestionEvent.IngestionStarted(_, _) => Namespace(0)
@@ -37,6 +38,8 @@ object IngestionEvent {
         case IngestionEvent.IngestionCompleted(_) => Namespace(5)
 
       }
+
+    extension (self: IngestionEvent) def hierarchy: Option[Hierarchy] = None
   }
 
   given IngestionEventHandler with {

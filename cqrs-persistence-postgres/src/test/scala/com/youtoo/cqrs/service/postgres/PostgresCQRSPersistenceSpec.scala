@@ -28,6 +28,7 @@ object PostgresCQRSPersistenceSpec extends PgSpec {
 
   given MetaInfo[DummyEvent] with {
     extension (self: DummyEvent) def namespace: Namespace = Namespace(0)
+    extension (self: DummyEvent) def hierarchy: Option[Hierarchy] = None
 
   }
 
@@ -63,12 +64,14 @@ object PostgresCQRSPersistenceSpec extends PgSpec {
           a = assert(saveResult)(equalTo(1L))
 
           events0 <- atomically(
-            persistence.readEvents[DummyEvent](key, DummyEvent.discriminator, ns = NonEmptyChunk(Namespace(0))),
+            persistence
+              .readEvents[DummyEvent](key, DummyEvent.discriminator, ns = NonEmptyChunk(Namespace(0)).some, None),
           )
           b = assert(events0)(isNonEmpty)
 
           events1 <- atomically(
-            persistence.readEvents[DummyEvent](key, DummyEvent.discriminator, ns = NonEmptyChunk(Namespace(1))),
+            persistence
+              .readEvents[DummyEvent](key, DummyEvent.discriminator, ns = NonEmptyChunk(Namespace(1)).some, None),
           )
           c = assert(events1)(isEmpty)
 
@@ -227,8 +230,9 @@ object PostgresCQRSPersistenceSpec extends PgSpec {
         }
       },
       test("read all events by namespace is optimized") {
-        check(keyGen, namespacesGen) { case (key, ns) =>
-          val query = PostgresCQRSPersistence.Queries.READ_EVENTS[DummyEvent](key, DummyEvent.discriminator, ns)
+        check(keyGen, Gen.option(namespacesGen), Gen.option(hierarchyGen)) { case (key, ns, hierarchy) =>
+          val query =
+            PostgresCQRSPersistence.Queries.READ_EVENTS[DummyEvent](key, DummyEvent.discriminator, ns, hierarchy)
           for {
 
             executionTime <- atomically(query.selectAll).timed.map(_._1)
@@ -241,18 +245,20 @@ object PostgresCQRSPersistenceSpec extends PgSpec {
         }
       },
       test("read snapshot events by namespace is optimized") {
-        check(keyGen, versionGen, namespacesGen) { case (key, version, ns) =>
-          val query =
-            PostgresCQRSPersistence.Queries.READ_EVENTS[DummyEvent](key, DummyEvent.discriminator, version, ns)
-          for {
+        check(keyGen, versionGen, Gen.option(namespacesGen), Gen.option(hierarchyGen)) {
+          case (key, version, ns, hierarchy) =>
+            val query =
+              PostgresCQRSPersistence.Queries
+                .READ_EVENTS[DummyEvent](key, DummyEvent.discriminator, version, ns, hierarchy)
+            for {
 
-            executionTime <- atomically(query.selectAll).timed.map(_._1)
-            timeAssertion = assert(executionTime.toMillis)(isLessThanEqualTo(100L))
+              executionTime <- atomically(query.selectAll).timed.map(_._1)
+              timeAssertion = assert(executionTime.toMillis)(isLessThanEqualTo(100L))
 
-            executionPlan <- atomically(query.sql.getExecutionPlan)
-            planAssertion = assert(executionPlan)(containsString("Index Scan"))
+              executionPlan <- atomically(query.sql.getExecutionPlan)
+              planAssertion = assert(executionPlan)(containsString("Index Scan"))
 
-          } yield planAssertion && timeAssertion
+            } yield planAssertion && timeAssertion
         }
       },
     ).provideSomeLayerShared(
@@ -268,6 +274,11 @@ object PostgresCQRSPersistenceSpec extends PgSpec {
 
   val keyGen: Gen[Any, Key] = Gen.fromZIO(Key.gen.orDie)
   val versionGen: Gen[Any, Version] = Gen.fromZIO(Version.gen.orDie)
+
+  val hierarchyGen: Gen[Any, Hierarchy] = Gen.oneOf(
+    keyGen map { parentId => Hierarchy.Child(parentId) },
+    (keyGen <*> keyGen) map { case (grandParentId, parentId) => Hierarchy.Descendant(grandParentId, parentId) },
+  )
 
   val namespacesGen: Gen[Any, NonEmptyChunk[Namespace]] =
     Gen

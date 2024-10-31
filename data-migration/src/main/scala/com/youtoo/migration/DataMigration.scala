@@ -8,10 +8,11 @@ import zio.stream.*
 import com.youtoo.migration.model.*
 
 import com.youtoo.std.*
+import com.youtoo.migration.service.*
 
 trait DataMigration {
 
-  def run(id: Migration.Id): ZIO[DataMigration.Processor & MigrationCQRS, Throwable, Unit]
+  def run(id: Migration.Id): ZIO[DataMigration.Processor & MigrationCQRS & MigrationService, Throwable, Unit]
 
   def stop(id: Migration.Id): Task[Unit]
 
@@ -24,7 +25,9 @@ object DataMigration {
   inline def load(): ZStream[DataMigration.Processor, Throwable, Key] = ZStream.serviceWithStream(_.load())
   inline def process(key: Key): RIO[DataMigration.Processor, Unit] = ZIO.serviceWithZIO(_.process(key))
 
-  inline def run(id: Migration.Id): RIO[DataMigration & MigrationCQRS & DataMigration.Processor, Unit] =
+  inline def run(
+    id: Migration.Id,
+  ): RIO[DataMigration & MigrationCQRS & DataMigration.Processor & MigrationService, Unit] =
     ZIO.serviceWithZIO[DataMigration](_.run(id) @@ ZIOAspect.annotated("migration_id", id.asKey.value))
 
   inline def stop(id: Migration.Id): RIO[DataMigration, Unit] =
@@ -53,7 +56,7 @@ object DataMigration {
     }
 
   class Live(interrupter: Interrupter, healthcheck: Healthcheck, batchSize: Int) extends DataMigration {
-    def run(id: Migration.Id): ZIO[DataMigration.Processor & MigrationCQRS, Throwable, Unit] =
+    def run(id: Migration.Id): ZIO[DataMigration.Processor & MigrationCQRS & MigrationService, Throwable, Unit] =
       val migrationKey = id.asKey
 
       inline def logInfo(msg: => String): Task[Unit] =
@@ -61,7 +64,7 @@ object DataMigration {
       inline def logError(msg: => String, e: => Throwable): Task[Unit] =
         ZIO.logErrorCause(msg, Cause.die(e))
 
-      (DataMigration.count() <&> MigrationCQRS.load(id = migrationKey)) flatMap {
+      (DataMigration.count() <&> MigrationService.load(id = id)) flatMap {
         case (_, None) => ZIO.fail(IllegalArgumentException("Migration not found"))
 
         case (l, Some(migration)) =>

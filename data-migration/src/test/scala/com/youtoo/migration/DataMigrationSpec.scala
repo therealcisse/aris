@@ -11,6 +11,7 @@ import zio.*
 import com.youtoo.std.*
 
 import com.youtoo.migration.model.*
+import com.youtoo.migration.service.*
 
 object DataMigrationSpec extends ZIOSpecDefault {
 
@@ -53,14 +54,24 @@ object DataMigrationSpec extends ZIOSpecDefault {
         new MigrationCQRS {
           def add(id: Key, cmd: MigrationCommand): Task[Unit] =
             cmds.update(cmd :: _)
-          def load(id: Key): Task[Option[Migration]] = ZIO.succeed(migration.some)
+
+        }
+      }
+
+      migrationService = ZLayer.succeed {
+        new MigrationService {
+          def load(id: Migration.Id): Task[Option[Migration]] = ZIO.succeed(migration.some)
+          def loadMany(offset: Option[Key], limit: Long): Task[Chunk[Key]] = ZIO.succeed(Chunk(migration.id.asKey))
+          def save(o: Migration): Task[Long] = ZIO.succeed(1L)
 
         }
       }
 
       healthcheck <- ZIO.service[Healthcheck]
 
-      layer = (processor ++ ZLayer.succeed(new DataMigration.Live(interrupter, healthcheck, 1)) ++ migrationCQRS)
+      layer = (processor ++ ZLayer.succeed(
+        new DataMigration.Live(interrupter, healthcheck, 1),
+      ) ++ migrationCQRS ++ migrationService)
       fiber <- DataMigration.run(migrationId).fork.provideLayer(layer)
       _ <- processingStarted.await
       _ <- DataMigration.stop(migrationId).provideLayer(layer)
@@ -93,13 +104,15 @@ object DataMigrationSpec extends ZIOSpecDefault {
       timestamp = Timestamp(java.lang.System.currentTimeMillis),
     )
 
-    val migrationCQRSExpectations =
-      MigrationCQRSMock
-        .Load(equalTo(migrationId.asKey), value(initialMigration.some)) ++ MigrationCQRSMock
-        .Add(anything, unit)
-        .exactly(keys.size)
+    val migrationServiceMock = MigrationServiceMock.Load(equalTo(migrationId), value(initialMigration.some))
 
-    val env = (processorExpectations.exactly(executions) ++ migrationCQRSExpectations.exactly(executions)).toLayer
+    val migrationCQRSExpectations = MigrationCQRSMock
+      .Add(anything, unit)
+      .exactly(keys.size)
+
+    val env = (migrationServiceMock ++ processorExpectations.exactly(executions) ++ migrationCQRSExpectations.exactly(
+      executions,
+    )).toLayer
 
     val testEffect = for {
       _ <- DataMigration.run(migrationId).repeatN(executions)
@@ -146,12 +159,14 @@ object DataMigrationSpec extends ZIOSpecDefault {
         }
       }
 
-    val migrationCQRSExpectations = MigrationCQRSMock.Load(
-      equalTo(migrationId.asKey),
+    val migrationServiceMock = MigrationServiceMock.Load(
+      equalTo(migrationId),
       value(initialMigration.some),
-    ) ++ MigrationCQRSMock.Add(anything, unit)
+    )
 
-    val env = (processorExpectations ++ migrationCQRSExpectations).toLayer
+    val migrationCQRSExpectations = MigrationCQRSMock.Add(anything, unit)
+
+    val env = (migrationServiceMock ++ processorExpectations ++ migrationCQRSExpectations).toLayer
 
     val testEffect = for {
       _ <- DataMigration.run(migrationId)
@@ -178,13 +193,16 @@ object DataMigrationSpec extends ZIOSpecDefault {
       timestamp = Timestamp(java.lang.System.currentTimeMillis),
     )
 
-    val migrationCQRSExpectations = (
-      MigrationCQRSMock.Load(equalTo(migrationId.asKey), value(initialMigration.some)) ++ MigrationCQRSMock
-        .Add(anything, unit)
-        .exactly(keys.size)
+    val migrationServiceMock = MigrationServiceMock.Load(
+      equalTo(migrationId),
+      value(initialMigration.some),
     )
 
-    val env = (processorExpectations ++ migrationCQRSExpectations).toLayer
+    val migrationCQRSExpectations = MigrationCQRSMock
+      .Add(anything, unit)
+      .exactly(keys.size)
+
+    val env = (migrationServiceMock ++ processorExpectations ++ migrationCQRSExpectations).toLayer
 
     val testEffect = for {
       _ <- DataMigration.run(migrationId)

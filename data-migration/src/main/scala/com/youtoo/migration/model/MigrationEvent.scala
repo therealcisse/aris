@@ -41,6 +41,18 @@ object MigrationEvent {
         case MigrationEvent.ExecutionFinished(_, _) => Namespace(6)
         case MigrationEvent.ExecutionFailed(_, _) => Namespace(7)
       }
+
+    extension (self: MigrationEvent)
+      def hierarchy: Option[Hierarchy] = self match {
+        case MigrationEvent.MigrationRegistered(_, _) => None
+        case MigrationEvent.ExecutionStarted(_, _) => None
+        case MigrationEvent.ProcessingStarted(id, _) => Hierarchy.Child(id.asKey).some
+        case MigrationEvent.KeyProcessed(id, _) => Hierarchy.Child(id.asKey).some
+        case MigrationEvent.ProcessingFailed(id, _) => Hierarchy.Child(id.asKey).some
+        case MigrationEvent.ExecutionStopped(_, _) => None
+        case MigrationEvent.ExecutionFinished(_, _) => None
+        case MigrationEvent.ExecutionFailed(_, _) => None
+      }
   }
 
   given MigrationEventHandler with {

@@ -41,7 +41,7 @@ object BenchmarkServer extends ZIOApp {
   val jvmMetricsLayer = zio.metrics.jvm.DefaultJvmMetrics.live
 
   type Environment =
-    FlywayMigration & ZConnectionPool & CQRSPersistence & SnapshotStore & IngestionEventStore & IngestionCQRS & IngestionProvider & IngestionCheckpointer & Server & Server.Config & NettyConfig & IngestionService & IngestionRepository & PrometheusPublisher & MetricsConfig & SnapshotStrategy.Factory
+    FlywayMigration & ZConnectionPool & CQRSPersistence & SnapshotStore & IngestionEventStore & IngestionCQRS & Server & Server.Config & NettyConfig & IngestionService & IngestionRepository & PrometheusPublisher & MetricsConfig & SnapshotStrategy.Factory
 
   given environmentTag: EnvironmentTag[Environment] = EnvironmentTag[Environment]
 
@@ -62,9 +62,7 @@ object BenchmarkServer extends ZIOApp {
           PostgresCQRSPersistence.live(),
           FlywayMigration.live(),
           SnapshotStore.live(),
-          IngestionProvider.live(),
           IngestionEventStore.live(),
-          IngestionCheckpointer.live(),
           IngestionService.live(),
           IngestionRepository.live(),
           IngestionCQRS.live(),
@@ -86,7 +84,7 @@ object BenchmarkServer extends ZIOApp {
         success = ids =>
           for {
             ingestions <- ZIO.foreachPar(ids) { key =>
-              IngestionCQRS.load(key)
+              IngestionService.load(Ingestion.Id(key))
             }
 
             ins = ingestions.mapFilter(identity)
@@ -131,7 +129,7 @@ object BenchmarkServer extends ZIOApp {
     Method.GET / "ingestion" / string("id") -> handler { (id: String, req: Request) =>
       val key = Key.wrap(id)
 
-      IngestionCQRS.load(key) map {
+      IngestionService.load(Ingestion.Id(key)) map {
         case Some(ingestion) =>
           val bytes = summon[BinaryCodec[Ingestion]].encode(ingestion)
 
@@ -161,7 +159,7 @@ object BenchmarkServer extends ZIOApp {
       numFiles match {
         case Left(_) => ZIO.succeed(Response.notFound)
         case Right(n) =>
-          IngestionCQRS.load(id = Key.wrap(id)) map {
+          IngestionService.load(id = Ingestion.Id(Key(id))) map {
             case None => Response.notFound
             case Some(ingestion) =>
               if ingestion.status.totalFiles.fold(false)(_.size == n) && (ingestion.status is status) then Response.ok
@@ -180,7 +178,7 @@ object BenchmarkServer extends ZIOApp {
 
         _ <- IngestionCQRS.add(id, IngestionCommand.StartIngestion(Ingestion.Id(id), timestamp))
 
-        opt <- IngestionCQRS.load(id)
+        opt <- IngestionService.load(Ingestion.Id(id))
 
         _ <- opt.fold(ZIO.unit) { ingestion =>
           atomically {
