@@ -6,6 +6,8 @@ import zio.stream.*
 import zio.test.*
 import zio.test.Assertion.*
 import zio.mock.Expectation.*
+import zio.stream.*
+import zio.stm.*
 import zio.mock.*
 import zio.*
 
@@ -13,6 +15,7 @@ import com.youtoo.std.*
 
 import com.youtoo.migration.model.*
 import com.youtoo.migration.service.*
+import com.youtoo.cqrs.CQRS
 
 object DataMigrationSpec extends MockSpecDefault {
 
@@ -21,7 +24,7 @@ object DataMigrationSpec extends MockSpecDefault {
     testSuccessfulMigrationExecution,
     testIncompleteMigrationResumption,
     testStopMigration,
-  ).provideLayerShared(
+  ).provideSomeLayerShared(
     (Healthcheck.live() ++ Interrupter.live()) >+> DataMigration.live(),
   ) @@ TestAspect.withLiveClock
 
@@ -86,140 +89,117 @@ object DataMigrationSpec extends MockSpecDefault {
   }
 
   val testExecutionRecordsCreation = test("Execution Records Creation") {
-    inline val executions = 3
+    check(migrationIdGen, timestampGen, Gen.int(100, 1000)) { case (migrationId, now, n) =>
+      val keys = NonEmptyChunk(Key("key1"), (2 to n).map(i => Key(s"key$i")).toList*)
 
-    val migrationId = Migration.Id(Key("migration3"))
-    val keys = NonEmptyChunk(Key("key1"), (2 to 10).map(i => Key(s"key$i")).toList*)
+      val initialMigration = Migration(
+        id = migrationId,
+        state = Migration.State(Map.empty),
+        timestamp = now,
+      )
 
-    val processorExpectations = (
-      ProcessorMock.Load(returns = value(ZStream.fromIterable(keys.toList))) ++ ProcessorMock.Count(returns =
-        value(10L),
-      ) ++ keys.tail.foldLeft(ProcessorMock.Process(equalTo(keys.head), unit)) { case (a, key) =>
-        a ++ ProcessorMock.Process(equalTo(key), unit)
-      }
-    )
+      val processor = MockProcessor(keys)
+      val cqrs = MockMigrationCQRS()
 
-    val initialMigration = Migration(
-      id = migrationId,
-      state = Migration.State(Map.empty),
-      timestamp = Timestamp(java.lang.System.currentTimeMillis),
-    )
+      val layer =
+        MigrationServiceMock.Load(equalTo(migrationId), value(initialMigration.some)).toLayer ++ ZLayer.succeed(
+          processor,
+        ) ++ ZLayer.succeed(cqrs)
 
-    val migrationServiceMock = MigrationServiceMock.Load(equalTo(migrationId), value(initialMigration.some))
+      for {
+        service <- ZIO.service[DataMigration]
+        _ <- service.run(migrationId).provide(layer)
+        calls <- cqrs.getCalls
+        seenKeys <- processor.getKeys
+      } yield assert(calls.size)(equalTo(n + 2)) && assert(seenKeys)(equalTo(n))
 
-    val migrationCQRSExpectations = MigrationCQRSMock
-      .Add(anything, unit)
-      .exactly(keys.size)
+    }
 
-    val env = (migrationServiceMock ++ processorExpectations.exactly(executions) ++ migrationCQRSExpectations.exactly(
-      executions,
-    )).toLayer
-
-    val testEffect = for {
-      _ <- DataMigration.run(migrationId).repeatN(executions)
-    } yield assertCompletes
-
-    testEffect.provideSomeLayer[DataMigration](env)
   } @@ TestAspect.ignore
 
   val testIncompleteMigrationResumption = test("Incomplete Migration Resumption") {
-    val migrationId = Migration.Id(Key("migration2"))
-    val allKeys = NonEmptyChunk(Key("key1"), (2 to 10).map(i => Key(s"key$i")).toList*)
+    check(migrationIdGen, timestampGen, Gen.int(100, 1000)) { case (migrationId, now, n) =>
+      val allKeys = NonEmptyChunk(Key("key1"), (2 to n).map(i => Key(s"key$i")).toList*)
 
-    val (processedKeys, remainingKeys) = allKeys.splitAt(50)
+      val (processedKeys, remainingKeys) = allKeys.splitAt(n / 2)
 
-    val initialStats = Stats(
-      processing = Set.empty,
-      processed = processedKeys.toSet,
-      failed = Set.empty,
-    )
+      val initialStats = Stats(
+        processing = Set.empty,
+        processed = processedKeys.toSet,
+        failed = Set.empty,
+      )
 
-    val now = java.lang.System.currentTimeMillis
+      val previousExecution = Execution.Stopped(
+        processing =
+          Execution.Processing(Execution.Id(Key("exec1")), initialStats, Timestamp(now.value - (3600L * 1000L))),
+        timestamp = Timestamp(now.value - (1800L * 1000L)),
+      )
+      val initialMigration = Migration(
+        id = migrationId,
+        state = Migration.State(Map(Execution.Id(Key("exec1")) -> previousExecution)),
+        timestamp = Timestamp(now.value - (3600L * 1000L)),
+      )
 
-    val previousExecution = Execution.Stopped(
-      processing = Execution.Processing(Execution.Id(Key("exec1")), initialStats, Timestamp(now - (3600L * 1000L))),
-      timestamp = Timestamp(now - (1800L * 1000L)),
-    )
-    val initialMigration = Migration(
-      id = migrationId,
-      state = Migration.State(Map(Execution.Id(Key("exec1")) -> previousExecution)),
-      timestamp = Timestamp(now - (3600L * 1000L)),
-    )
+      val processor = MockProcessor(remainingKeys)
+      val cqrs = MockMigrationCQRS()
 
-    val expections =
-      ProcessorMock.Count(returns = value(100L)) ++ ProcessorMock.Load(returns = value(ZStream.fromIterable(allKeys)))
-    val processorExpectations = NonEmptyChunk
-      .fromIterableOption(remainingKeys)
-      .fold(
-        expections,
-      ) { nec =>
-        expections ++ nec.tail.foldLeft(ProcessorMock.Process(equalTo(nec.head), unit)) { (a, key) =>
-          a ++ ProcessorMock.Process(equalTo(key), unit)
+      val layer =
+        MigrationServiceMock.Load(equalTo(migrationId), value(initialMigration.some)).toLayer ++ ZLayer.succeed(
+          processor,
+        ) ++ ZLayer.succeed(cqrs)
 
-        }
-      }
+      for {
+        service <- ZIO.service[DataMigration]
+        _ <- service.run(migrationId).provide(layer)
+        calls <- cqrs.getCalls
+        seenKeys <- processor.getKeys
+      } yield assert(calls.size)(equalTo(remainingKeys.size + 2)) && assert(seenKeys)(equalTo(Set(remainingKeys*)))
 
-    val migrationServiceMock = MigrationServiceMock.Load(
-      equalTo(migrationId),
-      value(initialMigration.some),
-    )
+    }
 
-    val migrationCQRSExpectations = MigrationCQRSMock.Add(anything, unit)
-
-    val env = (migrationServiceMock ++ processorExpectations ++ migrationCQRSExpectations).toLayer
-
-    val testEffect = for {
-      _ <- DataMigration.run(migrationId)
-    } yield assertCompletes
-
-    testEffect.provideSomeLayer[DataMigration](env)
-  } @@ TestAspect.ignore
+  }
 
   val testSuccessfulMigrationExecution = test("Successful Migration Execution") {
-    inline val size = 1L
-    val migrationId = Migration.Id(Key("migration1"))
-    val keys = NonEmptyChunk(Key("key1"), (2L to size).map(i => Key(s"key$i")).toList*)
+    check(migrationIdGen, timestampGen, Gen.setOfBounded(1, 1000)(keyGen)) { case (id, timestamp, keys) =>
+      val processor = MockProcessor(keys)
+      val cqrs = MockMigrationCQRS()
 
-    val count = ProcessorMock.Count(returns = value(size))
+      val migration = Migration(id, Migration.State.empty, timestamp)
 
-    val load = ProcessorMock.Load(returns = value(ZStream.fromIterable(keys))).toLayer
+      val layer = MigrationServiceMock.Load(equalTo(id), value(migration.some)).toLayer ++ ZLayer.succeed(
+        processor,
+      ) ++ ZLayer.succeed(cqrs)
 
-    val processorExpectations = keys.tail.foldLeft(
-      ProcessorMock.Process(equalTo(keys.head), unit).toLayer ++ MigrationCQRSMock.Add(isArg0(), unit).toLayer,
-    ) { case (a, key) =>
-      a ++ ProcessorMock.Process(equalTo(key), unit).toLayer ++ MigrationCQRSMock.Add(isArg0(), unit).toLayer
+      for {
+        service <- ZIO.service[DataMigration]
+        _ <- service.run(id).provide(layer)
+        calls <- cqrs.getCalls
+        seenKeys <- processor.getKeys
+      } yield assert(calls.size)(equalTo(keys.size + 2)) && assert(seenKeys)(equalTo(keys))
+
+    }
+  }
+
+  final class MockProcessor(keysToLoad: Iterable[Key]) extends DataMigration.Processor {
+    private val processedKeysRef = Unsafe.unsafe { implicit unsafe =>
+      Ref.unsafe.make(Set.empty[Key])
     }
 
-    val initialMigration = Migration(
-      id = migrationId,
-      state = Migration.State(Map.empty),
-      timestamp = Timestamp(java.lang.System.currentTimeMillis),
-    )
+    def count(): Task[Long] = ZIO.succeed(keysToLoad.size.toLong)
+    def load(): ZStream[Any, Throwable, Key] = ZStream.fromIterable(keysToLoad)
+    def process(key: Key): Task[Unit] = processedKeysRef.update(_ + key)
+    def getKeys: Task[Set[Key]] = processedKeysRef.get
+  }
 
-    val migrationServiceMock = MigrationServiceMock.Load(
-      equalTo(migrationId),
-      value(initialMigration.some),
-    )
-
-    inline def isArg0() = assertion[(Key, MigrationCommand)]("isArg0") { case (_, _) =>
-      true
+  final class MockMigrationCQRS extends MigrationCQRS {
+    private val callsRef: Ref[List[(Key, MigrationCommand)]] = Unsafe.unsafe { implicit unsafe =>
+      Ref.unsafe.make(List.empty[(Key, MigrationCommand)])
     }
 
-    inline def isArg(key: Key) = assertion[(Key, MigrationCommand)]("isArg") { case (id, _) =>
-      id == key
-    }
+    def add(id: Key, cmd: MigrationCommand): Task[Unit] =
+      callsRef.update(calls => (id, cmd) :: calls)
 
-    val startExecution = MigrationCQRSMock.Add(isArg(migrationId.asKey), unit).toLayer
-    val finishExecution = MigrationCQRSMock.Add(isArg(migrationId.asKey), unit).toLayer
-
-    val env =
-      ((migrationServiceMock ++ count) || (count ++ migrationServiceMock)).toLayer ++ startExecution ++ load ++ processorExpectations ++ finishExecution
-
-    val testEffect = for {
-      _ <- DataMigration.run(migrationId)
-    } yield assertCompletes
-
-    testEffect.provideSomeLayer(env)
-  } @@ TestAspect.ignore
-
+    def getCalls: Task[List[(Key, MigrationCommand)]] =
+      callsRef.get
+  }
 }
