@@ -3,8 +3,6 @@ package migration
 
 import zio.*
 
-import cats.implicits.*
-
 import zio.jdbc.*
 import zio.prelude.*
 
@@ -15,7 +13,6 @@ import com.youtoo.cqrs.domain.*
 import com.youtoo.migration.model.*
 import com.youtoo.cqrs.*
 import com.youtoo.cqrs.service.*
-import com.youtoo.migration.service.*
 import com.youtoo.migration.store.*
 
 import zio.metrics.*
@@ -37,7 +34,8 @@ object MigrationCQRS {
 
   inline def add(id: Key, cmd: MigrationCommand)(using
     Cmd: MigrationCommandHandler,
-  ): RIO[MigrationCQRS, Unit] = ZIO.serviceWithZIO[MigrationCQRS](_.add(id, cmd)) @@ metrics.addition.trackDuration
+  ): RIO[MigrationCQRS, Unit] =
+    ZIO.serviceWithZIO[MigrationCQRS](_.add(id, cmd)) @@ metrics.addition.trackDuration
 
   def live(): ZLayer[
     ZConnectionPool & MigrationEventStore & SnapshotStore &
@@ -53,9 +51,10 @@ object MigrationCQRS {
         pool: ZConnectionPool,
       ) =>
         ZLayer {
-
           for {
-            strategy <- factory.create(MigrationEvent.discriminator)
+            strategy <- factory.create(MigrationEvent.discriminator).tapErrorCause { e =>
+              ZIO.logErrorCause(s"SnapshotStrategy creation failed for ${MigrationEvent.discriminator}", e)
+            }
 
           } yield new MigrationCQRS {
             private val Cmd = summon[CmdHandler[MigrationCommand, MigrationEvent]]

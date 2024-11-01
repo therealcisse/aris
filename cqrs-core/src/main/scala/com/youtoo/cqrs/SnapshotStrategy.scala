@@ -20,9 +20,10 @@ object SnapshotStrategy {
 
         def create(discriminator: Discriminator): Task[SnapshotStrategy] =
           given Config[SnapshotStrategy] =
-            Config.int("threshold").nested(discriminator.value, "snapshots").map { threshold =>
+            Config.int("threshold").nested(discriminator.value, "snapshots") map { threshold =>
               new SnapshotStrategy {
-                def apply(version: Option[Version], n: Int): Boolean = n >= threshold
+                def apply(version: Option[Version], n: Int): Boolean =
+                  n >= threshold
 
               }
 

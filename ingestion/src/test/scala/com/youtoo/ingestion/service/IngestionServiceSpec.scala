@@ -23,176 +23,73 @@ import com.youtoo.ingestion.store.*
 import com.youtoo.cqrs.store.*
 
 object IngestionServiceSpec extends MockSpecDefault {
+  inline val Threshold = 10
+
+  override val bootstrap: ZLayer[Any, Any, TestEnvironment] =
+    testEnvironment ++ Runtime.setConfigProvider(
+      ConfigProvider.fromMap(Map("Ingestion.snapshots.threshold" -> s"$Threshold")),
+    )
+
   def spec = suite("IngestionServiceSpec")(
     test("should load ingestion") {
       check(
-        keyGen,
         Gen.option(ingestionGen),
         Gen.option(versionGen),
         validEventSequenceGen,
-        Gen.int(0, 12),
-      ) { case (id, ingestion, version, events, amount) =>
-        val chs = NonEmptyList(events.head, events.tail.take(amount)*)
-        val sendSnapshot = chs.size >= 10
-        val maxChange = chs.maxBy(_.version)
+      ) { case (ingestion, version, events) =>
+        val maxChange = events.maxBy(_.version)
 
-        val (key, deps) = (ingestion, version).tupled match {
+        val (id, deps) = (ingestion, version).tupled match {
           case None =>
-            val in = summon[IngestionEventHandler].applyEvents(chs)
+            val sendSnapshot = events.size >= Threshold
+            val in @ Ingestion(id, _, _) = summon[EventHandler[IngestionEvent, Ingestion]].applyEvents(events)
 
-            val ingestionRepositoryLoadMock = IngestionRepositoryMock.Load(
-              equalTo(in.id),
-              value(None),
-            )
+            val loadMock = IngestionRepositoryMock.Load(equalTo(id), value(None))
+            val readSnapshotMock = MockSnapshotStore.ReadSnapshot(equalTo(id), value(None))
+            val saveMock = IngestionRepositoryMock.Save(equalTo(in), value(1L))
+            val saveSnapshotMock = MockSnapshotStore.SaveSnapshot(equalTo((id.asKey, maxChange.version)), value(1L))
+            val readEventsMock = MockIngestionEventStore.ReadEvents.Full(equalTo(id.asKey), value(events.some))
 
-            val ingestionServiceEnv =
+            val layers =
               if sendSnapshot then
-                IngestionServiceMock
-                  .Save(
-                    equalTo(in),
-                    value(1L),
-                  )
-                  .toLayer
-              else IngestionServiceMock.empty
+                ((loadMock ++ readSnapshotMock) || (readSnapshotMock ++ loadMock)) ++ readEventsMock ++ ((saveMock ++ saveSnapshotMock) || (saveSnapshotMock ++ saveMock))
+              else ((loadMock ++ readSnapshotMock) || (readSnapshotMock ++ loadMock)) ++ readEventsMock
 
-            val snapshotStoreReadEnv = MockSnapshotStore.ReadSnapshot(
-              equalTo(id),
-              value(None),
-            )
-
-            val snapshotStoreSaveEnv =
-              if sendSnapshot then
-                MockSnapshotStore
-                  .SaveSnapshot(
-                    equalTo((id, maxChange.version)),
-                    value(1L),
-                  )
-                  .toLayer
-              else MockSnapshotStore.empty
-
-            val providerEnv = IngestionServiceMock.Load(
-              equalTo(id),
-              value(None),
-            )
-
-            val eventStoreReadEnv = MockIngestionEventStore.ReadEvents.Full(
-              equalTo(id),
-              value(chs.some),
-            )
-
-            val ingestionServiceSaveMock =
-              if sendSnapshot then
-                IngestionServiceMock
-                  .Save(
-                    equalTo(ingestion),
-                    value(1L),
-                  )
-                  .toLayer
-              else IngestionServiceMock.empty
-
-            (
-              id,
-              ingestionRepositoryLoadMock.toLayer ++ ingestionServiceEnv ++ snapshotStoreReadEnv.toLayer ++ snapshotStoreSaveEnv ++ providerEnv.toLayer ++ ingestionServiceSaveMock ++ eventStoreReadEnv.toLayer,
-            )
+            (id, layers.toLayer)
 
           case Some((in @ Ingestion(id, _, _), v)) =>
-            val ingestionServiceEnv =
+            val sendSnapshot = (events.size - 1) >= Threshold
+
+            val es = NonEmptyList.fromIterableOption(events.tail)
+
+            val inn = es match {
+              case None => in
+              case Some(nel) => summon[EventHandler[IngestionEvent, Ingestion]].applyEvents(in, nel)
+            }
+
+            val readSnapshotMock = MockSnapshotStore.ReadSnapshot(equalTo(id.asKey), value(v.some))
+            val loadMock = IngestionRepositoryMock.Load(equalTo(id), value(in.some))
+            val saveMock = IngestionRepositoryMock.Save(equalTo(inn), value(1L))
+            val saveSnapshotMock = MockSnapshotStore.SaveSnapshot(equalTo((id.asKey, maxChange.version)), value(1L))
+            val readEventsMock = MockIngestionEventStore.ReadEvents.Snapshot(equalTo((id.asKey, v)), value(es))
+
+            val layers =
               if sendSnapshot then
-                IngestionServiceMock
-                  .Save(
-                    equalTo(in),
-                    value(1L),
-                  )
-                  .toLayer
-              else IngestionServiceMock.empty
+                ((readSnapshotMock ++ loadMock) || (loadMock ++ readSnapshotMock)) ++ readEventsMock ++ ((saveMock ++ saveSnapshotMock) || (saveSnapshotMock ++ saveMock))
+              else ((readSnapshotMock ++ loadMock) || (loadMock ++ readSnapshotMock)) ++ readEventsMock
 
-            val ingestionRepositoryLoadMock = IngestionRepositoryMock.Load(
-              equalTo(id),
-              value(in.some),
-            )
-
-            val snapshotStoreReadEnv = MockSnapshotStore.ReadSnapshot(
-              equalTo(id.asKey),
-              value(v.some),
-            )
-
-            val snapshotStoreSaveEnv =
-              if sendSnapshot then
-                MockSnapshotStore
-                  .SaveSnapshot(
-                    equalTo((id.asKey, maxChange.version)),
-                    value(1L),
-                  )
-                  .toLayer
-              else MockSnapshotStore.empty
-
-            val providerEnv = IngestionServiceMock.Load(
-              equalTo(id.asKey),
-              value(in.some),
-            )
-
-            val eventStoreReadEnv = MockIngestionEventStore.ReadEvents.Snapshot(
-              equalTo((id.asKey, v)),
-              value(chs.some),
-            )
-
-            val ingestionServiceSaveMock =
-              if sendSnapshot then
-                IngestionServiceMock
-                  .Save(
-                    equalTo(ingestion),
-                    value(1L),
-                  )
-                  .toLayer
-              else IngestionServiceMock.empty
-
-            (
-              id.asKey,
-              ingestionRepositoryLoadMock.toLayer ++ ingestionServiceEnv ++ snapshotStoreReadEnv.toLayer ++ snapshotStoreSaveEnv ++ providerEnv.toLayer ++ ingestionServiceSaveMock ++ eventStoreReadEnv.toLayer,
-            )
-
+            (id, layers.toLayer)
         }
 
         (for {
 
-          _ <- IngestionService.load(Ingestion.Id(key))
+          _ <- IngestionService.load(id)
 
         } yield assertCompletes)
-          .provide((deps >+> ZConnectionMock.pool() ++ SnapshotStrategy.live()))
+          .provideSomeLayer[ZConnectionPool]((deps ++ SnapshotStrategy.live()) >>> IngestionService.live())
       }
 
     },
-    test("load returns expected ingestion using IngestionRepository") {
-      check(ingestionGen) { case expectedIngestion =>
-        val ingestionId = expectedIngestion.id
-
-        val mockSnapshot = MockSnapshotStore.ReadSnapshot(
-          equalTo(ingestionId.asKey),
-          value(Version(expectedIngestion.id.asKey.value).some),
-        )
-
-        val mockEnv = IngestionRepositoryMock.Load(
-          equalTo(ingestionId),
-          value(expectedIngestion.some),
-        )
-
-        val env = (mockEnv ++ mockSnapshot).toLayer
-
-        (for {
-          effect <- atomically(IngestionService.load(ingestionId))
-          testResult = assert(effect)(equalTo(expectedIngestion.some))
-        } yield testResult).provideSomeLayer[ZConnectionPool](
-          env >>> ZLayer.makeSome[IngestionRepository & ZConnectionPool, IngestionService](
-            PostgresCQRSPersistence.live(),
-            IngestionEventStore.live(),
-            SnapshotStore.live(),
-            SnapshotStrategy.live(),
-            IngestionService.live(),
-          ),
-        )
-
-      }
-    } @@ TestAspect.samples(1),
     test("save returns expected result using IngestionRepository") {
       check(ingestionGen) { case ingestion =>
         val expected = 1L
@@ -241,6 +138,6 @@ object IngestionServiceSpec extends MockSpecDefault {
 
       }
     } @@ TestAspect.samples(1),
-  ).provideSomeLayerShared(ZConnectionMock.pool())
+  ).provideSomeLayerShared(ZConnectionMock.pool()) @@ TestAspect.withLiveClock
 
 }

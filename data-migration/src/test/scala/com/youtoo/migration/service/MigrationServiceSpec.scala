@@ -4,6 +4,7 @@ package service
 
 import cats.implicits.*
 
+import zio.prelude.*
 import zio.test.*
 import zio.test.Assertion.*
 import zio.mock.Expectation.*
@@ -17,36 +18,92 @@ import com.youtoo.cqrs.service.postgres.*
 import com.youtoo.migration.repository.*
 
 import com.youtoo.migration.model.*
-import com.youtoo.migration.store.MigrationEventStore
-import com.youtoo.cqrs.store.SnapshotStore
-import com.youtoo.cqrs.SnapshotStrategy
+import com.youtoo.migration.store.*
+import com.youtoo.cqrs.store.*
+import com.youtoo.cqrs.*
+
+import com.youtoo.migration.model.*
+import com.youtoo.cqrs.*
+import com.youtoo.migration.store.*
+import com.youtoo.cqrs.store.*
 
 object MigrationServiceSpec extends MockSpecDefault {
-  def spec = suite("MigrationServiceSpec")(
-    test("load returns expected migration using MigrationRepository") {
-      check(migrationGen) { case expectedMigration =>
-        val migrationId = expectedMigration.id
+  inline val Threshold = 10
 
-        val mockEnv = MigrationRepositoryMock.Load(
-          equalTo(migrationId),
-          value(expectedMigration.some),
-        )
+  override val bootstrap: ZLayer[Any, Any, TestEnvironment] =
+    testEnvironment ++ Runtime.setConfigProvider(
+      ConfigProvider.fromMap(Map("Migration.snapshots.threshold" -> s"$Threshold")),
+    )
+
+  def spec = suite("MigrationServiceSpec")(
+    test("should load migration") {
+      check(
+        Gen.option(migrationGen),
+        Gen.option(versionGen),
+        validMigrationEventSequence,
+      ) { case (migration, version, events) =>
+        val maxChange = events.maxBy(_.version)
+
+        val eventHandler = summon[EventHandler[MigrationEvent, Migration]]
+
+        val (id, deps) = (migration, version).tupled match {
+          case None =>
+            val sendSnapshot = events.size >= Threshold
+            val in @ Migration(id, _, _) = eventHandler.applyEvents(events)
+
+            val loadMock = MigrationRepositoryMock.Load(equalTo(id), value(None))
+            val readSnapshotMock = MockSnapshotStore.ReadSnapshot(equalTo(id), value(None))
+            val saveMock = MigrationRepositoryMock.Save(equalTo(in), value(1L))
+            val saveSnapshotMock = MockSnapshotStore.SaveSnapshot(equalTo((id.asKey, maxChange.version)), value(1L))
+            val readEventsMock = MockMigrationEventStore.ReadEvents.Full(equalTo(id.asKey), value(events.some))
+
+            val layers =
+              if sendSnapshot then
+                ((loadMock ++ readSnapshotMock) || (readSnapshotMock ++ loadMock)) ++ readEventsMock ++ ((saveMock ++ saveSnapshotMock) || (saveSnapshotMock ++ saveMock))
+              else ((loadMock ++ readSnapshotMock) || (readSnapshotMock ++ loadMock)) ++ readEventsMock
+
+            (
+              id,
+              layers.toLayer,
+            )
+
+          case Some((in @ Migration(id, _, _), v)) =>
+            val sendSnapshot = (events.size - 1) >= Threshold
+
+            val es = NonEmptyList.fromIterableOption(events.tail)
+
+            val inn = es match {
+              case None => in
+              case Some(nel) => eventHandler.applyEvents(in, nel)
+            }
+
+            val readSnapshotMock = MockSnapshotStore.ReadSnapshot(equalTo(id.asKey), value(v.some))
+            val loadMock = MigrationRepositoryMock.Load(equalTo(id), value(in.some))
+            val saveMock = MigrationRepositoryMock.Save(equalTo(inn), value(1L))
+            val saveSnapshotMock = MockSnapshotStore.SaveSnapshot(equalTo((id.asKey, maxChange.version)), value(1L))
+            val readEventsMock = MockMigrationEventStore.ReadEvents.Snapshot(equalTo((id.asKey, v)), value(es))
+
+            val layers =
+              if sendSnapshot then
+                ((readSnapshotMock ++ loadMock) || (loadMock ++ readSnapshotMock)) ++ readEventsMock ++ ((saveMock ++ saveSnapshotMock) || (saveSnapshotMock ++ saveMock))
+              else ((readSnapshotMock ++ loadMock) || (loadMock ++ readSnapshotMock)) ++ readEventsMock
+
+            (
+              id,
+              layers.toLayer,
+            )
+
+        }
 
         (for {
-          effect <- atomically(MigrationService.load(migrationId))
-          testResult = assert(effect)(equalTo(expectedMigration.some))
-        } yield testResult).provideSomeLayer[ZConnectionPool](
-          mockEnv.toLayer >>> ZLayer.makeSome[MigrationRepository & ZConnectionPool, MigrationService](
-            PostgresCQRSPersistence.live(),
-            MigrationEventStore.live(),
-            SnapshotStore.live(),
-            SnapshotStrategy.live(),
-            MigrationService.live(),
-          ),
-        )
 
+          _ <- MigrationService.load(id)
+
+        } yield assertCompletes)
+          .provideSomeLayer[ZConnectionPool]((deps ++ SnapshotStrategy.live()) >>> MigrationService.live())
       }
-    } @@ TestAspect.samples(1),
+
+    },
     test("save returns expected result using MigrationRepository") {
       check(migrationGen) { case migration =>
         val expected = 1L

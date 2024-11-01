@@ -16,30 +16,45 @@ import com.youtoo.cqrs.service.*
 import com.youtoo.cqrs.store.*
 
 import com.youtoo.cqrs.service.postgres.*
+import com.youtoo.cqrs.domain.*
 
 object MigrationCQRSSpec extends MockSpecDefault {
+  override val bootstrap: ZLayer[Any, Any, TestEnvironment] =
+    testEnvironment ++ Runtime.setConfigProvider(ConfigProvider.fromMap(Map("Migration.snapshots.threshold" -> "10")))
 
   def spec = suite("MigrationCQRSSpec")(
     test("should add command") {
       check(keyGen, migrationCommandGen) { case (id, cmd) =>
-        val eventStoreEnv = MockMigrationEventStore.Save(
-          equalTo((id, anything)),
-          value(1L),
-        )
+        val Cmd = summon[CmdHandler[MigrationCommand, MigrationEvent]]
+
+        inline def isArg(key: Key, payload: MigrationEvent) = assertion[(Key, Change[MigrationEvent])]("isArg") {
+          case (id, ch) => id == key && ch.payload == payload
+        }
+
+        val evnts = Cmd.applyCmd(cmd)
+
+        val zero = MockMigrationEventStore
+          .Save(
+            isArg(id, evnts.head),
+            value(1L),
+          )
+          .toLayer
+
+        val eventStoreEnv = evnts.tail.foldLeft(zero) { case (ass, e) =>
+          ass ++ MockMigrationEventStore.Save(isArg(id, e), value(1L)).toLayer
+        }
+
+        val layer = eventStoreEnv ++ MockSnapshotStore.empty ++ SnapshotStrategy.live() >>> MigrationCQRS.live()
 
         (for {
 
           _ <- MigrationCQRS.add(id, cmd)
 
-        } yield assertCompletes).provide(
-          (
-            eventStoreEnv.toLayer ++ ZConnectionMock
-              .pool() ++ MockSnapshotStore.empty ++ SnapshotStrategy
-              .live()
-          ) >>> MigrationCQRS.live(),
-        )
+        } yield assertCompletes).provideSomeLayer[ZConnectionPool](layer)
+
       }
 
     },
-  ) @@ TestAspect.withLiveClock
+  ).provideLayerShared(ZConnectionMock.pool())
+
 }

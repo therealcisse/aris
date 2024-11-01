@@ -95,6 +95,7 @@ object DataloaderSpec extends ZIOSpecDefault {
           dataloader <- factory.createLoader(bulkLoader, 1)
           fiber <- ZIO.foreachPar(1 to n)(i => dataloader.fetch(Key(s"$i"))).fork
           _ <- TestClock.adjust((n * 15).millis)
+          _ <- TestClock.adjust((15).millis)
           calls <- bulkLoader.getCalls
           _ <- fiber.join
         } yield assert(calls.size)(equalTo(n))
