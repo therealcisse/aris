@@ -54,6 +54,7 @@ object PostgresCQRSPersistenceSpec extends PgSpec {
 
           c <- (
             for {
+              events0 <- atomically(persistence.readEvents[DummyEvent](key, DummyEvent.discriminator))
               events1 <- atomically(
                 persistence.readEvents[DummyEvent](
                   DummyEvent.discriminator,
@@ -79,13 +80,16 @@ object PostgresCQRSPersistenceSpec extends PgSpec {
                 ),
               )
 
-            } yield assert(events1)(isNonEmpty) && assert(events2)(isEmpty) && assert(events3)(isEmpty) && assert(
+            } yield assert(events0)(isNonEmpty) && assert(events1)(isNonEmpty) && assert(events2)(isEmpty) && assert(
+              events3,
+            )(isEmpty) && assert(
               events0,
             )(equalTo(events1))
           )
 
           d <- (
             for {
+              events0 <- atomically(persistence.readEvents[DummyEvent](key, DummyEvent.discriminator))
               events1 <- atomically(
                 persistence.readEvents[DummyEvent](
                   DummyEvent.discriminator,
@@ -102,22 +106,15 @@ object PostgresCQRSPersistenceSpec extends PgSpec {
                   props = None,
                 ),
               )
-              events3 <- atomically(
-                persistence.readEvents[DummyEvent](
-                  DummyEvent.discriminator,
-                  ns = None,
-                  hierarchy = Hierarchy.GrandChild(Key("grandParentId")).some,
-                  props = None,
-                ),
-              )
 
-            } yield assert(events1)(isNonEmpty) && assert(events2)(isEmpty) && assert(events3)(isEmpty) && assert(
+            } yield assert(events0)(isNonEmpty) && assert(events1)(isNonEmpty) && assert(events2)(isEmpty) && assert(
               events0,
             )(equalTo(events1))
           )
 
           e <- (
             for {
+              events0 <- atomically(persistence.readEvents[DummyEvent](key, DummyEvent.discriminator))
               events1 <- atomically(
                 persistence.readEvents[DummyEvent](
                   DummyEvent.discriminator,
@@ -135,7 +132,9 @@ object PostgresCQRSPersistenceSpec extends PgSpec {
                 ),
               )
 
-            } yield assert(events1)(isNonEmpty) && assert(events2)(isEmpty) && assert(events0)(equalTo(events1))
+            } yield assert(events0)(isNonEmpty) && assert(events1)(isNonEmpty) && assert(events2)(isEmpty) && assert(
+              events0,
+            )(equalTo(events1))
           )
 
         } yield a && b && c && d && e
@@ -169,9 +168,7 @@ object PostgresCQRSPersistenceSpec extends PgSpec {
               props = NonEmptyList(EventProperty("type", "DummyEventXXX")).some,
             ),
           )
-          b = assert(events0)(isNonEmpty) && assert(events1)(isNonEmpty) && assert(events2)(isEmpty) && assert(events0)(
-            equalTo(events1),
-          )
+          b = assert(events0)(isNonEmpty) && assert(events1)(isNonEmpty) && assert(events2)(isEmpty)
 
         } yield a && b
       },
@@ -370,7 +367,7 @@ object PostgresCQRSPersistenceSpec extends PgSpec {
           } yield planAssertion && timeAssertion
         }
       },
-      test("read all events by namespace is optimized") {
+      test("read all events by args is optimized") {
         check(Gen.option(namespacesGen), Gen.option(hierarchyGen), Gen.option(eventPropertiesGen)) {
           case (ns, hierarchy, props) =>
             val query =
@@ -387,7 +384,7 @@ object PostgresCQRSPersistenceSpec extends PgSpec {
             } yield planAssertion && timeAssertion
         }
       },
-      test("read snapshot events by namespace is optimized") {
+      test("read snapshot events by args is optimized") {
         check(versionGen, Gen.option(namespacesGen), Gen.option(hierarchyGen), Gen.option(eventPropertiesGen)) {
           case (version, ns, hierarchy, props) =>
             val query =

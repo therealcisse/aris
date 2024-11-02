@@ -12,6 +12,7 @@ import zio.schema.codec.*
 import zio.prelude.*
 
 import com.youtoo.cqrs.Codecs.given
+import java.nio.charset.StandardCharsets
 
 trait PostgresCQRSPersistence extends CQRSPersistence {}
 
@@ -184,7 +185,7 @@ object PostgresCQRSPersistence {
     ): SqlFragment =
       val payload = java.util.Base64.getEncoder.encodeToString(summon[BinaryCodec[Event]].encode(event.payload).toArray)
 
-      val props = java.util.Base64.getEncoder.encodeToString(toJson(event.payload.props).toArray)
+      val props = String(toJson(event.payload.props).toArray, StandardCharsets.UTF_8.name)
 
       event.payload.hierarchy match {
         case None =>
@@ -197,8 +198,8 @@ object PostgresCQRSPersistence {
             ${event.payload.namespace},
             (
               SELECT jsonb_object_agg(elem->>'key', elem->>'value')
-              FROM jsonb_array_elements($props :: jsonb)
-              ) as elem,
+              FROM jsonb_array_elements($props :: jsonb) as elem
+              ),
             decode(${payload}, 'base64')
           )
           """
@@ -212,7 +213,10 @@ object PostgresCQRSPersistence {
             ${discriminator},
             ${event.payload.namespace},
             $grandParentId,
-            ($props) as elem,
+            (
+              SELECT jsonb_object_agg(elem->>'key', elem->>'value')
+              FROM jsonb_array_elements($props :: jsonb) as elem
+              ),
             decode(${payload}, 'base64')
           )
           """
@@ -226,7 +230,10 @@ object PostgresCQRSPersistence {
             ${discriminator},
             ${event.payload.namespace},
             $parentId,
-            ($props) as elem,
+            (
+              SELECT jsonb_object_agg(elem->>'key', elem->>'value')
+              FROM jsonb_array_elements($props :: jsonb) as elem
+              ),
             decode(${payload}, 'base64')
           )
           """
@@ -238,9 +245,13 @@ object PostgresCQRSPersistence {
             ${event.version},
             ${id},
             ${discriminator},
+            ${event.payload.namespace},
             $parentId,
             $grandParentId,
-            ($props) as elem,
+            (
+              SELECT jsonb_object_agg(elem->>'key', elem->>'value')
+              FROM jsonb_array_elements($props :: jsonb) as elem
+              ),
             decode(${payload}, 'base64')
           )
           """

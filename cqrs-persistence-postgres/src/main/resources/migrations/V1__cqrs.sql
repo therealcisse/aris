@@ -27,10 +27,3 @@ CREATE INDEX idx_events_parent_id ON events (parent_id);
 CREATE INDEX idx_events_grand_parent_id ON events (grand_parent_id);
 
 CREATE INDEX idx_events_props_all_keys ON events USING GIN (props);
-
-CREATE OR REPLACE FUNCTION decode_bytea_to_jsonb(data bytea)
-RETURNS jsonb AS $$
-BEGIN
-  RETURN data::text::jsonb;
-END;
-$$ LANGUAGE plpgsql IMMUTABLE;
