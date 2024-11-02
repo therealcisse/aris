@@ -36,6 +36,27 @@ object IngestionEventStore {
             NonEmptyList.fromIterableOption(es)
           }
 
+        def readEvents(
+          ns: Option[NonEmptyList[Namespace]],
+          hierarchy: Option[Hierarchy],
+          props: Option[NonEmptyList[EventProperty]],
+        ): RIO[ZConnection, Option[NonEmptyList[Change[IngestionEvent]]]] =
+          persistence.readEvents[IngestionEvent](IngestionEvent.discriminator, ns, hierarchy, props).map { es =>
+            NonEmptyList.fromIterableOption(es)
+          }
+
+        def readEvents(
+          snapshotVersion: Version,
+          ns: Option[NonEmptyList[Namespace]],
+          hierarchy: Option[Hierarchy],
+          props: Option[NonEmptyList[EventProperty]],
+        ): RIO[ZConnection, Option[NonEmptyList[Change[IngestionEvent]]]] =
+          persistence
+            .readEvents[IngestionEvent](IngestionEvent.discriminator, snapshotVersion, ns, hierarchy, props)
+            .map { es =>
+              NonEmptyList.fromIterableOption(es)
+            }
+
         def save(id: Key, event: Change[IngestionEvent]): RIO[ZConnection, Long] =
           persistence.saveEvent(id, IngestionEvent.discriminator, event)
 

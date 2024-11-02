@@ -16,6 +16,8 @@ object BuildHelper extends ScalaSettings {
     "-feature",
     "-unchecked",
     "-language:postfixOps",
+    "-Xmax-inlines",
+    "4096",
   ) ++ {
     if (sys.env.contains("CI")) {
       Seq("-Xfatal-warnings")

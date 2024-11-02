@@ -10,6 +10,9 @@ import zio.*
 import zio.jdbc.*
 
 trait JdbcCodecs {
+  def toJson[A: Schema](value: A): Chunk[Byte] =
+    val jsonCodec = JsonCodec.schemaBasedBinaryCodec(Schema[A])
+    jsonCodec.encode(value)
 
   given SqlFragment.Setter[Key] = SqlFragment.Setter[String].contramap(_.value.toString)
   given SqlFragment.Setter[Version] = SqlFragment.Setter[String].contramap(_.value)

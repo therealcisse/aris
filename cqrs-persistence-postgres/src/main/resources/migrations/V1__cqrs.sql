@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS events (
   namespace INT NOT NULL,
   parent_id TEXT,
   grand_parent_id TEXT,
+  props JSONB NOT NULL DEFAULT '{}'::jsonb,
   payload BYTEA NOT NULL
 );
 
@@ -24,3 +25,12 @@ CREATE INDEX idx_events_aggregate_id ON events (aggregate_id);
 CREATE INDEX idx_events_namespace ON events (namespace);
 CREATE INDEX idx_events_parent_id ON events (parent_id);
 CREATE INDEX idx_events_grand_parent_id ON events (grand_parent_id);
+
+CREATE INDEX idx_events_props_all_keys ON events USING GIN (props);
+
+CREATE OR REPLACE FUNCTION decode_bytea_to_jsonb(data bytea)
+RETURNS jsonb AS $$
+BEGIN
+  RETURN data::text::jsonb;
+END;
+$$ LANGUAGE plpgsql IMMUTABLE;

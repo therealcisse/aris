@@ -29,6 +29,8 @@ trait ScalaSettings {
     "-Xlint:deprecation", // Enable linted deprecations.
     "-Xlint:-infer-any", // Disable infer any warning
 
+    "-Wconf:cat=lint-match:error", // Make non-exhaustive pattern match warnings into errors
+
     // "-Wunused:explicits",                        // Warn if an explicit parameter is unused.
     // "-Wunused:params",                           // Enable -Wunused:explicits,implicits.
     // "-Wunused:linted",

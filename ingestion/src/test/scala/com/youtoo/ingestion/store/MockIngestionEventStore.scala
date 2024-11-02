@@ -17,6 +17,20 @@ object MockIngestionEventStore extends Mock[IngestionEventStore] {
     object Full extends Effect[Key, Throwable, Option[NonEmptyList[Change[IngestionEvent]]]]
     object Snapshot extends Effect[(Key, Version), Throwable, Option[NonEmptyList[Change[IngestionEvent]]]]
 
+    object FullArgs
+        extends Effect[
+          (Option[NonEmptyList[Namespace]], Option[Hierarchy], Option[NonEmptyList[EventProperty]]),
+          Throwable,
+          Option[
+            NonEmptyList[Change[IngestionEvent]],
+          ],
+        ]
+    object SnapshotArgs
+        extends Effect[
+          (Version, Option[NonEmptyList[Namespace]], Option[Hierarchy], Option[NonEmptyList[EventProperty]]),
+          Throwable,
+          Option[NonEmptyList[Change[IngestionEvent]]],
+        ]
   }
 
   object Save extends Effect[(Key, Change[IngestionEvent]), Throwable, Long]
@@ -31,6 +45,21 @@ object MockIngestionEventStore extends Mock[IngestionEventStore] {
 
         def readEvents(id: Key, snapshotVersion: Version): Task[Option[NonEmptyList[Change[IngestionEvent]]]] =
           proxy(ReadEvents.Snapshot, (id, snapshotVersion))
+
+        def readEvents(
+          snapshotVersion: Version,
+          ns: Option[NonEmptyList[Namespace]],
+          hierarchy: Option[Hierarchy],
+          props: Option[NonEmptyList[EventProperty]],
+        ): Task[Option[NonEmptyList[Change[IngestionEvent]]]] =
+          proxy(ReadEvents.SnapshotArgs, (snapshotVersion, ns, hierarchy, props))
+
+        def readEvents(
+          ns: Option[NonEmptyList[Namespace]],
+          hierarchy: Option[Hierarchy],
+          props: Option[NonEmptyList[EventProperty]],
+        ): Task[Option[NonEmptyList[Change[IngestionEvent]]]] =
+          proxy(ReadEvents.FullArgs, (ns, hierarchy, props))
 
         def save(id: Key, event: Change[IngestionEvent]): Task[Long] =
           proxy(Save, (id, event))

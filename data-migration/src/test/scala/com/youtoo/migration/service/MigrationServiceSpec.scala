@@ -127,7 +127,7 @@ object MigrationServiceSpec extends MockSpecDefault {
         )
 
       }
-    } @@ TestAspect.samples(1),
+    },
     test("load many returns expected result using MigrationRepository") {
       check(Gen.some(keyGen), Gen.long, keyGen) { case (key, limit, id) =>
         val expected = Chunk(id)
@@ -151,7 +151,7 @@ object MigrationServiceSpec extends MockSpecDefault {
         )
 
       }
-    } @@ TestAspect.samples(1),
+    },
   ).provideSomeLayerShared(ZConnectionMock.pool())
 
 }

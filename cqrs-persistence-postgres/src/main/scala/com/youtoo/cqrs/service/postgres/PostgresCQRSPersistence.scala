@@ -3,9 +3,13 @@ package cqrs
 package service
 package postgres
 
+import cats.implicits.*
+
 import com.youtoo.cqrs.domain.*
 
 import zio.schema.codec.*
+
+import zio.prelude.*
 
 import com.youtoo.cqrs.Codecs.given
 
@@ -33,21 +37,21 @@ object PostgresCQRSPersistence {
           Queries.READ_EVENTS(id, discriminator, snapshotVersion).selectAll
 
         def readEvents[Event: BinaryCodec: Tag](
-          id: Key,
           discriminator: Discriminator,
-          ns: Option[NonEmptyChunk[Namespace]],
+          ns: Option[NonEmptyList[Namespace]],
           hierarchy: Option[Hierarchy],
+          props: Option[NonEmptyList[EventProperty]],
         ): RIO[ZConnection, Chunk[Change[Event]]] =
-          Queries.READ_EVENTS(id, discriminator, ns, hierarchy).selectAll
+          Queries.READ_EVENTS(discriminator, ns, hierarchy, props).selectAll
 
         def readEvents[Event: BinaryCodec: Tag](
-          id: Key,
           discriminator: Discriminator,
           snapshotVersion: Version,
-          ns: Option[NonEmptyChunk[Namespace]],
+          ns: Option[NonEmptyList[Namespace]],
           hierarchy: Option[Hierarchy],
+          props: Option[NonEmptyList[EventProperty]],
         ): RIO[ZConnection, Chunk[Change[Event]]] =
-          Queries.READ_EVENTS(id, discriminator, snapshotVersion, ns, hierarchy).selectAll
+          Queries.READ_EVENTS(discriminator, snapshotVersion, ns, hierarchy, props).selectAll
 
         def saveEvent[Event: BinaryCodec: MetaInfo: Tag](
           id: Key,
@@ -93,15 +97,32 @@ object PostgresCQRSPersistence {
       """.query[(Version, Event)].map(Change.apply)
 
     def READ_EVENTS[Event: BinaryCodec](
-      id: Key,
       discriminator: Discriminator,
-      ns: Option[NonEmptyChunk[Namespace]],
+      ns: Option[NonEmptyList[Namespace]],
       hierarchy: Option[Hierarchy],
+      props: Option[NonEmptyList[EventProperty]],
     ): Query[Change[Event]] =
 
-      val nsQuery = ns.fold(SqlFragment.empty)(ns => sql" AND namespace in (${ns.toChunk})")
+      @scala.annotation.tailrec
+      def propsQuery(
+        props: Option[NonEmptyList[EventProperty]],
+        q: SqlFragment = SqlFragment.empty,
+      ): SqlFragment = props match {
+        case None => q
+        case Some(NonEmptyList.Single(EventProperty(key, value))) =>
+          q ++ s""" AND props->>'$key' = """ ++ sql"""$value"""
+        case Some(NonEmptyList.Cons(EventProperty(key, value), ns)) =>
+          propsQuery(ns.some, q ++ s""" AND props->>'$key' = """ ++ sql"""$value""")
+      }
+
+      val nsQuery = ns.fold(SqlFragment.empty) {
+        case NonEmptyList.Single(n) => sql" AND namespace = $n"
+        case NonEmptyList.Cons(n, ns) => sql" AND namespace in (${n :: ns.toList})"
+      }
+
       val hierarchyQuery = hierarchy.fold(SqlFragment.empty) {
         case Hierarchy.Child(parentId) => sql""" AND parent_id = $parentId"""
+        case Hierarchy.GrandChild(grandParentId) => sql""" AND grand_parent_id = $grandParentId"""
         case Hierarchy.Descendant(grandParentId, parentId) =>
           sql""" AND parent_id = $parentId AND grand_parent_id = $grandParentId"""
 
@@ -112,20 +133,36 @@ object PostgresCQRSPersistence {
         version,
         payload
       FROM events
-      WHERE aggregate_id = $id
-        AND discriminator = $discriminator""" ++ nsQuery ++ hierarchyQuery ++
+      WHERE discriminator = $discriminator""" ++ nsQuery ++ hierarchyQuery ++ propsQuery(props) ++
         sql""" ORDER BY version ASC""").query[(Version, Event)].map(Change.apply)
 
     def READ_EVENTS[Event: BinaryCodec](
-      id: Key,
       discriminator: Discriminator,
       snapshotVersion: Version,
-      ns: Option[NonEmptyChunk[Namespace]],
+      ns: Option[NonEmptyList[Namespace]],
       hierarchy: Option[Hierarchy],
+      props: Option[NonEmptyList[EventProperty]],
     ): Query[Change[Event]] =
-      val nsQuery = ns.fold(SqlFragment.empty)(ns => sql" AND namespace in (${ns.toChunk})")
+      @scala.annotation.tailrec
+      def propsQuery(
+        props: Option[NonEmptyList[EventProperty]],
+        q: SqlFragment = SqlFragment.empty,
+      ): SqlFragment = props match {
+        case None => q
+        case Some(NonEmptyList.Single(EventProperty(key, value))) =>
+          q ++ s""" AND props->>'$key' = """ ++ sql"""$value"""
+        case Some(NonEmptyList.Cons(EventProperty(key, value), ns)) =>
+          propsQuery(ns.some, q ++ s""" AND props->>'$key' = """ ++ sql"""$value""")
+      }
+
+      val nsQuery = ns.fold(SqlFragment.empty) {
+        case NonEmptyList.Single(n) => sql" AND namespace = $n"
+        case NonEmptyList.Cons(n, ns) => sql" AND namespace in (${n :: ns.toList})"
+      }
+
       val hierarchyQuery = hierarchy.fold(SqlFragment.empty) {
         case Hierarchy.Child(parentId) => sql""" AND parent_id = $parentId"""
+        case Hierarchy.GrandChild(grandParentId) => sql""" AND grand_parent_id = $grandParentId"""
         case Hierarchy.Descendant(grandParentId, parentId) =>
           sql""" AND parent_id = $parentId AND grand_parent_id = $grandParentId"""
 
@@ -136,9 +173,8 @@ object PostgresCQRSPersistence {
         version,
         payload
       FROM events
-      WHERE aggregate_id = $id
-        AND discriminator = $discriminator
-        AND version > $snapshotVersion""" ++ nsQuery ++ hierarchyQuery ++
+      WHERE discriminator = $discriminator
+        AND version > $snapshotVersion""" ++ nsQuery ++ hierarchyQuery ++ propsQuery(props) ++
         sql""" ORDER BY version ASC""").query[(Version, Event)].map(Change.apply)
 
     def SAVE_EVENT[Event: BinaryCodec: MetaInfo](
@@ -148,41 +184,63 @@ object PostgresCQRSPersistence {
     ): SqlFragment =
       val payload = java.util.Base64.getEncoder.encodeToString(summon[BinaryCodec[Event]].encode(event.payload).toArray)
 
+      val props = java.util.Base64.getEncoder.encodeToString(toJson(event.payload.props).toArray)
+
       event.payload.hierarchy match {
         case None =>
           sql"""
-          INSERT INTO events (version, aggregate_id, discriminator, namespace, payload)
+          INSERT INTO events (version, aggregate_id, discriminator, namespace, props, payload)
           VALUES (
             ${event.version},
             ${id},
             ${discriminator},
             ${event.payload.namespace},
+            (
+              SELECT jsonb_object_agg(elem->>'key', elem->>'value')
+              FROM jsonb_array_elements($props :: jsonb)
+              ) as elem,
+            decode(${payload}, 'base64')
+          )
+          """
+
+        case Some(Hierarchy.GrandChild(grandParentId)) =>
+          sql"""
+          INSERT INTO events (version, aggregate_id, discriminator, namespace, grand_parent_id, props, payload)
+          VALUES (
+            ${event.version},
+            ${id},
+            ${discriminator},
+            ${event.payload.namespace},
+            $grandParentId,
+            ($props) as elem,
             decode(${payload}, 'base64')
           )
           """
 
         case Some(Hierarchy.Child(parentId)) =>
           sql"""
-          INSERT INTO events (version, aggregate_id, discriminator, namespace, parent_id, payload)
+          INSERT INTO events (version, aggregate_id, discriminator, namespace, parent_id, props, payload)
           VALUES (
             ${event.version},
             ${id},
             ${discriminator},
             ${event.payload.namespace},
             $parentId,
+            ($props) as elem,
             decode(${payload}, 'base64')
           )
           """
 
         case Some(Hierarchy.Descendant(grandParentId, parentId)) =>
           sql"""
-          INSERT INTO events (version, aggregate_id, discriminator, namespace, parent_id, grand_parent_id, payload)
+          INSERT INTO events (version, aggregate_id, discriminator, namespace, parent_id, grand_parent_id, props, payload)
           VALUES (
             ${event.version},
             ${id},
             ${discriminator},
             $parentId,
             $grandParentId,
+            ($props) as elem,
             decode(${payload}, 'base64')
           )
           """

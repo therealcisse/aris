@@ -6,6 +6,7 @@ import com.youtoo.cqrs.domain.*
 
 import zio.*
 import zio.jdbc.*
+import zio.prelude.*
 import zio.schema.codec.*
 
 trait CQRSPersistence {
@@ -16,17 +17,17 @@ trait CQRSPersistence {
     snapshotVersion: Version,
   ): RIO[ZConnection, Chunk[Change[Event]]]
   def readEvents[Event: BinaryCodec: Tag](
-    id: Key,
     discriminator: Discriminator,
-    ns: Option[NonEmptyChunk[Namespace]],
+    ns: Option[NonEmptyList[Namespace]],
     hierarchy: Option[Hierarchy],
+    props: Option[NonEmptyList[EventProperty]],
   ): RIO[ZConnection, Chunk[Change[Event]]]
   def readEvents[Event: BinaryCodec: Tag](
-    id: Key,
     discriminator: Discriminator,
     snapshotVersion: Version,
-    ns: Option[NonEmptyChunk[Namespace]],
+    ns: Option[NonEmptyList[Namespace]],
     hierarchy: Option[Hierarchy],
+    props: Option[NonEmptyList[EventProperty]],
   ): RIO[ZConnection, Chunk[Change[Event]]]
 
   def saveEvent[Event: BinaryCodec: MetaInfo: Tag](

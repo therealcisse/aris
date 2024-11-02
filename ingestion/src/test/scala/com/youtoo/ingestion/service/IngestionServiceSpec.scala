@@ -113,7 +113,7 @@ object IngestionServiceSpec extends MockSpecDefault {
         )
 
       }
-    } @@ TestAspect.samples(1),
+    },
     test("load many returns expected result using IngestionRepository") {
       check(Gen.option(keyGen), Gen.long, keyGen) { case (key, limit, id) =>
         val expected = Chunk(id)
@@ -137,7 +137,7 @@ object IngestionServiceSpec extends MockSpecDefault {
         )
 
       }
-    } @@ TestAspect.samples(1),
+    },
   ).provideSomeLayerShared(ZConnectionMock.pool()) @@ TestAspect.withLiveClock
 
 }

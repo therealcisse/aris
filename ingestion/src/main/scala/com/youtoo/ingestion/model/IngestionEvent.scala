@@ -7,6 +7,7 @@ import com.youtoo.cqrs.domain.*
 
 import cats.implicits.*
 
+import zio.*
 import zio.prelude.*
 import zio.schema.*
 
@@ -40,6 +41,8 @@ object IngestionEvent {
       }
 
     extension (self: IngestionEvent) def hierarchy: Option[Hierarchy] = None
+
+    extension (self: IngestionEvent) def props: Chunk[EventProperty] = Chunk.empty
   }
 
   given IngestionEventHandler with {

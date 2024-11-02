@@ -8,6 +8,7 @@ import com.youtoo.cqrs.domain.*
 
 import cats.implicits.*
 
+import zio.*
 import zio.prelude.*
 import zio.schema.*
 
@@ -53,6 +54,9 @@ object MigrationEvent {
         case MigrationEvent.ExecutionFinished(_, _) => None
         case MigrationEvent.ExecutionFailed(_, _) => None
       }
+
+    extension (self: MigrationEvent) def props: Chunk[EventProperty] = Chunk.empty
+
   }
 
   given MigrationEventHandler with {

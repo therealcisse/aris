@@ -12,6 +12,7 @@ import com.youtoo.cqrs.Codecs.given
 import cats.implicits.*
 
 import zio.*
+import zio.prelude.*
 import zio.test.*
 import zio.test.Assertion.*
 import zio.jdbc.*
@@ -28,12 +29,152 @@ object PostgresCQRSPersistenceSpec extends PgSpec {
 
   given MetaInfo[DummyEvent] with {
     extension (self: DummyEvent) def namespace: Namespace = Namespace(0)
-    extension (self: DummyEvent) def hierarchy: Option[Hierarchy] = None
+    extension (self: DummyEvent)
+      def hierarchy: Option[Hierarchy] = Hierarchy.Descendant(Key("grandParentId"), Key("parentId")).some
+    extension (self: DummyEvent) def props: Chunk[EventProperty] = Chunk(EventProperty("type", "DummyEvent"))
 
   }
 
   def spec: Spec[ZConnectionPool & DatabaseConfig & FlywayMigration & TestEnvironment & Scope, Any] =
     suite("PostgresCQRSPersistenceSpec")(
+      test("should save and retrieve events correctly by hierarchy") {
+        for {
+          persistence <- ZIO.service[CQRSPersistence]
+
+          version <- Version.gen
+          event = Change(version = version, DummyEvent("test"))
+          key <- Key.gen
+
+          saveResult <- atomically(persistence.saveEvent(key, DummyEvent.discriminator, event))
+
+          a = assert(saveResult)(equalTo(1L))
+
+          events0 <- atomically(persistence.readEvents[DummyEvent](key, DummyEvent.discriminator))
+          b = assert(events0)(isNonEmpty)
+
+          c <- (
+            for {
+              events1 <- atomically(
+                persistence.readEvents[DummyEvent](
+                  DummyEvent.discriminator,
+                  ns = None,
+                  hierarchy = Hierarchy.Descendant(Key("grandParentId"), Key("parentId")).some,
+                  props = None,
+                ),
+              )
+              events2 <- atomically(
+                persistence.readEvents[DummyEvent](
+                  DummyEvent.discriminator,
+                  ns = None,
+                  hierarchy = Hierarchy.Descendant(Key("grandParentIdXXX"), Key("parentId")).some,
+                  props = None,
+                ),
+              )
+              events3 <- atomically(
+                persistence.readEvents[DummyEvent](
+                  DummyEvent.discriminator,
+                  ns = None,
+                  hierarchy = Hierarchy.Descendant(Key("grandParentId"), Key("parentIdXXX")).some,
+                  props = None,
+                ),
+              )
+
+            } yield assert(events1)(isNonEmpty) && assert(events2)(isEmpty) && assert(events3)(isEmpty) && assert(
+              events0,
+            )(equalTo(events1))
+          )
+
+          d <- (
+            for {
+              events1 <- atomically(
+                persistence.readEvents[DummyEvent](
+                  DummyEvent.discriminator,
+                  ns = None,
+                  hierarchy = Hierarchy.GrandChild(Key("grandParentId")).some,
+                  props = None,
+                ),
+              )
+              events2 <- atomically(
+                persistence.readEvents[DummyEvent](
+                  DummyEvent.discriminator,
+                  ns = None,
+                  hierarchy = Hierarchy.GrandChild(Key("grandParentIdXXX")).some,
+                  props = None,
+                ),
+              )
+              events3 <- atomically(
+                persistence.readEvents[DummyEvent](
+                  DummyEvent.discriminator,
+                  ns = None,
+                  hierarchy = Hierarchy.GrandChild(Key("grandParentId")).some,
+                  props = None,
+                ),
+              )
+
+            } yield assert(events1)(isNonEmpty) && assert(events2)(isEmpty) && assert(events3)(isEmpty) && assert(
+              events0,
+            )(equalTo(events1))
+          )
+
+          e <- (
+            for {
+              events1 <- atomically(
+                persistence.readEvents[DummyEvent](
+                  DummyEvent.discriminator,
+                  ns = None,
+                  hierarchy = Hierarchy.Child(Key("parentId")).some,
+                  props = None,
+                ),
+              )
+              events2 <- atomically(
+                persistence.readEvents[DummyEvent](
+                  DummyEvent.discriminator,
+                  ns = None,
+                  hierarchy = Hierarchy.Child(Key("parentIdXXX")).some,
+                  props = None,
+                ),
+              )
+
+            } yield assert(events1)(isNonEmpty) && assert(events2)(isEmpty) && assert(events0)(equalTo(events1))
+          )
+
+        } yield a && b && c && d && e
+      },
+      test("should save and retrieve events correctly by props") {
+        for {
+          persistence <- ZIO.service[CQRSPersistence]
+
+          version <- Version.gen
+          event = Change(version = version, DummyEvent("test"))
+          key <- Key.gen
+
+          saveResult <- atomically(persistence.saveEvent(key, DummyEvent.discriminator, event))
+
+          a = assert(saveResult)(equalTo(1L))
+
+          events0 <- atomically(persistence.readEvents[DummyEvent](key, DummyEvent.discriminator))
+          events1 <- atomically(
+            persistence.readEvents[DummyEvent](
+              DummyEvent.discriminator,
+              ns = None,
+              hierarchy = None,
+              props = NonEmptyList(EventProperty("type", "DummyEvent")).some,
+            ),
+          )
+          events2 <- atomically(
+            persistence.readEvents[DummyEvent](
+              DummyEvent.discriminator,
+              ns = None,
+              hierarchy = None,
+              props = NonEmptyList(EventProperty("type", "DummyEventXXX")).some,
+            ),
+          )
+          b = assert(events0)(isNonEmpty) && assert(events1)(isNonEmpty) && assert(events2)(isEmpty) && assert(events0)(
+            equalTo(events1),
+          )
+
+        } yield a && b
+      },
       test("should save and retrieve events correctly") {
         for {
           persistence <- ZIO.service[CQRSPersistence]
@@ -65,13 +206,13 @@ object PostgresCQRSPersistenceSpec extends PgSpec {
 
           events0 <- atomically(
             persistence
-              .readEvents[DummyEvent](key, DummyEvent.discriminator, ns = NonEmptyChunk(Namespace(0)).some, None),
+              .readEvents[DummyEvent](DummyEvent.discriminator, ns = NonEmptyList(Namespace(0)).some, None, None),
           )
           b = assert(events0)(isNonEmpty)
 
           events1 <- atomically(
             persistence
-              .readEvents[DummyEvent](key, DummyEvent.discriminator, ns = NonEmptyChunk(Namespace(1)).some, None),
+              .readEvents[DummyEvent](DummyEvent.discriminator, ns = NonEmptyList(Namespace(1)).some, None, None),
           )
           c = assert(events1)(isEmpty)
 
@@ -230,26 +371,28 @@ object PostgresCQRSPersistenceSpec extends PgSpec {
         }
       },
       test("read all events by namespace is optimized") {
-        check(keyGen, Gen.option(namespacesGen), Gen.option(hierarchyGen)) { case (key, ns, hierarchy) =>
-          val query =
-            PostgresCQRSPersistence.Queries.READ_EVENTS[DummyEvent](key, DummyEvent.discriminator, ns, hierarchy)
-          for {
+        check(Gen.option(namespacesGen), Gen.option(hierarchyGen), Gen.option(eventPropertiesGen)) {
+          case (ns, hierarchy, props) =>
+            val query =
+              PostgresCQRSPersistence.Queries
+                .READ_EVENTS[DummyEvent](DummyEvent.discriminator, ns, hierarchy, props)
+            for {
 
-            executionTime <- atomically(query.selectAll).timed.map(_._1)
-            timeAssertion = assert(executionTime.toMillis)(isLessThanEqualTo(100L))
+              executionTime <- atomically(query.selectAll).timed.map(_._1)
+              timeAssertion = assert(executionTime.toMillis)(isLessThanEqualTo(100L))
 
-            executionPlan <- atomically(query.sql.getExecutionPlan)
-            planAssertion = assert(executionPlan)(containsString("Index Scan") || containsString("Index Only Scan"))
+              executionPlan <- atomically(query.sql.getExecutionPlan)
+              planAssertion = assert(executionPlan)(containsString("Index Scan") || containsString("Index Only Scan"))
 
-          } yield planAssertion && timeAssertion
+            } yield planAssertion && timeAssertion
         }
       },
       test("read snapshot events by namespace is optimized") {
-        check(keyGen, versionGen, Gen.option(namespacesGen), Gen.option(hierarchyGen)) {
-          case (key, version, ns, hierarchy) =>
+        check(versionGen, Gen.option(namespacesGen), Gen.option(hierarchyGen), Gen.option(eventPropertiesGen)) {
+          case (version, ns, hierarchy, props) =>
             val query =
               PostgresCQRSPersistence.Queries
-                .READ_EVENTS[DummyEvent](key, DummyEvent.discriminator, version, ns, hierarchy)
+                .READ_EVENTS[DummyEvent](DummyEvent.discriminator, version, ns, hierarchy, props)
             for {
 
               executionTime <- atomically(query.selectAll).timed.map(_._1)
@@ -277,16 +420,24 @@ object PostgresCQRSPersistenceSpec extends PgSpec {
 
   val hierarchyGen: Gen[Any, Hierarchy] = Gen.oneOf(
     keyGen map { parentId => Hierarchy.Child(parentId) },
+    keyGen map { grandParentId => Hierarchy.GrandChild(grandParentId) },
     (keyGen <*> keyGen) map { case (grandParentId, parentId) => Hierarchy.Descendant(grandParentId, parentId) },
   )
 
-  val namespacesGen: Gen[Any, NonEmptyChunk[Namespace]] =
+  val namespacesGen: Gen[Any, NonEmptyList[Namespace]] =
     Gen
       .setOfBounded(1, 8)(Gen.int)
       .map(s =>
-        NonEmptyChunk.fromIterableOption(s) match {
+        NonEmptyList.fromIterableOption(s) match {
           case None => throw IllegalArgumentException("empty")
           case Some(nes) => nes.map(Namespace.apply)
         },
       )
+
+  val eventPropertiesGen: Gen[Any, NonEmptyList[EventProperty]] =
+    Gen
+      .setOfBounded(1, 8)(
+        (Gen.alphaNumericStringBounded(3, 20) <*> Gen.alphaNumericStringBounded(128, 512)) `map` EventProperty.apply,
+      )
+      .map(s => NonEmptyList.fromIterableOption(s).getOrElse(throw IllegalArgumentException("empty")))
 }

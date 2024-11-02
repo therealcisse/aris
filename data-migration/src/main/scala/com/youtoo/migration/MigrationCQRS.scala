@@ -19,7 +19,7 @@ import zio.metrics.*
 
 import java.time.temporal.ChronoUnit
 
-trait MigrationCQRS extends CQRS[Migration, MigrationEvent, MigrationCommand] {}
+trait MigrationCQRS extends CQRS[MigrationEvent, MigrationCommand] {}
 
 object MigrationCQRS {
 

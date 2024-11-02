@@ -3,8 +3,6 @@ package ingestion
 
 import zio.*
 
-import cats.implicits.*
-
 import zio.jdbc.*
 import zio.prelude.*
 
@@ -15,14 +13,13 @@ import com.youtoo.cqrs.store.*
 import com.youtoo.cqrs.domain.*
 import com.youtoo.ingestion.model.*
 import com.youtoo.cqrs.service.*
-import com.youtoo.ingestion.service.*
 import com.youtoo.ingestion.store.*
 
 import zio.metrics.*
 
 import java.time.temporal.ChronoUnit
 
-trait IngestionCQRS extends CQRS[Ingestion, IngestionEvent, IngestionCommand] {}
+trait IngestionCQRS extends CQRS[IngestionEvent, IngestionCommand] {}
 
 object IngestionCQRS {
 

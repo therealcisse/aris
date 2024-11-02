@@ -36,6 +36,27 @@ object MigrationEventStore {
             NonEmptyList.fromIterableOption(es)
           }
 
+        def readEvents(
+          ns: Option[NonEmptyList[Namespace]],
+          hierarchy: Option[Hierarchy],
+          props: Option[NonEmptyList[EventProperty]],
+        ): RIO[ZConnection, Option[NonEmptyList[Change[MigrationEvent]]]] =
+          persistence.readEvents[MigrationEvent](MigrationEvent.discriminator, ns, hierarchy, props).map { es =>
+            NonEmptyList.fromIterableOption(es)
+          }
+
+        def readEvents(
+          snapshotVersion: Version,
+          ns: Option[NonEmptyList[Namespace]],
+          hierarchy: Option[Hierarchy],
+          props: Option[NonEmptyList[EventProperty]],
+        ): RIO[ZConnection, Option[NonEmptyList[Change[MigrationEvent]]]] =
+          persistence
+            .readEvents[MigrationEvent](MigrationEvent.discriminator, snapshotVersion, ns, hierarchy, props)
+            .map { es =>
+              NonEmptyList.fromIterableOption(es)
+            }
+
         def save(id: Key, event: Change[MigrationEvent]): RIO[ZConnection, Long] =
           persistence.saveEvent(id, MigrationEvent.discriminator, event)
 
