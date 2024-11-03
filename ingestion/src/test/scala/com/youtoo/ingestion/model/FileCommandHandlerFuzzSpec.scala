@@ -8,11 +8,11 @@ import zio.prelude.*
 import zio.*
 import com.youtoo.cqrs.*
 
-object IngestionCommandHandlerFuzzSpec extends ZIOSpecDefault {
+object FileCommandHandlerFuzzSpec extends ZIOSpecDefault {
 
-  def spec = suite("IngestionCommandHandlerFuzzSpec")(
-    test("Fuzz test IngestionCommandHandler with random commands") {
-      check(Gen.listOf1(ingestionCommandGen)) { commands =>
+  def spec = suite("FileCommandHandlerFuzzSpec")(
+    test("Fuzz test FileCommandHandler with random commands") {
+      check(Gen.listOf1(fileCommandGen)) { commands =>
         ZIO.foldLeft(commands)(assert(true)(isTrue)) { (s, cmd) =>
           ZIO.attempt(CmdHandler.applyCmd(cmd)).either.map {
             case Left(_) =>
@@ -23,5 +23,5 @@ object IngestionCommandHandlerFuzzSpec extends ZIOSpecDefault {
         }
       }
     },
-  )
+  ) @@ TestAspect.withLiveClock
 }

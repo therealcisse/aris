@@ -49,8 +49,6 @@ object IngestionService {
       ) =>
         ZLayer {
           factory.create(IngestionEvent.discriminator) map { strategy =>
-            val Evt = summon[EventHandler[IngestionEvent, Ingestion]]
-
             new IngestionService {
               def load(id: Ingestion.Id): Task[Option[Ingestion]] =
                 val key = id.asKey
@@ -66,7 +64,7 @@ object IngestionService {
                         events <- eventStore.readEvents(key)
                         inn = events map { es =>
                           (
-                            Evt.applyEvents(es),
+                            EventHandler.applyEvents(es),
                             es.maxBy(_.version),
                             es.size,
                             None,
@@ -80,7 +78,7 @@ object IngestionService {
 
                       events map (_.map { es =>
                         (
-                          Evt.applyEvents(in, es),
+                          EventHandler.applyEvents(in, es),
                           es.maxBy(_.version),
                           es.size,
                           version.some,

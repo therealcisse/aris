@@ -18,23 +18,21 @@ import com.youtoo.cqrs.store.*
 import com.youtoo.cqrs.service.postgres.*
 import com.youtoo.cqrs.domain.*
 
-object IngestionCQRSSpec extends MockSpecDefault {
-  override val bootstrap: ZLayer[Any, Any, TestEnvironment] =
-    testEnvironment ++ Runtime.setConfigProvider(ConfigProvider.fromMap(Map("Ingestion.snapshots.threshold" -> "10")))
+object FileCQRSSpec extends MockSpecDefault {
 
-  def spec = suite("IngestionCQRSSpec")(
+  def spec = suite("FileCQRSSpec")(
     test("should add command") {
-      check(keyGen, ingestionCommandGen) { case (id, cmd) =>
-        val Cmd = summon[CmdHandler[IngestionCommand, IngestionEvent]]
+      check(keyGen, fileCommandGen) { case (id, cmd) =>
+        val Cmd = summon[CmdHandler[FileCommand, FileEvent]]
 
-        inline def isArg(key: Key, payload: IngestionEvent) =
-          assertion[(Key, Change[IngestionEvent])]("IngestionCQRS.isArg") { case (id, ch) =>
+        inline def isArg(key: Key, payload: FileEvent) =
+          assertion[(Key, Change[FileEvent])]("FileCQRS.isArg") { case (id, ch) =>
             id == key && ch.payload == payload
           }
 
         val evnts = Cmd.applyCmd(cmd)
 
-        val zero = MockIngestionEventStore
+        val zero = MockFileEventStore
           .Save(
             isArg(id, evnts.head),
             value(1L),
@@ -42,14 +40,14 @@ object IngestionCQRSSpec extends MockSpecDefault {
           .toLayer
 
         val eventStoreEnv = evnts.tail.foldLeft(zero) { case (ass, e) =>
-          ass ++ MockIngestionEventStore.Save(isArg(id, e), value(1L)).toLayer
+          ass ++ MockFileEventStore.Save(isArg(id, e), value(1L)).toLayer
         }
 
-        val layer = eventStoreEnv ++ MockSnapshotStore.empty ++ SnapshotStrategy.live() >>> IngestionCQRS.live()
+        val layer = eventStoreEnv ++ MockSnapshotStore.empty >>> FileCQRS.live()
 
         (for {
 
-          _ <- IngestionCQRS.add(id, cmd)
+          _ <- FileCQRS.add(id, cmd)
 
         } yield assertCompletes).provideSomeLayer[ZConnectionPool](layer)
       }
@@ -57,3 +55,4 @@ object IngestionCQRSSpec extends MockSpecDefault {
     },
   ).provideLayerShared(ZConnectionMock.pool())
 }
+

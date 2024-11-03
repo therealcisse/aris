@@ -5,14 +5,14 @@ package model
 import zio.*
 import zio.test.*
 import zio.test.Assertion.*
+import com.youtoo.cqrs.*
 
 object IngestionEventHandlerFuzzSpec extends ZIOSpecDefault {
-  val handler = summon[IngestionEventHandler]
 
   def spec = suite("IngestionEventHandlerFuzzSpec")(
     test("Fuzz test IngestionEventHandler does not crash on invalid inputs") {
       check(eventSequenceGen) { events =>
-        val result = ZIO.attempt(handler.applyEvents(events))
+        val result = ZIO.attempt(EventHandler.applyEvents(events))
         result.fold(
           _ => assertCompletes, // Test passes if an exception is thrown (as expected)
           _ => assertCompletes, // Test also passes if no exception is thrown
@@ -21,7 +21,7 @@ object IngestionEventHandlerFuzzSpec extends ZIOSpecDefault {
     },
     test("Fuzz test IngestionEventHandler with random events") {
       check(validEventSequenceGen) { events =>
-        val result = ZIO.attempt(handler.applyEvents(events)).either
+        val result = ZIO.attempt(EventHandler.applyEvents(events)).either
         result.map {
           case Left(_) =>
             assertCompletes
@@ -30,5 +30,5 @@ object IngestionEventHandlerFuzzSpec extends ZIOSpecDefault {
         }
       }
     },
-  ) @@ TestAspect.samples(1) @@ TestAspect.withLiveClock
+  ) @@ TestAspect.withLiveClock
 }

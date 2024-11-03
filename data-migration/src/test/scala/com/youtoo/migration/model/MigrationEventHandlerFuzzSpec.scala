@@ -5,14 +5,14 @@ package model
 import zio.*
 import zio.test.*
 import zio.test.Assertion.*
+import com.youtoo.cqrs.*
 
 object MigrationEventHandlerFuzzSpec extends ZIOSpecDefault {
-  val handler = summon[MigrationEventHandler]
 
   def spec = suite("MigrationEventHandlerFuzzSpec")(
     test("Fuzz test MigrationEventHandler does not crash on invalid inputs") {
       check(eventSequenceGen) { events =>
-        val result = ZIO.attempt(handler.applyEvents(events))
+        val result = ZIO.attempt(EventHandler.applyEvents(events))
         result.fold(
           _ => assertCompletes, // Test passes if an exception is thrown (as expected)
           _ => assertCompletes, // Test also passes if no exception is thrown
@@ -21,7 +21,7 @@ object MigrationEventHandlerFuzzSpec extends ZIOSpecDefault {
     },
     test("Fuzz test MigrationEventHandler with random valid events") {
       check(validMigrationEventSequence) { events =>
-        val result = ZIO.attempt(handler.applyEvents(events)).either
+        val result = ZIO.attempt(EventHandler.applyEvents(events)).either
         result.map {
           case Left(_) =>
             assertCompletes

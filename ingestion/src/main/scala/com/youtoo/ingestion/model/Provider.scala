@@ -8,8 +8,6 @@ import zio.*
 
 import zio.prelude.*
 import zio.schema.*
-import com.youtoo.cqrs.EventHandler
-import com.youtoo.cqrs.domain.Change
 
 case class Provider(id: Provider.Id, name: Provider.Name, location: Provider.Location)
 

@@ -11,10 +11,10 @@ import zio.schema.*
 
 enum IngestionCommand {
   case StartIngestion(id: Ingestion.Id, timestamp: Timestamp)
-  case SetFiles(files: NonEmptySet[String])
-  case FileProcessing(file: String)
-  case FileProcessed(file: String)
-  case FileFailed(file: String)
+  case SetFiles(files: NonEmptySet[IngestionFile.Id])
+  case FileProcessing(file: IngestionFile.Id)
+  case FileProcessed(file: IngestionFile.Id)
+  case FileFailed(file: IngestionFile.Id)
   case StopIngestion(timestamp: Timestamp)
 
 }

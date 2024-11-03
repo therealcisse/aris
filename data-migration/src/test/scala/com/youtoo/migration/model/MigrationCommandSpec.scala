@@ -6,15 +6,15 @@ import zio.test.*
 import zio.test.Assertion.*
 import zio.prelude.*
 import zio.*
+import com.youtoo.cqrs.*
 
 object MigrationCommandHandlerSpec extends ZIOSpecDefault {
-  val handler = summon[MigrationCommandHandler]
 
   def spec = suite("MigrationCommandHandlerSpec")(
     test("RegisterMigration command produces MigrationRegistered event") {
       check(migrationIdGen, timestampGen) { (id, timestamp) =>
         val command = MigrationCommand.RegisterMigration(id, timestamp)
-        val events = handler.applyCmd(command)
+        val events = CmdHandler.applyCmd(command)
         val expectedEvent = MigrationEvent.MigrationRegistered(id, timestamp)
         assert(events)(equalTo(NonEmptyList(expectedEvent)))
       }
@@ -22,7 +22,7 @@ object MigrationCommandHandlerSpec extends ZIOSpecDefault {
     test("StartExecution command produces ExecutionStarted event") {
       check(executionIdGen, timestampGen) { (id, timestamp) =>
         val command = MigrationCommand.StartExecution(id, timestamp)
-        val events = handler.applyCmd(command)
+        val events = CmdHandler.applyCmd(command)
         val expectedEvent = MigrationEvent.ExecutionStarted(id, timestamp)
         assert(events)(equalTo(NonEmptyList(expectedEvent)))
       }
@@ -30,7 +30,7 @@ object MigrationCommandHandlerSpec extends ZIOSpecDefault {
     test("StartProcessingKey command produces ProcessingStarted event") {
       check(executionIdGen, keyGen) { (id, key) =>
         val command = MigrationCommand.StartProcessingKey(id, key)
-        val events = handler.applyCmd(command)
+        val events = CmdHandler.applyCmd(command)
         val expectedEvent = MigrationEvent.ProcessingStarted(id, key)
         assert(events)(equalTo(NonEmptyList(expectedEvent)))
       }
@@ -38,7 +38,7 @@ object MigrationCommandHandlerSpec extends ZIOSpecDefault {
     test("ProcessKey command produces KeyProcessed event") {
       check(executionIdGen, keyGen) { (id, key) =>
         val command = MigrationCommand.ProcessKey(id, key)
-        val events = handler.applyCmd(command)
+        val events = CmdHandler.applyCmd(command)
         val expectedEvent = MigrationEvent.KeyProcessed(id, key)
         assert(events)(equalTo(NonEmptyList(expectedEvent)))
       }
@@ -46,7 +46,7 @@ object MigrationCommandHandlerSpec extends ZIOSpecDefault {
     test("FailKey command produces ProcessingFailed event") {
       check(executionIdGen, keyGen) { (id, key) =>
         val command = MigrationCommand.FailKey(id, key)
-        val events = handler.applyCmd(command)
+        val events = CmdHandler.applyCmd(command)
         val expectedEvent = MigrationEvent.ProcessingFailed(id, key)
         assert(events)(equalTo(NonEmptyList(expectedEvent)))
       }
@@ -54,7 +54,7 @@ object MigrationCommandHandlerSpec extends ZIOSpecDefault {
     test("StopExecution command produces ExecutionStopped event") {
       check(executionIdGen, timestampGen) { (id, timestamp) =>
         val command = MigrationCommand.StopExecution(id, timestamp)
-        val events = handler.applyCmd(command)
+        val events = CmdHandler.applyCmd(command)
         val expectedEvent = MigrationEvent.ExecutionStopped(id, timestamp)
         assert(events)(equalTo(NonEmptyList(expectedEvent)))
       }
@@ -62,7 +62,7 @@ object MigrationCommandHandlerSpec extends ZIOSpecDefault {
     test("FinishExecution command produces ExecutionFinished event") {
       check(executionIdGen, timestampGen) { (id, timestamp) =>
         val command = MigrationCommand.FinishExecution(id, timestamp)
-        val events = handler.applyCmd(command)
+        val events = CmdHandler.applyCmd(command)
         val expectedEvent = MigrationEvent.ExecutionFinished(id, timestamp)
         assert(events)(equalTo(NonEmptyList(expectedEvent)))
       }
@@ -70,7 +70,7 @@ object MigrationCommandHandlerSpec extends ZIOSpecDefault {
     test("FailExecution command produces ExecutionFailed event") {
       check(executionIdGen, timestampGen) { (id, timestamp) =>
         val command = MigrationCommand.FailExecution(id, timestamp)
-        val events = handler.applyCmd(command)
+        val events = CmdHandler.applyCmd(command)
         val expectedEvent = MigrationEvent.ExecutionFailed(id, timestamp)
         assert(events)(equalTo(NonEmptyList(expectedEvent)))
       }
@@ -78,8 +78,8 @@ object MigrationCommandHandlerSpec extends ZIOSpecDefault {
     test("Applying the same command multiple times produces the same event") {
       check(executionIdGen, keyGen) { (id, key) =>
         val command = MigrationCommand.StartProcessingKey(id, key)
-        val events1 = handler.applyCmd(command)
-        val events2 = handler.applyCmd(command)
+        val events1 = CmdHandler.applyCmd(command)
+        val events2 = CmdHandler.applyCmd(command)
         assert(events1)(equalTo(events2))
       }
     },

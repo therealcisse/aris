@@ -36,10 +36,15 @@ object Ingestion {
 
   enum Status {
     case Initial()
-    case Resolved(files: NonEmptySet[String])
-    case Processing(remaining: Set[String], processing: Set[String], processed: Set[String], failed: Set[String])
-    case Completed(files: NonEmptySet[String])
-    case Failed(done: Set[String], failed: NonEmptySet[String])
+    case Resolved(files: NonEmptySet[IngestionFile.Id])
+    case Processing(
+      remaining: Set[IngestionFile.Id],
+      processing: Set[IngestionFile.Id],
+      processed: Set[IngestionFile.Id],
+      failed: Set[IngestionFile.Id],
+    )
+    case Completed(files: NonEmptySet[IngestionFile.Id])
+    case Failed(done: Set[IngestionFile.Id], failed: NonEmptySet[IngestionFile.Id])
     case Stopped(processing: Status.Processing, timestamp: Timestamp)
 
     def isSuccessful: Status = this match {
@@ -61,7 +66,7 @@ object Ingestion {
   }
 
   extension (status: Status)
-    def totalFiles: Option[NonEmptySet[String]] =
+    def totalFiles: Option[NonEmptySet[IngestionFile.Id]] =
       status match {
         case Status.Initial() => None
         case Status.Completed(files) => files.some

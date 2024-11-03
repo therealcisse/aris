@@ -18,11 +18,6 @@ import com.youtoo.cqrs.service.postgres.*
 import com.youtoo.migration.repository.*
 
 import com.youtoo.migration.model.*
-import com.youtoo.migration.store.*
-import com.youtoo.cqrs.store.*
-import com.youtoo.cqrs.*
-
-import com.youtoo.migration.model.*
 import com.youtoo.cqrs.*
 import com.youtoo.migration.store.*
 import com.youtoo.cqrs.store.*

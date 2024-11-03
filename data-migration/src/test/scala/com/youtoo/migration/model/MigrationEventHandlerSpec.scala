@@ -9,15 +9,15 @@ import zio.test.Assertion.*
 import zio.prelude.*
 import zio.*
 import com.youtoo.cqrs.domain.*
+import com.youtoo.cqrs.*
 
 object MigrationEventHandlerSpec extends ZIOSpecDefault {
-  val handler = summon[MigrationEventHandler]
 
   def spec = suite("MigrationEventHandlerSpec")(
     test("Applying MigrationRegistered event initializes the state") {
       check(migrationIdGen, timestampGen, versionGen) { (id, timestamp, version) =>
         val event = Change(version, MigrationEvent.MigrationRegistered(id, timestamp))
-        val state = handler.applyEvents(NonEmptyList(event))
+        val state = EventHandler.applyEvents(NonEmptyList(event))
         val expectedState = Migration(id, Migration.State(Map.empty), timestamp)
         assert(state)(equalTo(expectedState)) && assert(state.state.status)(equalTo(ExecutionStatus.registered))
       }
@@ -29,7 +29,7 @@ object MigrationEventHandlerSpec extends ZIOSpecDefault {
             Change(v1, MigrationEvent.MigrationRegistered(migrationId, timestamp)),
             Change(v2, MigrationEvent.ExecutionStarted(executionId, timestamp)),
           )
-          val state = handler.applyEvents(events)
+          val state = EventHandler.applyEvents(events)
           val execution = Execution.Processing(executionId, Stats.empty, timestamp)
           val expectedState = Migration(
             migrationId,
@@ -47,7 +47,7 @@ object MigrationEventHandlerSpec extends ZIOSpecDefault {
             Change(v2, MigrationEvent.ExecutionStarted(executionId, timestamp)),
             Change(v3, MigrationEvent.ProcessingStarted(executionId, key)),
           )
-          val state = handler.applyEvents(events)
+          val state = EventHandler.applyEvents(events)
           val stats = Stats(processing = Set(key), processed = Set.empty, failed = Set.empty)
           val processingExecution: Execution.Processing = Execution.Processing(executionId, stats, timestamp)
           val expectedState = Migration(
@@ -67,7 +67,7 @@ object MigrationEventHandlerSpec extends ZIOSpecDefault {
             Change(v3, MigrationEvent.ProcessingStarted(executionId, key)),
             Change(v4, MigrationEvent.KeyProcessed(executionId, key)),
           )
-          val state = handler.applyEvents(events)
+          val state = EventHandler.applyEvents(events)
           val stats = Stats(processing = Set.empty, processed = Set(key), failed = Set.empty)
           val processingExecution: Execution.Processing = Execution.Processing(executionId, stats, timestamp)
           val expectedState = Migration(
@@ -87,7 +87,7 @@ object MigrationEventHandlerSpec extends ZIOSpecDefault {
             Change(v3, MigrationEvent.ProcessingStarted(executionId, key)),
             Change(v4, MigrationEvent.ProcessingFailed(executionId, key)),
           )
-          val state = handler.applyEvents(events)
+          val state = EventHandler.applyEvents(events)
           val stats = Stats(processing = Set.empty, processed = Set.empty, failed = Set(key))
           val processingExecution: Execution.Processing = Execution.Processing(executionId, stats, timestamp)
           val expectedState = Migration(
@@ -109,7 +109,7 @@ object MigrationEventHandlerSpec extends ZIOSpecDefault {
           val processing: Execution.Processing =
             Execution.Processing(executionId, Stats(Set.empty, Set.empty, Set.empty), timestamp)
           val stoppedExecution = Execution.Stopped(processing, timestamp)
-          val state = handler.applyEvents(events)
+          val state = EventHandler.applyEvents(events)
           val expectedState = Migration(
             migrationId,
             Migration.State(Map(executionId -> stoppedExecution)),
@@ -129,7 +129,7 @@ object MigrationEventHandlerSpec extends ZIOSpecDefault {
           val processing: Execution.Processing =
             Execution.Processing(executionId, Stats(Set.empty, Set.empty, Set.empty), timestamp)
           val finishedExecution = Execution.Finished(processing, timestamp)
-          val state = handler.applyEvents(events)
+          val state = EventHandler.applyEvents(events)
           val expectedState = Migration(
             migrationId,
             Migration.State(Map(executionId -> finishedExecution)),
@@ -149,7 +149,7 @@ object MigrationEventHandlerSpec extends ZIOSpecDefault {
           val processing: Execution.Processing =
             Execution.Processing(executionId, Stats(Set.empty, Set.empty, Set.empty), timestamp)
           val failedExecution = Execution.Failed(processing, timestamp)
-          val state = handler.applyEvents(events)
+          val state = EventHandler.applyEvents(events)
           val expectedState = Migration(
             migrationId,
             Migration.State(Map(executionId -> failedExecution)),
@@ -165,7 +165,7 @@ object MigrationEventHandlerSpec extends ZIOSpecDefault {
             Change(v1, MigrationEvent.ExecutionStarted(executionId, timestamp)),
             Change(v2, MigrationEvent.MigrationRegistered(migrationId, timestamp)),
           )
-          assertZIO(ZIO.attempt(handler.applyEvents(events)).exit)(failsWithA[IllegalArgumentException])
+          assertZIO(ZIO.attempt(EventHandler.applyEvents(events)).exit)(failsWithA[IllegalArgumentException])
       }
     },
     test("Processing invalid event sequence throws an exception") {
@@ -176,7 +176,7 @@ object MigrationEventHandlerSpec extends ZIOSpecDefault {
             Change(v2, MigrationEvent.KeyProcessed(executionId, key)), // Invalid as no ExecutionStarted
             Change(v3, MigrationEvent.ExecutionStarted(executionId, timestamp)),
           )
-          assertZIO(ZIO.attempt(handler.applyEvents(events)).exit)(failsWithA[IllegalArgumentException])
+          assertZIO(ZIO.attempt(EventHandler.applyEvents(events)).exit)(failsWithA[IllegalArgumentException])
       }
     },
   ) @@ TestAspect.samples(1)

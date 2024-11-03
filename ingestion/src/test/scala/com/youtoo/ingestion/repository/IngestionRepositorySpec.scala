@@ -75,7 +75,9 @@ object IngestionRepositorySpec extends PgSpec {
 
             for {
               _ <- IngestionRepository.save(ingestion)
-              updatedIngestion = ingestion.copy(status = Ingestion.Status.Completed(NonEmptySet("file1", "file2")))
+              updatedIngestion = ingestion.copy(status =
+                Ingestion.Status.Completed(NonEmptySet(IngestionFile.Id("file1"), IngestionFile.Id("file2"))),
+              )
               _ <- IngestionRepository.save(updatedIngestion)
               result <- IngestionRepository.load(ingestion.id)
             } yield assert(result)(isSome(equalTo(updatedIngestion)))

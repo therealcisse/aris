@@ -18,6 +18,12 @@ enum FileCommand {
     sig: IngestionFile.Sig,
   )
 
+  case AddProvider(
+    id: Provider.Id,
+    name: Provider.Name,
+    location: Provider.Location,
+  )
+
 }
 
 type FileCommandHandler = CmdHandler[FileCommand, FileEvent]
@@ -30,6 +36,9 @@ object FileCommand {
       cmd match {
         case FileCommand.AddFile(provider, id, name, metadata, sig) =>
           NonEmptyList(FileEvent.FileAdded(provider, id, name, metadata, sig))
+
+        case FileCommand.AddProvider(id, name, location) =>
+          NonEmptyList(FileEvent.ProviderAdded(id, name, location))
 
       }
 

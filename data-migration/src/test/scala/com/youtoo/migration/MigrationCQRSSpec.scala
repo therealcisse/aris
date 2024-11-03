@@ -27,9 +27,10 @@ object MigrationCQRSSpec extends MockSpecDefault {
       check(keyGen, migrationCommandGen) { case (id, cmd) =>
         val Cmd = summon[CmdHandler[MigrationCommand, MigrationEvent]]
 
-        inline def isArg(key: Key, payload: MigrationEvent) = assertion[(Key, Change[MigrationEvent])]("isArg") {
-          case (id, ch) => id == key && ch.payload == payload
-        }
+        inline def isArg(key: Key, payload: MigrationEvent) =
+          assertion[(Key, Change[MigrationEvent])]("MigrationCQRS.isArg") { case (id, ch) =>
+            id == key && ch.payload == payload
+          }
 
         val evnts = Cmd.applyCmd(cmd)
 

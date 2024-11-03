@@ -49,8 +49,6 @@ object MigrationService {
         ZLayer {
 
           factory.create(MigrationEvent.discriminator) map { strategy =>
-            val Evt = summon[EventHandler[MigrationEvent, Migration]]
-
             new MigrationService {
               def load(id: Migration.Id): Task[Option[Migration]] =
                 val key = id.asKey
@@ -66,7 +64,7 @@ object MigrationService {
                         events <- eventStore.readEvents(key)
                         inn = events map { es =>
                           (
-                            Evt.applyEvents(es),
+                            EventHandler.applyEvents(es),
                             es.maxBy(_.version),
                             es.size,
                             None,
@@ -80,7 +78,7 @@ object MigrationService {
 
                       events map (_.map { es =>
                         (
-                          Evt.applyEvents(in, es),
+                          EventHandler.applyEvents(in, es),
                           es.maxBy(_.version),
                           es.size,
                           version.some,

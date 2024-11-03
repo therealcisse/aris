@@ -13,10 +13,10 @@ import zio.schema.*
 
 enum IngestionEvent {
   case IngestionStarted(id: Ingestion.Id, timestamp: Timestamp)
-  case IngestionFilesResolved(files: NonEmptySet[String])
-  case IngestionFileProcessing(file: String)
-  case IngestionFileProcessed(file: String)
-  case IngestionFileFailed(file: String)
+  case IngestionFilesResolved(files: NonEmptySet[IngestionFile.Id])
+  case IngestionFileProcessing(file: IngestionFile.Id)
+  case IngestionFileProcessed(file: IngestionFile.Id)
+  case IngestionFileFailed(file: IngestionFile.Id)
   case IngestionCompleted(timestamp: Timestamp)
 }
 
