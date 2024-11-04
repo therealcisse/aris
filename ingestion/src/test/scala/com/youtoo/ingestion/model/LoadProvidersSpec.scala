@@ -49,7 +49,7 @@ object LoadProvidersSpec extends ZIOSpecDefault {
       }
     },
     test("should return empty list if no ProviderAdded events") {
-      check(versionGen) { (version) =>
+      check(versionGen, ingestionFileMetadataGen) { (version, metadata) =>
         val handler = new FileEvent.LoadProviders()
 
         val events = NonEmptyList(
@@ -59,7 +59,7 @@ object LoadProvidersSpec extends ZIOSpecDefault {
               provider = Provider.Id("provider-1"),
               id = IngestionFile.Id("file-1"),
               name = IngestionFile.Name("file-name"),
-              metadata = IngestionFile.Metadata(),
+              metadata = metadata,
               sig = IngestionFile.Sig("signature"),
             ),
           ),

@@ -150,6 +150,8 @@ lazy val ingestion = (project in file("ingestion"))
   .settings(
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
     libraryDependencies ++= Seq(
+      `hadoop-client`,
+      `hadoop-aws`,
       `zio-metrics`,
       `zio-metrics-connectors-prometheus`,
       `testcontainers-scala-postgresql`,

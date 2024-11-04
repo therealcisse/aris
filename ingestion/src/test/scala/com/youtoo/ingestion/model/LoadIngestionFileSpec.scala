@@ -14,7 +14,7 @@ object LoadIngestionFileSpec extends ZIOSpecDefault {
 
   def spec = suite("LoadIngestionFileSpec")(
     test("should load IngestionFile by ID from events") {
-      check(versionGen) { version =>
+      check(versionGen, ingestionFileMetadataGen) { (version, metadata) =>
         val fileId = IngestionFile.Id("file-1")
         val handler = new FileEvent.LoadIngestionFile(fileId)
 
@@ -25,7 +25,7 @@ object LoadIngestionFileSpec extends ZIOSpecDefault {
               provider = Provider.Id("provider-1"),
               id = fileId,
               name = IngestionFile.Name("file-name"),
-              metadata = IngestionFile.Metadata(),
+              metadata = metadata,
               sig = IngestionFile.Sig("signature"),
             ),
           ),
@@ -36,7 +36,7 @@ object LoadIngestionFileSpec extends ZIOSpecDefault {
         val expectedFile = IngestionFile(
           id = fileId,
           name = IngestionFile.Name("file-name"),
-          metadata = IngestionFile.Metadata(),
+          metadata = metadata,
           sig = IngestionFile.Sig("signature"),
         )
 
@@ -44,7 +44,7 @@ object LoadIngestionFileSpec extends ZIOSpecDefault {
       }
     },
     test("should return None if file with given ID is not in events") {
-      check(versionGen) { version =>
+      check(versionGen, ingestionFileMetadataGen) { (version, metadata) =>
         val fileId = IngestionFile.Id("non-existent-file")
         val handler = new FileEvent.LoadIngestionFile(fileId)
 
@@ -55,7 +55,7 @@ object LoadIngestionFileSpec extends ZIOSpecDefault {
               provider = Provider.Id("provider-1"),
               id = IngestionFile.Id("file-1"),
               name = IngestionFile.Name("file-name"),
-              metadata = IngestionFile.Metadata(),
+              metadata = metadata,
               sig = IngestionFile.Sig("signature"),
             ),
           ),

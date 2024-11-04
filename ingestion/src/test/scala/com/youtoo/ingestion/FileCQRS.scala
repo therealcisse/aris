@@ -25,8 +25,8 @@ object FileCQRSSpec extends MockSpecDefault {
       check(keyGen, fileCommandGen) { case (id, cmd) =>
         val Cmd = summon[CmdHandler[FileCommand, FileEvent]]
 
-        inline def isArg(key: Key, payload: FileEvent) =
-          assertion[(Key, Change[FileEvent])]("FileCQRS.isArg") { case (id, ch) =>
+        inline def isPayload(key: Key, payload: FileEvent) =
+          assertion[(Key, Change[FileEvent])]("FileCQRS.isPayload") { case (id, ch) =>
             id == key && ch.payload == payload
           }
 
@@ -34,13 +34,13 @@ object FileCQRSSpec extends MockSpecDefault {
 
         val zero = MockFileEventStore
           .Save(
-            isArg(id, evnts.head),
+            isPayload(id, evnts.head),
             value(1L),
           )
           .toLayer
 
         val eventStoreEnv = evnts.tail.foldLeft(zero) { case (ass, e) =>
-          ass ++ MockFileEventStore.Save(isArg(id, e), value(1L)).toLayer
+          ass ++ MockFileEventStore.Save(isPayload(id, e), value(1L)).toLayer
         }
 
         val layer = eventStoreEnv ++ MockSnapshotStore.empty >>> FileCQRS.live()
@@ -55,4 +55,3 @@ object FileCQRSSpec extends MockSpecDefault {
     },
   ).provideLayerShared(ZConnectionMock.pool())
 }
-

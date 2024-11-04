@@ -27,8 +27,8 @@ object MigrationCQRSSpec extends MockSpecDefault {
       check(keyGen, migrationCommandGen) { case (id, cmd) =>
         val Cmd = summon[CmdHandler[MigrationCommand, MigrationEvent]]
 
-        inline def isArg(key: Key, payload: MigrationEvent) =
-          assertion[(Key, Change[MigrationEvent])]("MigrationCQRS.isArg") { case (id, ch) =>
+        inline def isPayload(key: Key, payload: MigrationEvent) =
+          assertion[(Key, Change[MigrationEvent])]("MigrationCQRS.isPayload") { case (id, ch) =>
             id == key && ch.payload == payload
           }
 
@@ -36,13 +36,13 @@ object MigrationCQRSSpec extends MockSpecDefault {
 
         val zero = MockMigrationEventStore
           .Save(
-            isArg(id, evnts.head),
+            isPayload(id, evnts.head),
             value(1L),
           )
           .toLayer
 
         val eventStoreEnv = evnts.tail.foldLeft(zero) { case (ass, e) =>
-          ass ++ MockMigrationEventStore.Save(isArg(id, e), value(1L)).toLayer
+          ass ++ MockMigrationEventStore.Save(isPayload(id, e), value(1L)).toLayer
         }
 
         val layer = eventStoreEnv ++ MockSnapshotStore.empty ++ SnapshotStrategy.live() >>> MigrationCQRS.live()

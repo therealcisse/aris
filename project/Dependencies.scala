@@ -77,4 +77,7 @@ object Dependencies {
   val pprint = "com.lihaoyi" %% "pprint" % "0.9.0"
 
   val `scala-collection-contrib` = "org.scala-lang.modules" %% "scala-collection-contrib" % "0.4.0"
+
+  val `hadoop-aws` = "org.apache.hadoop" % "hadoop-aws" % "3.4.1"
+  val `hadoop-client` = "org.apache.hadoop" % "hadoop-client" % "3.4.1"
 }

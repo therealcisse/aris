@@ -33,28 +33,22 @@ object FileServiceSpec extends MockSpecDefault {
         val expectedEvent = FileEvent.FileAdded(providerId, fileId, fileName, metadata, sig)
 
         val eventStoreMock = MockFileEventStore.Save(
-          isArg(fileId.asKey, expectedEvent),
+          isPayload(fileId.asKey, expectedEvent),
           value(1L),
         )
 
-        inline def isArg(key: Key, payload: FileEvent) = assertion[(Key, Change[FileEvent])]("FileService.isArg") {
-          case (id, ch) => id == key && ch.payload == payload
-        }
-
-        val effect = for {
-          _ <- FileService.addFile(providerId, fileId, fileName, metadata, sig)
-        } yield ()
+        val effect = FileService.addFile(providerId, fileId, fileName, metadata, sig)
 
         assertZIO(effect.provideSomeLayer[ZConnectionPool](eventStoreMock.toLayer >>> FileService.live()))(isUnit)
       }
     },
     test("loadNamed should return IngestionFile when found") {
-      check(ingestionFileNameGen, versionGen) { (fileName, version) =>
+      check(ingestionFileNameGen, versionGen, ingestionFileMetadataGen) { (fileName, version, metadata) =>
         // Set up the EventHandler to return the expected IngestionFile
         val expectedFile = IngestionFile(
           id = IngestionFile.Id("file-id"),
           name = fileName,
-          metadata = IngestionFile.Metadata(),
+          metadata = metadata,
           sig = IngestionFile.Sig("sig"),
         )
 
@@ -62,7 +56,7 @@ object FileServiceSpec extends MockSpecDefault {
           provider = Provider.Id("provider-1"),
           id = IngestionFile.Id("file-id"),
           name = fileName,
-          metadata = IngestionFile.Metadata(),
+          metadata = metadata,
           sig = IngestionFile.Sig("sig"),
         )
         val expectedChange = Change(version = version, payload = expectedEvent)
@@ -74,9 +68,7 @@ object FileServiceSpec extends MockSpecDefault {
         )
 
         // Test effect
-        val effect = for {
-          result <- FileService.loadNamed(fileName)
-        } yield result
+        val effect = FileService.loadNamed(fileName)
 
         // Run the test
         assertZIO(effect.provideSomeLayer[ZConnectionPool](eventStoreMock.toLayer >>> FileService.live()))(
@@ -85,12 +77,12 @@ object FileServiceSpec extends MockSpecDefault {
       }
     },
     test("loadSig should return IngestionFile when found") {
-      check(fileSigGen, versionGen) { (fileSig, version) =>
+      check(fileSigGen, versionGen, ingestionFileMetadataGen) { (fileSig, version, metadata) =>
         // Set up the EventHandler to return the expected IngestionFile
         val expectedFile = IngestionFile(
           id = IngestionFile.Id("file-id"),
           name = IngestionFile.Name("file-name"),
-          metadata = IngestionFile.Metadata(),
+          metadata = metadata,
           sig = fileSig,
         )
 
@@ -98,7 +90,7 @@ object FileServiceSpec extends MockSpecDefault {
           provider = Provider.Id("provider-1"),
           id = IngestionFile.Id("file-id"),
           name = IngestionFile.Name("file-name"),
-          metadata = IngestionFile.Metadata(),
+          metadata = metadata,
           sig = fileSig,
         )
         val expectedChange = Change(version = version, payload = expectedEvent)
@@ -110,9 +102,7 @@ object FileServiceSpec extends MockSpecDefault {
         )
 
         // Test effect
-        val effect = for {
-          result <- FileService.loadSig(fileSig)
-        } yield result
+        val effect = FileService.loadSig(fileSig)
 
         // Run the test
         assertZIO(effect.provideSomeLayer[ZConnectionPool](eventStoreMock.toLayer >>> FileService.live()))(
@@ -121,12 +111,12 @@ object FileServiceSpec extends MockSpecDefault {
       }
     },
     test("load should return IngestionFile when found") {
-      check(fileIdGen, versionGen) { (fileId, version) =>
+      check(fileIdGen, versionGen, ingestionFileMetadataGen) { (fileId, version, metadata) =>
         // Set up the EventHandler to return the expected IngestionFile
         val expectedFile = IngestionFile(
           id = fileId,
           name = IngestionFile.Name("file-name"),
-          metadata = IngestionFile.Metadata(),
+          metadata = metadata,
           sig = IngestionFile.Sig("sig"),
         )
 
@@ -134,7 +124,7 @@ object FileServiceSpec extends MockSpecDefault {
           provider = Provider.Id("provider-1"),
           id = fileId,
           name = IngestionFile.Name("file-name"),
-          metadata = IngestionFile.Metadata(),
+          metadata = metadata,
           sig = IngestionFile.Sig("sig"),
         )
         val expectedChange = Change(version = version, payload = expectedEvent)
@@ -146,9 +136,7 @@ object FileServiceSpec extends MockSpecDefault {
         )
 
         // Test effect
-        val effect = for {
-          result <- FileService.load(fileId)
-        } yield result
+        val effect = FileService.load(fileId)
 
         // Run the test
         assertZIO(effect.provideSomeLayer[ZConnectionPool](eventStoreMock.toLayer >>> FileService.live()))(

@@ -16,7 +16,7 @@ object FileCommandHandlerSpec extends ZIOSpecDefault {
         provider = Provider.Id("provider-1"),
         id = IngestionFile.Id("file-1"),
         name = IngestionFile.Name("file-name"),
-        metadata = IngestionFile.Metadata(),
+        metadata = IngestionFile.Metadata.File(0L, Timestamp(0L)),
         sig = IngestionFile.Sig("signature"),
       )
 
@@ -28,7 +28,7 @@ object FileCommandHandlerSpec extends ZIOSpecDefault {
         provider = Provider.Id("provider-1"),
         id = IngestionFile.Id("file-1"),
         name = IngestionFile.Name("file-name"),
-        metadata = IngestionFile.Metadata(),
+        metadata = IngestionFile.Metadata.File(0L, Timestamp(0L)),
         sig = IngestionFile.Sig("signature"),
       )
 

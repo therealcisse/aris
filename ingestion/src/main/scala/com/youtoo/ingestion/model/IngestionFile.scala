@@ -69,7 +69,10 @@ object IngestionFile {
 
   }
 
-  case class Metadata()
+  enum Metadata {
+    case File(size: Long, lastModified: Timestamp)
+
+  }
 
   object Metadata {
     given Schema[Metadata] = DeriveSchema.gen

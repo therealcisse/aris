@@ -197,7 +197,10 @@ object PostgresCQRSPersistence {
             ${discriminator},
             ${event.payload.namespace},
             (
-              SELECT jsonb_object_agg(elem->>'key', elem->>'value')
+              SELECT COALESCE(
+                  jsonb_object_agg(elem->>'key', elem->>'value'),
+                  '{}'::jsonb
+              )
               FROM jsonb_array_elements($props :: jsonb) as elem
               ),
             decode(${payload}, 'base64')
@@ -214,8 +217,12 @@ object PostgresCQRSPersistence {
             ${event.payload.namespace},
             $grandParentId,
             (
-              SELECT jsonb_object_agg(elem->>'key', elem->>'value')
+              SELECT COALESCE(
+                  jsonb_object_agg(elem->>'key', elem->>'value'),
+                  '{}'::jsonb
+              )
               FROM jsonb_array_elements($props :: jsonb) as elem
+
               ),
             decode(${payload}, 'base64')
           )
@@ -231,8 +238,12 @@ object PostgresCQRSPersistence {
             ${event.payload.namespace},
             $parentId,
             (
-              SELECT jsonb_object_agg(elem->>'key', elem->>'value')
+              SELECT COALESCE(
+                  jsonb_object_agg(elem->>'key', elem->>'value'),
+                  '{}'::jsonb
+              )
               FROM jsonb_array_elements($props :: jsonb) as elem
+
               ),
             decode(${payload}, 'base64')
           )
@@ -249,8 +260,12 @@ object PostgresCQRSPersistence {
             $parentId,
             $grandParentId,
             (
-              SELECT jsonb_object_agg(elem->>'key', elem->>'value')
+              SELECT COALESCE(
+                  jsonb_object_agg(elem->>'key', elem->>'value'),
+                  '{}'::jsonb
+              )
               FROM jsonb_array_elements($props :: jsonb) as elem
+
               ),
             decode(${payload}, 'base64')
           )

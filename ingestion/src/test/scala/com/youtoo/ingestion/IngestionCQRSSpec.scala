@@ -27,8 +27,8 @@ object IngestionCQRSSpec extends MockSpecDefault {
       check(keyGen, ingestionCommandGen) { case (id, cmd) =>
         val Cmd = summon[CmdHandler[IngestionCommand, IngestionEvent]]
 
-        inline def isArg(key: Key, payload: IngestionEvent) =
-          assertion[(Key, Change[IngestionEvent])]("IngestionCQRS.isArg") { case (id, ch) =>
+        inline def isPayload(key: Key, payload: IngestionEvent) =
+          assertion[(Key, Change[IngestionEvent])]("IngestionCQRS.isPayload") { case (id, ch) =>
             id == key && ch.payload == payload
           }
 
@@ -36,13 +36,13 @@ object IngestionCQRSSpec extends MockSpecDefault {
 
         val zero = MockIngestionEventStore
           .Save(
-            isArg(id, evnts.head),
+            isPayload(id, evnts.head),
             value(1L),
           )
           .toLayer
 
         val eventStoreEnv = evnts.tail.foldLeft(zero) { case (ass, e) =>
-          ass ++ MockIngestionEventStore.Save(isArg(id, e), value(1L)).toLayer
+          ass ++ MockIngestionEventStore.Save(isPayload(id, e), value(1L)).toLayer
         }
 
         val layer = eventStoreEnv ++ MockSnapshotStore.empty ++ SnapshotStrategy.live() >>> IngestionCQRS.live()

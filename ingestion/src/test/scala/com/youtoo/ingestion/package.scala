@@ -3,6 +3,7 @@ package ingestion
 
 import zio.*
 import zio.test.*
+import zio.test.Assertion.*
 import zio.prelude.*
 
 import com.youtoo.cqrs.*
@@ -11,6 +12,10 @@ import com.youtoo.cqrs.domain.*
 import com.youtoo.ingestion.model.*
 
 import com.youtoo.cqrs.Codecs.given
+
+inline def isPayload[Event](key: Key, payload: Event) = assertion[(Key, Change[Event])]("isPayload") { case (id, ch) =>
+  id == key && ch.payload == payload
+}
 
 given keyGen: Gen[Any, Key] = Gen.fromZIO(Key.gen.orDie)
 given ingestionIdGen: Gen[Any, Ingestion.Id] = Gen.fromZIO(Ingestion.Id.gen.orDie)
@@ -221,8 +226,10 @@ val ingestionFileIdGen: Gen[Any, IngestionFile.Id] =
 val ingestionFileNameGen: Gen[Any, IngestionFile.Name] =
   Gen.alphaNumericStringBounded(5, 50).map(IngestionFile.Name(_))
 
-val ingestionFileMetadataGen: Gen[Any, IngestionFile.Metadata] =
-  Gen.const(IngestionFile.Metadata())
+lazy val ingestionFileMetadataGen: Gen[Any, IngestionFile.Metadata] =
+  Gen.oneOf(
+    (Gen.long <*> timestampGen) map (IngestionFile.Metadata.File.apply),
+  )
 
 val ingestionFileSigGen: Gen[Any, IngestionFile.Sig] =
   Gen.alphaNumericStringBounded(10, 100).map(IngestionFile.Sig(_))
@@ -246,11 +253,12 @@ val addProviderCommandGen: Gen[Any, FileCommand.AddProvider] =
 val fileCommandGen: Gen[Any, FileCommand] =
   Gen.oneOf(addFileCommandGen, addProviderCommandGen)
 
-val ingestionFileGen = for {
+lazy val ingestionFileGen = for {
   id <- fileIdGen
   name <- fileNameGen
   sig <- fileSigGen
-} yield IngestionFile(id, name, IngestionFile.Metadata(), sig)
+  metadata <- ingestionFileMetadataGen
+} yield IngestionFile(id, name, metadata, sig)
 
 val providerGen = for {
   id <- providerIdGen

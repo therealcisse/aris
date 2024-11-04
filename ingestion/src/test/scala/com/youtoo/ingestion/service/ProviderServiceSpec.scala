@@ -27,18 +27,11 @@ object ProviderServiceSpec extends MockSpecDefault {
         val expectedEvent = FileEvent.ProviderAdded(id, name, location)
 
         val eventStoreMock = MockFileEventStore.Save(
-          isArg(id.asKey, expectedEvent),
+          isPayload(id.asKey, expectedEvent),
           value(1L),
         )
 
-        inline def isArg(key: Key, payload: FileEvent) = assertion[(Key, Change[FileEvent])]("ProviderService.isArg") {
-          case (id, ch) => id == key && ch.payload == payload
-        }
-
-        val effect = for {
-          service <- ZIO.service[ProviderService]
-          _ <- service.addProvider(id, name, location)
-        } yield ()
+        val effect = ProviderService.addProvider(id, name, location)
 
         assertZIO(effect.provideSomeLayer[ZConnectionPool](eventStoreMock.toLayer >>> ProviderService.live()))(isUnit)
       }
@@ -55,10 +48,7 @@ object ProviderServiceSpec extends MockSpecDefault {
           value(Some(events)),
         )
 
-        val effect = for {
-          service <- ZIO.service[ProviderService]
-          result <- service.load(id)
-        } yield result
+        val effect = ProviderService.load(id)
 
         assertZIO(effect.provideSomeLayer[ZConnectionPool](eventStoreMock.toLayer >>> ProviderService.live()))(
           isSome(equalTo(expectedProvider)),
@@ -77,10 +67,7 @@ object ProviderServiceSpec extends MockSpecDefault {
           value(Some(events)),
         )
 
-        val effect = for {
-          service <- ZIO.service[ProviderService]
-          result <- service.loadAll(None, 100L)
-        } yield result
+        val effect = ProviderService.loadAll(None, 100L)
 
         assertZIO(effect.provideSomeLayer[ZConnectionPool](eventStoreMock.toLayer >>> ProviderService.live()))(
           equalTo(List(expectedProvider)),
@@ -88,26 +75,29 @@ object ProviderServiceSpec extends MockSpecDefault {
       }
     },
     test("getFiles should return NonEmptyList[IngestionFile] when files are found") {
-      check(providerIdGen, ingestionFileIdGen, ingestionFileNameGen, ingestionFileSigGen, versionGen) {
-        (providerId, fileId, fileName, sig, version) =>
-          val expectedFile = IngestionFile(fileId, fileName, IngestionFile.Metadata(), sig)
-          val expectedEvent = FileEvent.FileAdded(providerId, fileId, fileName, IngestionFile.Metadata(), sig)
-          val expectedChange = Change(version = version, payload = expectedEvent)
-          val events = NonEmptyList(expectedChange)
+      check(
+        providerIdGen,
+        ingestionFileIdGen,
+        ingestionFileNameGen,
+        ingestionFileSigGen,
+        versionGen,
+        ingestionFileMetadataGen,
+      ) { (providerId, fileId, fileName, sig, version, metadata) =>
+        val expectedFile = IngestionFile(fileId, fileName, metadata, sig)
+        val expectedEvent = FileEvent.FileAdded(providerId, fileId, fileName, metadata, sig)
+        val expectedChange = Change(version = version, payload = expectedEvent)
+        val events = NonEmptyList(expectedChange)
 
-          val eventStoreMock = MockFileEventStore.ReadEventsByFilters(
-            equalTo((Some(NonEmptyList(Namespace(0))), Some(Hierarchy.Child(providerId.asKey)), None)),
-            value(Some(events)),
-          )
+        val eventStoreMock = MockFileEventStore.ReadEventsByFilters(
+          equalTo((Some(NonEmptyList(Namespace(0))), Some(Hierarchy.Child(providerId.asKey)), None)),
+          value(Some(events)),
+        )
 
-          val effect = for {
-            service <- ZIO.service[ProviderService]
-            result <- service.getFiles(providerId, None, 100L)
-          } yield result
+        val effect = ProviderService.getFiles(providerId, None, 100L)
 
-          assertZIO(effect.provideSomeLayer[ZConnectionPool](eventStoreMock.toLayer >>> ProviderService.live()))(
-            isSome(equalTo(NonEmptyList(expectedFile))),
-          )
+        assertZIO(effect.provideSomeLayer[ZConnectionPool](eventStoreMock.toLayer >>> ProviderService.live()))(
+          isSome(equalTo(NonEmptyList(expectedFile))),
+        )
       }
     },
   ).provideLayerShared(ZConnectionMock.pool())
