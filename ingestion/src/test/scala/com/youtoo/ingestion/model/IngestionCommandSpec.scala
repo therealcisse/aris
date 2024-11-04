@@ -24,34 +24,34 @@ object IngestionCommandHandlerSpec extends ZIOSpecDefault {
 
     },
     test("SetFiles command produces IngestionFilesResolved event") {
-      val files = NonEmptySet(IngestionFile.Id("file1"), IngestionFile.Id("file2"))
+      val files = NonEmptySet(IngestionFile.Id(1L), IngestionFile.Id(2L))
       val command = IngestionCommand.SetFiles(files)
       val events = handler.applyCmd(command)
       val expectedEvent = IngestionEvent.IngestionFilesResolved(files)
       assert(events)(equalTo(NonEmptyList(expectedEvent)))
     },
     test("Applying the same command multiple times produces the same event") {
-      val command = IngestionCommand.FileProcessed(IngestionFile.Id("file1"))
+      val command = IngestionCommand.FileProcessed(IngestionFile.Id(1L))
       val events1 = handler.applyCmd(command)
       val events2 = handler.applyCmd(command)
       assert(events1)(equalTo(events2))
     },
     test("FileProcessed command produces IngestionFileProcessed event") {
-      val file = IngestionFile.Id("file1")
+      val file = IngestionFile.Id(1L)
       val command = IngestionCommand.FileProcessed(file)
       val events = handler.applyCmd(command)
       val expectedEvent = IngestionEvent.IngestionFileProcessed(file)
       assert(events)(equalTo(NonEmptyList(expectedEvent)))
     },
     test("FileProcessing command produces IngestionFileProcessing event") {
-      val file = IngestionFile.Id("file1")
+      val file = IngestionFile.Id(1L)
       val command = IngestionCommand.FileProcessing(file)
       val events = handler.applyCmd(command)
       val expectedEvent = IngestionEvent.IngestionFileProcessing(file)
       assert(events)(equalTo(NonEmptyList(expectedEvent)))
     },
     test("FileFailed command produces IngestionFileFailed event") {
-      val file = IngestionFile.Id("file2")
+      val file = IngestionFile.Id(2L)
       val command = IngestionCommand.FileFailed(file)
       val events = handler.applyCmd(command)
       val expectedEvent = IngestionEvent.IngestionFileFailed(file)

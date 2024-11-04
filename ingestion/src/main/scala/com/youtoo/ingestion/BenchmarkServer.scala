@@ -104,7 +104,7 @@ object BenchmarkServer extends ZIOApp {
 
     },
     Method.GET / "ingestion" -> handler { (req: Request) =>
-      val offset = req.queryParam("offset").filterNot(_.isEmpty)
+      val offset = req.queryParamTo[Long]("offset").toOption
       val limit = req.queryParamToOrElse[Long]("limit", FetchSize)
 
       atomically {
@@ -126,7 +126,7 @@ object BenchmarkServer extends ZIOApp {
       }
 
     },
-    Method.GET / "ingestion" / string("id") -> handler { (id: String, req: Request) =>
+    Method.GET / "ingestion" / long("id") -> handler { (id: Long, req: Request) =>
       val key = Key.wrap(id)
 
       IngestionService.load(Ingestion.Id(key)) map {
@@ -143,7 +143,7 @@ object BenchmarkServer extends ZIOApp {
       }
 
     },
-    Method.PUT / "ingestion" / string("id") -> handler { (id: String, req: Request) =>
+    Method.PUT / "ingestion" / long("id") -> handler { (id: Long, req: Request) =>
       val key = Key.wrap(id)
 
       req.body.fromBody[IngestionCommand] foldZIO (
@@ -152,7 +152,7 @@ object BenchmarkServer extends ZIOApp {
       )
 
     },
-    Method.GET / "ingestion" / string("id") / "validate" -> handler { (id: String, req: Request) =>
+    Method.GET / "ingestion" / long("id") / "validate" -> handler { (id: Long, req: Request) =>
       val numFiles = req.queryParamTo[Long]("numFiles")
       val status = req.queryParamToOrElse[String]("status", "initial")
 

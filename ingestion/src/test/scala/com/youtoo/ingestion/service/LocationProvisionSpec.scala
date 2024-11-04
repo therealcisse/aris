@@ -16,13 +16,13 @@ object LocationProvisionSpec extends ZIOSpecDefault {
         val testPath = "/test-path"
         val testFiles = List(
           IngestionFile(
-            IngestionFile.Id("1"),
+            IngestionFile.Id(1L),
             IngestionFile.Name("file1"),
             IngestionFile.Metadata.File(100L, t0),
             IngestionFile.Sig("sig1"),
           ),
           IngestionFile(
-            IngestionFile.Id("2"),
+            IngestionFile.Id(2L),
             IngestionFile.Name("file2"),
             IngestionFile.Metadata.File(200L, t1),
             IngestionFile.Sig("sig2"),

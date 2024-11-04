@@ -62,15 +62,18 @@ lazy val kernel = (project in file("kernel"))
   .settings(buildInfoSettings("youtoo"))
   .enablePlugins(BuildInfoPlugin)
   .settings(
+    testFrameworks += new TestFramework("com.novocode.junit.JUnitFramework"),
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
     libraryDependencies ++= Seq(
       `scala-collection-contrib`,
       // pprint,
+      junit,
+      `junit-interface`,
+      `junit-jupiter`,
       zio,
       cats,
       `zio-prelude`,
       `zio-schema`,
-      ulid,
       zio,
       `zio-test`,
       `zio-test-sbt`,
@@ -95,7 +98,6 @@ lazy val core = (project in file("cqrs-core"))
       `zio-jdbc`,
       `zio-schema-protobuf`,
       `zio-schema-json`,
-      ulid,
       `zio-test`,
       `zio-test-sbt`,
       `zio-test-magnolia`,

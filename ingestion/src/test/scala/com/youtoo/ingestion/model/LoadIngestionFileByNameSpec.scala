@@ -13,7 +13,7 @@ import com.youtoo.cqrs.Codecs.given
 object LoadIngestionFileByNameSpec extends ZIOSpecDefault {
   def spec = suite("LoadIngestionFileByNameSpec")(
     test("should load IngestionFile by name from events") {
-      check(providerIdGen, fileIdGen, fileNameGen, fileSigGen, versionGen, ingestionFileMetadataGen) {
+      check(providerIdGen, fileIdGen, fileNameGen, fileSigGen, versionGen, fileMetadataGen) {
         (providerId, fileId, fileName, fileSig, version, metadata) =>
           val handler = new FileEvent.LoadIngestionFileByName(fileName)
 
@@ -43,26 +43,33 @@ object LoadIngestionFileByNameSpec extends ZIOSpecDefault {
       }
     },
     test("should return None if file with given name is not in events") {
-      check(fileNameGen, fileNameGen, versionGen, ingestionFileMetadataGen) {
-        (fileName, differentFileName, version, metadata) =>
+      check(fileNameGen, fileNameGen, versionGen, fileMetadataGen, providerIdGen, fileIdGen, fileSigGen) {
+        (fileName, differentFileName, version, metadata, providerId, fileId, fileSig) =>
           val handler = new FileEvent.LoadIngestionFileByName(fileName)
 
           val events = NonEmptyList(
             Change(
               version = version,
               payload = FileEvent.FileAdded(
-                provider = Provider.Id("provider-1"),
-                id = IngestionFile.Id("file-1"),
+                provider = providerId,
+                id = fileId,
                 name = differentFileName, // Different name
                 metadata = metadata,
-                sig = IngestionFile.Sig("signature"),
+                sig = fileSig,
               ),
             ),
           )
 
           val result = handler.applyEvents(events)
 
-          assert(result)(if fileName == differentFileName then isSome else isNone)
+          val expectedFile = IngestionFile(
+            id = fileId,
+            name = fileName,
+            metadata = metadata,
+            sig = fileSig,
+          )
+
+          assert(result)(if fileName == differentFileName then isSome(equalTo(expectedFile)) else isNone)
       }
     },
   )

@@ -13,7 +13,7 @@ import com.youtoo.cqrs.Codecs.given
 object LoadIngestionFileBySigSpec extends ZIOSpecDefault {
   def spec = suite("LoadIngestionFileBySigSpec")(
     test("should load IngestionFile by signature from events") {
-      check(providerIdGen, fileIdGen, fileNameGen, fileSigGen, versionGen, ingestionFileMetadataGen) {
+      check(providerIdGen, fileIdGen, fileNameGen, fileSigGen, versionGen, fileMetadataGen) {
         (providerId, fileId, fileName, fileSig, version, metadata) =>
           val handler = new FileEvent.LoadIngestionFileBySig(fileSig)
 
@@ -43,7 +43,7 @@ object LoadIngestionFileBySigSpec extends ZIOSpecDefault {
       }
     },
     test("should return None if file with given signature is not in events") {
-      check(providerIdGen, fileIdGen, fileNameGen, fileSigGen, fileSigGen, versionGen, ingestionFileMetadataGen) {
+      check(providerIdGen, fileIdGen, fileNameGen, fileSigGen, fileSigGen, versionGen, fileMetadataGen) {
         (providerId, fileId, fileName, fileSig, differentFileSig, version, metadata) =>
           val handler = new FileEvent.LoadIngestionFileBySig(fileSig)
 

@@ -30,7 +30,6 @@ object Dependencies {
   val `slf4j-api` = "org.slf4j" % "slf4j-api" % "2.0.13"
   val `slf4j-simple` = "org.slf4j" % "slf4j-simple" % "2.0.13"
 
-  val ulid = "dev.shamil" % "ulid4j" % ULIDVersion
   val `postgres-driver` = "org.postgresql" % "postgresql" % PostgresVersion
 
   val cats = "org.typelevel" %% "cats-core" % CatsVersion
@@ -80,4 +79,8 @@ object Dependencies {
 
   val `hadoop-aws` = "org.apache.hadoop" % "hadoop-aws" % "3.4.1"
   val `hadoop-client` = "org.apache.hadoop" % "hadoop-client" % "3.4.1"
+
+  val junit = "junit" % "junit" % "4.13.2" % Test
+  val `junit-interface` = "com.novocode" % "junit-interface" % "0.11" % Test
+  val `junit-jupiter` = "org.junit.jupiter" % "junit-jupiter-api" % "5.11.3" % Test
 }

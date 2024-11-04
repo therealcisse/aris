@@ -77,11 +77,11 @@ object ProviderServiceSpec extends MockSpecDefault {
     test("getFiles should return NonEmptyList[IngestionFile] when files are found") {
       check(
         providerIdGen,
-        ingestionFileIdGen,
-        ingestionFileNameGen,
-        ingestionFileSigGen,
+        fileIdGen,
+        fileNameGen,
+        fileSigGen,
         versionGen,
-        ingestionFileMetadataGen,
+        fileMetadataGen,
       ) { (providerId, fileId, fileName, sig, version, metadata) =>
         val expectedFile = IngestionFile(fileId, fileName, metadata, sig)
         val expectedEvent = FileEvent.FileAdded(providerId, fileId, fileName, metadata, sig)

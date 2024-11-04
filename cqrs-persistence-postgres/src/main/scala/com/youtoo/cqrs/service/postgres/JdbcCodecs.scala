@@ -14,8 +14,8 @@ trait JdbcCodecs {
     val jsonCodec = JsonCodec.schemaBasedBinaryCodec(Schema[A])
     jsonCodec.encode(value)
 
-  given SqlFragment.Setter[Key] = SqlFragment.Setter[String].contramap(_.value.toString)
-  given SqlFragment.Setter[Version] = SqlFragment.Setter[String].contramap(_.value)
+  given SqlFragment.Setter[Key] = SqlFragment.Setter[Long].contramap(_.value)
+  given SqlFragment.Setter[Version] = SqlFragment.Setter[Long].contramap(_.value)
   given SqlFragment.Setter[Timestamp] = SqlFragment.Setter[Long].contramap(_.value)
   given SqlFragment.Setter[Discriminator] = SqlFragment.Setter[String].contramap(_.value)
   given SqlFragment.Setter[Namespace] = SqlFragment.Setter[Int].contramap(_.value)

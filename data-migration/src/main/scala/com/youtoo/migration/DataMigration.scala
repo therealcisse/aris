@@ -28,7 +28,7 @@ object DataMigration {
   inline def run(
     id: Migration.Id,
   ): RIO[DataMigration & MigrationCQRS & DataMigration.Processor & MigrationService, Unit] =
-    ZIO.serviceWithZIO[DataMigration](_.run(id) @@ ZIOAspect.annotated("migration_id", id.asKey.value))
+    ZIO.serviceWithZIO[DataMigration](_.run(id) @@ ZIOAspect.annotated("migration_id", id.asKey.value.toString))
 
   inline def stop(id: Migration.Id): RIO[DataMigration, Unit] =
     ZIO.serviceWithZIO(_.stop(id))

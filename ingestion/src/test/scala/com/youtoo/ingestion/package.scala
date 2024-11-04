@@ -34,7 +34,7 @@ val startIngestionGen: Gen[Any, IngestionCommand.StartIngestion] =
 
 val setFilesGen: Gen[Any, IngestionCommand.SetFiles] =
   Gen
-    .setOfBounded(1, 12)(Gen.alphaNumericString)
+    .setOfBounded(1, 12)(keyGen)
     .map(s =>
       NonEmptySet.fromIterableOption(s) match {
         case None => throw IllegalArgumentException("empty")
@@ -43,10 +43,10 @@ val setFilesGen: Gen[Any, IngestionCommand.SetFiles] =
     )
 
 val fileProcessedGen: Gen[Any, IngestionCommand.FileProcessed] =
-  Gen.alphaNumericString.map(IngestionFile.Id.apply).map(IngestionCommand.FileProcessed.apply)
+  keyGen.map(IngestionFile.Id.apply).map(IngestionCommand.FileProcessed.apply)
 
 val fileFailedGen: Gen[Any, IngestionCommand.FileFailed] =
-  Gen.alphaNumericString.map(IngestionFile.Id.apply).map(IngestionCommand.FileFailed.apply)
+  keyGen.map(IngestionFile.Id.apply).map(IngestionCommand.FileFailed.apply)
 
 val stopIngestionGen: Gen[Any, IngestionCommand.StopIngestion] =
   timestampGen.map(IngestionCommand.StopIngestion.apply)
@@ -70,7 +70,7 @@ val ingestionStartedGen: Gen[Any, IngestionEvent.IngestionStarted] =
 
 val ingestionFilesResolvedGen: Gen[Any, IngestionEvent.IngestionFilesResolved] =
   Gen
-    .setOfBounded(3, 8)(Gen.alphaNumericString)
+    .setOfBounded(3, 8)(keyGen)
     .map(s =>
       NonEmptySet.fromIterableOption(s) match {
         case None => throw IllegalArgumentException("empty")
@@ -79,10 +79,10 @@ val ingestionFilesResolvedGen: Gen[Any, IngestionEvent.IngestionFilesResolved] =
     )
 
 val ingestionFileProcessedGen: Gen[Any, IngestionEvent.IngestionFileProcessed] =
-  Gen.alphaNumericString.map(IngestionFile.Id.apply).map(IngestionEvent.IngestionFileProcessed.apply)
+  keyGen.map(IngestionFile.Id.apply).map(IngestionEvent.IngestionFileProcessed.apply)
 
 val ingestionFileFailedGen: Gen[Any, IngestionEvent.IngestionFileFailed] =
-  Gen.alphaNumericString.map(IngestionFile.Id.apply).map(IngestionEvent.IngestionFileFailed.apply)
+  keyGen.map(IngestionFile.Id.apply).map(IngestionEvent.IngestionFileFailed.apply)
 
 val ingestionCompletedGen: Gen[Any, IngestionEvent.IngestionCompleted] =
   timestampGen.map(IngestionEvent.IngestionCompleted.apply)
@@ -152,36 +152,35 @@ val validEventSequenceGen: Gen[Any, NonEmptyList[Change[IngestionEvent]]] =
   } yield NonEmptyList.fromIterable(startEvent, changes)
 
 object IngestionStatusGenerators {
+  val genIngestionFileId: Gen[Any, IngestionFile.Id] = keyGen.map(IngestionFile.Id.apply)
 
-  val genString: Gen[Any, String] = Gen.alphaNumericStringBounded(8, 32)
+  val genSetIngestionFile: Gen[Any, Set[IngestionFile.Id]] = Gen.setOf(keyGen).map(_.map(IngestionFile.Id.apply))
 
-  val genSetString: Gen[Any, Set[String]] = Gen.setOf(genString)
-
-  val genNonEmptySetString: Gen[Any, NonEmptySet[String]] =
-    Gen.setOfBounded(1, 36)(genString).map(chunk => NonEmptySet.fromIterableOption(chunk).get)
+  val genNonEmptySetIngestionFile: Gen[Any, NonEmptySet[IngestionFile.Id]] =
+    Gen.setOfBounded(1, 36)(genIngestionFileId).map(chunk => NonEmptySet.fromIterableOption(chunk).get)
 
   val genInitial: Gen[Any, Ingestion.Status.Initial] = Gen.const(Ingestion.Status.Initial())
 
   val genResolved: Gen[Any, Ingestion.Status.Resolved] =
-    genNonEmptySetString.map(_.map(IngestionFile.Id.apply)).map(Ingestion.Status.Resolved(_))
+    genNonEmptySetIngestionFile.map(Ingestion.Status.Resolved(_))
 
   val genProcessing: Gen[Any, Ingestion.Status.Processing] =
     for {
-      allFiles <- genSetString.map(_.map(IngestionFile.Id.apply))
+      allFiles <- genSetIngestionFile
       remaining <- Gen.setOf(Gen.fromIterable(allFiles))
       processedAndFailed = allFiles -- remaining
       processed <- Gen.setOf(Gen.fromIterable(processedAndFailed))
       failed = processedAndFailed -- processed
-      processing <- Gen.setOf(genString).map(_.map(IngestionFile.Id.apply)) // Optionally generate processing files
+      processing <- Gen.setOf(genIngestionFileId)
     } yield Ingestion.Status.Processing(remaining, processing, processed, failed)
 
   val genCompleted: Gen[Any, Ingestion.Status.Completed] =
-    genNonEmptySetString.map(m => Ingestion.Status.Completed(m `map` IngestionFile.Id.apply))
+    genNonEmptySetIngestionFile.map(m => Ingestion.Status.Completed(m))
 
   val genFailed: Gen[Any, Ingestion.Status.Failed] =
     for {
-      done <- genSetString.map(_.map(IngestionFile.Id.apply))
-      failedFiles <- genNonEmptySetString.map(_.map(IngestionFile.Id.apply))
+      done <- genSetIngestionFile
+      failedFiles <- genNonEmptySetIngestionFile
     } yield Ingestion.Status.Failed(done, failedFiles)
 
   val genStopped: Gen[Any, Ingestion.Status.Stopped] =
@@ -201,16 +200,16 @@ object IngestionStatusGenerators {
 }
 
 val fileIdGen: Gen[Any, IngestionFile.Id] =
-  Gen.alphaNumericStringBounded(5, 20).map(IngestionFile.Id(_))
+  keyGen.map(IngestionFile.Id(_))
 
 val fileNameGen: Gen[Any, IngestionFile.Name] =
   Gen.alphaNumericStringBounded(5, 50).map(IngestionFile.Name(_))
 
 val fileSigGen: Gen[Any, IngestionFile.Sig] =
-  Gen.alphaNumericStringBounded(5, 50).map(IngestionFile.Sig(_))
+  Gen.alphaNumericStringBounded(32, 64).map(IngestionFile.Sig(_))
 
 val providerIdGen: Gen[Any, Provider.Id] =
-  Gen.alphaNumericStringBounded(5, 20).map(Provider.Id(_))
+  keyGen.map(Provider.Id(_))
 
 val providerNameGen: Gen[Any, Provider.Name] =
   Gen.alphaNumericStringBounded(5, 50).map(Provider.Name(_))
@@ -220,13 +219,7 @@ val providerLocationGen: Gen[Any, Provider.Location] =
     Gen.alphaNumericStringBounded(5, 50).map(Provider.Location.File(_)),
   )
 
-val ingestionFileIdGen: Gen[Any, IngestionFile.Id] =
-  Gen.alphaNumericStringBounded(5, 20).map(IngestionFile.Id(_))
-
-val ingestionFileNameGen: Gen[Any, IngestionFile.Name] =
-  Gen.alphaNumericStringBounded(5, 50).map(IngestionFile.Name(_))
-
-lazy val ingestionFileMetadataGen: Gen[Any, IngestionFile.Metadata] =
+lazy val fileMetadataGen: Gen[Any, IngestionFile.Metadata] =
   Gen.oneOf(
     (Gen.long <*> timestampGen) map (IngestionFile.Metadata.File.apply),
   )
@@ -237,9 +230,9 @@ val ingestionFileSigGen: Gen[Any, IngestionFile.Sig] =
 val addFileCommandGen: Gen[Any, FileCommand.AddFile] =
   for {
     provider <- providerIdGen
-    id <- ingestionFileIdGen
-    name <- ingestionFileNameGen
-    metadata <- ingestionFileMetadataGen
+    id <- fileIdGen
+    name <- fileNameGen
+    metadata <- fileMetadataGen
     sig <- ingestionFileSigGen
   } yield FileCommand.AddFile(provider, id, name, metadata, sig)
 
@@ -257,7 +250,7 @@ lazy val ingestionFileGen = for {
   id <- fileIdGen
   name <- fileNameGen
   sig <- fileSigGen
-  metadata <- ingestionFileMetadataGen
+  metadata <- fileMetadataGen
 } yield IngestionFile(id, name, metadata, sig)
 
 val providerGen = for {
@@ -278,9 +271,9 @@ val fileEventChangeGen: Gen[Any, Change[FileEvent]] =
 val fileAddedGen: Gen[Any, FileEvent.FileAdded] =
   for {
     provider <- providerIdGen
-    id <- ingestionFileIdGen
-    name <- ingestionFileNameGen
-    metadata <- ingestionFileMetadataGen
+    id <- fileIdGen
+    name <- fileNameGen
+    metadata <- fileMetadataGen
     sig <- ingestionFileSigGen
   } yield FileEvent.FileAdded(provider, id, name, metadata, sig)
 

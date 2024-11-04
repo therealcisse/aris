@@ -37,7 +37,7 @@ object MigrationServiceSpec extends MockSpecDefault {
         Gen.option(versionGen),
         validMigrationEventSequence,
       ) { case (migration, version, events) =>
-        val maxChange = events.maxBy(_.version)
+        val maxChange = events.toList.maxBy(_.version)
 
         val eventHandler = summon[EventHandler[MigrationEvent, Migration]]
 

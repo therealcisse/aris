@@ -88,7 +88,7 @@ object MigrationRepositorySpec extends PgSpec {
         atomically {
 
           for {
-            id <- Random.nextUUID.map(uuid => Migration.Id(Key(uuid.toString)))
+            id <- Random.nextLong.map(l => Migration.Id(Key(l)))
             result <- MigrationRepository.load(id)
           } yield assert(result)(isNone)
         }

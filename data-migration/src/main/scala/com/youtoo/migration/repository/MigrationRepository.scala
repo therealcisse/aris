@@ -58,11 +58,11 @@ object MigrationRepository {
 
   object Queries extends JdbcCodecs {
     given JdbcDecoder[Migration.State] = byteArrayDecoder[Migration.State]
-    given JdbcDecoder[Migration.Id] = JdbcDecoder[String].map(s => Migration.Id(Key(s)))
-    given JdbcDecoder[Key] = JdbcDecoder[String].map(string => Key(string))
-    given JdbcDecoder[Timestamp] = JdbcDecoder[Long].map(long => Timestamp(long))
+    given JdbcDecoder[Migration.Id] = JdbcDecoder[Long].map(s => Migration.Id(Key(s)))
+    given JdbcDecoder[Key] = JdbcDecoder[Long].map(Key.apply)
+    given JdbcDecoder[Timestamp] = JdbcDecoder[Long].map(Timestamp.apply)
 
-    given SqlFragment.Setter[Migration.Id] = SqlFragment.Setter[String].contramap(_.asKey.value)
+    given SqlFragment.Setter[Migration.Id] = SqlFragment.Setter[Long].contramap(_.asKey.value)
 
     inline def READ_MIGRATION(id: Migration.Id): Query[Migration] =
       sql"""

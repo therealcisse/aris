@@ -8,22 +8,20 @@ import cats.Order
 
 type Version = Version.Type
 
-object Version extends Newtype[String] {
+object Version extends Newtype[Long] {
   import zio.schema.*
 
-  def gen: Task[Version] = ZIO.attempt(Version(UlidGenerator.monotonic()))
+  def gen: Task[Version] = ZIO.attempt(Version(SnowflakeIdGenerator.INSTANCE.nextId()))
 
-  extension (a: Version) inline def value: String = Version.unwrap(a)
-  extension (a: Version) inline def timestamp: Timestamp = Timestamp(UlidGenerator.unixTime(a.value))
-  extension (a: Version) inline def isValid: Boolean = UlidGenerator.isValid(a.value)
+  extension (a: Version) inline def value: Long = Version.unwrap(a)
+  extension (a: Version) inline def timestamp: Timestamp = Timestamp(SnowflakeIdGenerator.extractTimestamp(a.value))
 
   given Schema[Version] = Schema
-    .primitive[String]
+    .primitive[Long]
     .transform(
       wrap,
       unwrap,
     )
 
   given Order[Version] = Order.by(_.value)
-  given Ord[Version] = Ord.make((a, b) => Ord[String].compare(a.value, b.value))
 }

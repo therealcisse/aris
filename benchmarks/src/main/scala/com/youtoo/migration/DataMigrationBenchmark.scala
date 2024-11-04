@@ -125,7 +125,7 @@ object DataMigrationBenchmark {
 
       _ <- (op0 <&> op1).provideLayer(deps)
 
-    } yield (Migration.Id(id), tableName.value)
+    } yield (Migration.Id(id), s"${tableName.value}")
 
   def dropTable(name: String): Task[Unit] =
     val op = (atomically {
@@ -152,7 +152,7 @@ object DataMigrationBenchmark {
       new DataMigration.Processor {
         def count(): Task[Long] = ZIO.succeed(rows)
 
-        def load(): ZStream[Any, Throwable, Key] = ZStream.fromIterable((1L to rows).map(a => Key(s"$a")))
+        def load(): ZStream[Any, Throwable, Key] = ZStream.fromIterable((1L to rows).map(a => Key(a)))
 
         def process(key: Key): Task[Unit] =
           (Timestamp.now <&> zio.Random.nextString(length = 256)) flatMap { case (timestamp, body) =>

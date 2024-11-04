@@ -55,11 +55,11 @@ object IngestionRepository {
 
   object Queries extends JdbcCodecs {
     given JdbcDecoder[Ingestion.Status] = byteArrayDecoder[Ingestion.Status]
-    given JdbcDecoder[Ingestion.Id] = JdbcDecoder[String].map(string => Ingestion.Id(Key(string)))
-    given JdbcDecoder[Key] = JdbcDecoder[String].map(string => Key(string))
+    given JdbcDecoder[Ingestion.Id] = JdbcDecoder[Long].map(n => Ingestion.Id(Key(n)))
+    given JdbcDecoder[Key] = JdbcDecoder[Long].map(Key.apply)
     given JdbcDecoder[Timestamp] = JdbcDecoder[Long].map(long => Timestamp(long))
 
-    given SqlFragment.Setter[Ingestion.Id] = SqlFragment.Setter[String].contramap(_.asKey.value)
+    given SqlFragment.Setter[Ingestion.Id] = SqlFragment.Setter[Long].contramap(_.asKey.value)
 
     inline def READ_INGESTION(id: Ingestion.Id): Query[Ingestion] =
       sql"""

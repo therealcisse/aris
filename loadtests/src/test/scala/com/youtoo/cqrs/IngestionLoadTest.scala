@@ -41,7 +41,7 @@ class IngestionLoadTest extends Simulation {
         numCommandsPerIngestion
       val data = summon[BinaryCodec[IngestionCommand]].encode(
         IngestionCommand.SetFiles(
-          NonEmptySet(IngestionFile.Id("1"), (2 to numCommands).map(n => IngestionFile.Id(n.toString)).toSeq*),
+          NonEmptySet(IngestionFile.Id(1L), (2L to numCommands).map(n => IngestionFile.Id(n)).toSeq*),
         ),
       )
       session.setAll(
@@ -66,7 +66,7 @@ class IngestionLoadTest extends Simulation {
       exec { session =>
         val index = session("index").as[Int]
         val data = summon[BinaryCodec[IngestionCommand]].encode(
-          IngestionCommand.FileProcessing(IngestionFile.Id(s"${index + 1}")),
+          IngestionCommand.FileProcessing(IngestionFile.Id(index + 1L)),
         )
         session.set("command", String(data.toArray, StandardCharsets.UTF_8.name))
       }.exec(
@@ -92,7 +92,7 @@ class IngestionLoadTest extends Simulation {
       exec { session =>
         val index = session("index").as[Int]
         val data = summon[BinaryCodec[IngestionCommand]].encode(
-          IngestionCommand.FileProcessed(IngestionFile.Id(s"${index + 1}")),
+          IngestionCommand.FileProcessed(IngestionFile.Id(index + 1L)),
         )
         session.set("command", String(data.toArray, StandardCharsets.UTF_8.name))
       }.exec(

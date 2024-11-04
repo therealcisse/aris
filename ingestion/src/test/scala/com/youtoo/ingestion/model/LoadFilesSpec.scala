@@ -14,7 +14,7 @@ object LoadFilesSpec extends ZIOSpecDefault {
 
   def spec = suite("LoadFilesSpec")(
     test("should load all IngestionFiles for a provider from events") {
-      check(providerIdGen, Gen.listOfN(5)(ingestionFileGen), versionGen, ingestionFileMetadataGen) {
+      check(providerIdGen, Gen.listOfN(5)(ingestionFileGen), versionGen, fileMetadataGen) {
         (providerId, files, version, metadata) =>
           val handler = new FileEvent.LoadFiles(providerId)
 
@@ -36,8 +36,8 @@ object LoadFilesSpec extends ZIOSpecDefault {
                 Change(
                   version,
                   FileEvent.FileAdded(
-                    provider = Provider.Id("other-provider"),
-                    id = IngestionFile.Id("other-file"),
+                    provider = Provider.Id(0L),
+                    id = IngestionFile.Id(0L),
                     name = IngestionFile.Name("other-name"),
                     metadata = metadata,
                     sig = IngestionFile.Sig("other-sig"),
@@ -51,7 +51,7 @@ object LoadFilesSpec extends ZIOSpecDefault {
                   version,
                   FileEvent.FileAdded(
                     provider = providerId,
-                    id = IngestionFile.Id("dummy"),
+                    id = IngestionFile.Id(0L),
                     name = IngestionFile.Name("dummy"),
                     metadata = metadata,
                     sig = IngestionFile.Sig("dummy"),
@@ -68,15 +68,15 @@ object LoadFilesSpec extends ZIOSpecDefault {
       }
     },
     test("should return None if no files for provider in events") {
-      check(versionGen, ingestionFileMetadataGen) { case (version, metadata) =>
-        val handler = new FileEvent.LoadFiles(Provider.Id("provider-1"))
+      check(versionGen, fileMetadataGen) { case (version, metadata) =>
+        val handler = new FileEvent.LoadFiles(Provider.Id(0L))
 
         val events = NonEmptyList(
           Change(
             version,
             FileEvent.FileAdded(
-              provider = Provider.Id("other-provider"),
-              id = IngestionFile.Id("file-1"),
+              provider = Provider.Id(1L),
+              id = IngestionFile.Id(0L),
               name = IngestionFile.Name("file-name"),
               metadata = metadata,
               sig = IngestionFile.Sig("signature"),

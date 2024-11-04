@@ -76,7 +76,7 @@ object IngestionRepositorySpec extends PgSpec {
             for {
               _ <- IngestionRepository.save(ingestion)
               updatedIngestion = ingestion.copy(status =
-                Ingestion.Status.Completed(NonEmptySet(IngestionFile.Id("file1"), IngestionFile.Id("file2"))),
+                Ingestion.Status.Completed(NonEmptySet(IngestionFile.Id(1L), IngestionFile.Id(2L))),
               )
               _ <- IngestionRepository.save(updatedIngestion)
               result <- IngestionRepository.load(ingestion.id)
@@ -88,7 +88,7 @@ object IngestionRepositorySpec extends PgSpec {
         atomically {
 
           for {
-            id <- Random.nextUUID.map(uuid => Ingestion.Id(Key(uuid.toString)))
+            id <- Random.nextLong.map(l => Ingestion.Id(Key(l)))
             result <- IngestionRepository.load(id)
           } yield assert(result)(isNone)
         }

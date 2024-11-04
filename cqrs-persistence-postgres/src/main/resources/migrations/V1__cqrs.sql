@@ -1,21 +1,20 @@
 -- Drop tables if they exist
 DROP TABLE IF EXISTS snapshots CASCADE;
 DROP TABLE IF EXISTS events CASCADE;
-DROP TABLE IF EXISTS aggregates CASCADE;
 
 CREATE TABLE IF NOT EXISTS snapshots (
-  aggregate_id TEXT NOT NULL PRIMARY KEY,
-  version TEXT NOT NULL,
+  aggregate_id BIGINT NOT NULL PRIMARY KEY,
+  version BIGINT NOT NULL,
   UNIQUE (aggregate_id, version)
 );
 
 CREATE TABLE IF NOT EXISTS events (
-  version TEXT NOT NULL PRIMARY KEY,
-  aggregate_id TEXT NOT NULL,
+  version BIGINT NOT NULL PRIMARY KEY,
+  aggregate_id BIGINT NOT NULL,
   discriminator TEXT NOT NULL,
   namespace INT NOT NULL,
-  parent_id TEXT,
-  grand_parent_id TEXT,
+  parent_id BIGINT,
+  grand_parent_id BIGINT,
   props JSONB NOT NULL DEFAULT '{}'::jsonb,
   payload BYTEA NOT NULL
 );

@@ -11,7 +11,7 @@ object FileEventMetaInfoSpec extends ZIOSpecDefault {
 
   def spec = suite("FileEventMetaInfoSpec")(
     test("MetaInfo[FileEvent] - FileAdded event") {
-      check(providerIdGen, ingestionFileIdGen, ingestionFileNameGen, ingestionFileSigGen, ingestionFileMetadataGen) {
+      check(providerIdGen, fileIdGen, fileNameGen, fileSigGen, fileMetadataGen) {
         (providerId, fileId, fileName, fileSig, metadata) =>
           val event = FileEvent.FileAdded(
             provider = providerId,

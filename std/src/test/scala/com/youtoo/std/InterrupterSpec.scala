@@ -11,7 +11,7 @@ object InterrupterSpec extends ZIOSpecDefault {
       for {
         ref <- Ref.Synchronized.make(Map.empty[Key, Promise[Throwable, Unit]])
         interrupter = new Interrupter.Live(ref)
-        key = Key("key1")
+        key = Key(1L)
         promises0 <- interrupter.watch(key)(_ => ref.get)
         promises <- ref.get
       } yield assert(promises0.contains(key))(isTrue) && assert(promises.contains(key))(isFalse) &&
@@ -21,7 +21,7 @@ object InterrupterSpec extends ZIOSpecDefault {
       for {
         ref <- Ref.Synchronized.make(Map.empty[Key, Promise[Throwable, Unit]])
         interrupter = new Interrupter.Live(ref)
-        key = Key("key1")
+        key = Key(1L)
         res <- interrupter.watch(key)(p => interrupter.watch(key)(g => ZIO.succeed((p, g))))
       } yield assert(res._1)(equalTo(res._2))
     },
@@ -29,7 +29,7 @@ object InterrupterSpec extends ZIOSpecDefault {
       for {
         ref <- Ref.Synchronized.make(Map.empty[Key, Promise[Throwable, Unit]])
         interrupter = new Interrupter.Live(ref)
-        key = Key("key1")
+        key = Key(1L)
         fiber <- interrupter.watch(key)(promise => promise.await).fork
         _ <- interrupter.interrupt(key)
         result <- fiber.join

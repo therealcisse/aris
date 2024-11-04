@@ -110,7 +110,7 @@ object BenchmarkServer extends ZIOApp {
 
     },
     Method.GET / "migration" -> handler { (req: Request) =>
-      val offset = req.queryParam("offset").filterNot(_.isEmpty)
+      val offset = req.queryParamTo[Long]("offset").toOption
       val limit = req.queryParamToOrElse[Long]("limit", FetchSize)
 
       atomically {
@@ -132,7 +132,7 @@ object BenchmarkServer extends ZIOApp {
       }
 
     },
-    Method.GET / "migration" / string("id") -> handler { (id: String, req: Request) =>
+    Method.GET / "migration" / long("id") -> handler { (id: Long, req: Request) =>
       val key = Key.wrap(id)
 
       MigrationService.load(Migration.Id(key)) map {
@@ -169,14 +169,14 @@ object BenchmarkServer extends ZIOApp {
       } yield Response.json(s"""{"id":"$id"}""")
 
     },
-    Method.POST / "migration" / string("id") / "run" -> handler { (id: String, req: Request) =>
+    Method.POST / "migration" / long("id") / "run" -> handler { (id: Long, req: Request) =>
       val numKeys = req.queryParamToOrElse[Long]("numKeys", 10L)
 
       val processor: ZLayer[Any, Nothing, DataMigration.Processor] = ZLayer.succeed {
 
         new DataMigration.Processor {
           def count(): Task[Long] = ZIO.succeed(numKeys)
-          def load(): ZStream[Any, Throwable, Key] = ZStream((0L until numKeys).map(i => Key(s"$i"))*)
+          def load(): ZStream[Any, Throwable, Key] = ZStream((0L until numKeys).map(i => Key(i))*)
           def process(key: Key): Task[Unit] = ZIO.logInfo(s"Processed $key")
 
         }
@@ -190,7 +190,7 @@ object BenchmarkServer extends ZIOApp {
       op `as` Response.ok
 
     },
-    Method.DELETE / "migration" / string("id") / "stop" -> handler { (id: String, req: Request) =>
+    Method.DELETE / "migration" / long("id") / "stop" -> handler { (id: Long, req: Request) =>
       Interrupter.interrupt(id = Key(id)) `as` Response.ok
 
     },

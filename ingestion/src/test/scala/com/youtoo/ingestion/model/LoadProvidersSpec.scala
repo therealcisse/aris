@@ -14,60 +14,62 @@ object LoadProvidersSpec extends ZIOSpecDefault {
 
   def spec = suite("LoadProvidersSpec")(
     test("should load all Providers from events") {
-      check(Gen.listOfN(5)(providerGen), versionGen) { (providers, version) =>
-        val handler = new FileEvent.LoadProviders()
+      check(Gen.listOfN(5)(providerGen), versionGen, providerIdGen, providerNameGen, providerLocationGen) {
+        (providers, version, dummyProviderId, dummyProviderName, dummyProviderLocation) =>
+          val handler = new FileEvent.LoadProviders()
 
-        val events = NonEmptyList
-          .fromIterableOption(
-            providers.map { provider =>
-              Change(
-                version,
-                FileEvent.ProviderAdded(
-                  id = provider.id,
-                  name = provider.name,
-                  location = provider.location,
+          val events = NonEmptyList
+            .fromIterableOption(
+              providers.map { provider =>
+                Change(
+                  version,
+                  FileEvent.ProviderAdded(
+                    id = provider.id,
+                    name = provider.name,
+                    location = provider.location,
+                  ),
+                )
+              }.toList,
+            )
+            .getOrElse(
+              NonEmptyList(
+                Change(
+                  version,
+                  FileEvent.ProviderAdded(
+                    id = dummyProviderId,
+                    name = dummyProviderName,
+                    location = dummyProviderLocation,
+                  ),
                 ),
-              )
-            }.toList,
-          )
-          .getOrElse(
-            NonEmptyList(
-              Change(
-                version,
-                FileEvent.ProviderAdded(
-                  id = Provider.Id("dummy"),
-                  name = Provider.Name("dummy"),
-                  location = Provider.Location.File("dummy"),
-                ),
+              ),
+            )
+
+          val result = handler.applyEvents(events)
+
+          assert(result.toSet)(equalTo(providers.toSet))
+      }
+    },
+    test("should return empty list if no ProviderAdded events") {
+      check(versionGen, fileMetadataGen, providerIdGen, fileIdGen, fileNameGen, fileSigGen) {
+        (version, metadata, providerId, fileId, fileName, fileSig) =>
+          val handler = new FileEvent.LoadProviders()
+
+          val events = NonEmptyList(
+            Change(
+              version,
+              FileEvent.FileAdded(
+                provider = providerId,
+                id = fileId,
+                name = fileName,
+                metadata = metadata,
+                sig = fileSig,
               ),
             ),
           )
 
-        val result = handler.applyEvents(events)
+          val result = handler.applyEvents(events)
 
-        assert(result.toSet)(equalTo(providers.toSet))
-      }
-    },
-    test("should return empty list if no ProviderAdded events") {
-      check(versionGen, ingestionFileMetadataGen) { (version, metadata) =>
-        val handler = new FileEvent.LoadProviders()
-
-        val events = NonEmptyList(
-          Change(
-            version,
-            FileEvent.FileAdded(
-              provider = Provider.Id("provider-1"),
-              id = IngestionFile.Id("file-1"),
-              name = IngestionFile.Name("file-name"),
-              metadata = metadata,
-              sig = IngestionFile.Sig("signature"),
-            ),
-          ),
-        )
-
-        val result = handler.applyEvents(events)
-
-        assert(result)(isEmpty)
+          assert(result)(isEmpty)
       }
     },
   )

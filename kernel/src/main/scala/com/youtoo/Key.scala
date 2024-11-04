@@ -7,15 +7,15 @@ import cats.Order
 
 type Key = Key.Type
 
-object Key extends Newtype[String] {
+object Key extends Newtype[Long] {
   import zio.schema.*
 
-  def gen: Task[Key] = ZIO.attempt(Key(UlidGenerator.monotonic()))
+  def gen: Task[Key] = ZIO.attempt(Key(SnowflakeIdGenerator.INSTANCE.nextId()))
 
-  extension (a: Key) inline def value: String = Key.unwrap(a)
+  extension (a: Key) inline def value: Long = Key.unwrap(a)
 
   given Schema[Key] = Schema
-    .primitive[String]
+    .primitive[Long]
     .transform(
       wrap,
       unwrap,

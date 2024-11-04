@@ -25,10 +25,10 @@ object FileServiceSpec extends MockSpecDefault {
     test("addFile should save events to EventStore") {
       check(
         providerIdGen,
-        ingestionFileIdGen,
-        ingestionFileNameGen,
-        ingestionFileMetadataGen,
-        ingestionFileSigGen,
+        fileIdGen,
+        fileNameGen,
+        fileMetadataGen,
+        fileSigGen,
       ) { (providerId, fileId, fileName, metadata, sig) =>
         val expectedEvent = FileEvent.FileAdded(providerId, fileId, fileName, metadata, sig)
 
@@ -43,18 +43,18 @@ object FileServiceSpec extends MockSpecDefault {
       }
     },
     test("loadNamed should return IngestionFile when found") {
-      check(ingestionFileNameGen, versionGen, ingestionFileMetadataGen) { (fileName, version, metadata) =>
+      check(fileNameGen, versionGen, fileMetadataGen) { (fileName, version, metadata) =>
         // Set up the EventHandler to return the expected IngestionFile
         val expectedFile = IngestionFile(
-          id = IngestionFile.Id("file-id"),
+          id = IngestionFile.Id(0L),
           name = fileName,
           metadata = metadata,
           sig = IngestionFile.Sig("sig"),
         )
 
         val expectedEvent = FileEvent.FileAdded(
-          provider = Provider.Id("provider-1"),
-          id = IngestionFile.Id("file-id"),
+          provider = Provider.Id(1L),
+          id = IngestionFile.Id(0L),
           name = fileName,
           metadata = metadata,
           sig = IngestionFile.Sig("sig"),
@@ -77,18 +77,18 @@ object FileServiceSpec extends MockSpecDefault {
       }
     },
     test("loadSig should return IngestionFile when found") {
-      check(fileSigGen, versionGen, ingestionFileMetadataGen) { (fileSig, version, metadata) =>
+      check(fileSigGen, versionGen, fileMetadataGen) { (fileSig, version, metadata) =>
         // Set up the EventHandler to return the expected IngestionFile
         val expectedFile = IngestionFile(
-          id = IngestionFile.Id("file-id"),
+          id = IngestionFile.Id(0L),
           name = IngestionFile.Name("file-name"),
           metadata = metadata,
           sig = fileSig,
         )
 
         val expectedEvent = FileEvent.FileAdded(
-          provider = Provider.Id("provider-1"),
-          id = IngestionFile.Id("file-id"),
+          provider = Provider.Id(1L),
+          id = IngestionFile.Id(0L),
           name = IngestionFile.Name("file-name"),
           metadata = metadata,
           sig = fileSig,
@@ -111,7 +111,7 @@ object FileServiceSpec extends MockSpecDefault {
       }
     },
     test("load should return IngestionFile when found") {
-      check(fileIdGen, versionGen, ingestionFileMetadataGen) { (fileId, version, metadata) =>
+      check(fileIdGen, versionGen, fileMetadataGen) { (fileId, version, metadata) =>
         // Set up the EventHandler to return the expected IngestionFile
         val expectedFile = IngestionFile(
           id = fileId,
@@ -121,7 +121,7 @@ object FileServiceSpec extends MockSpecDefault {
         )
 
         val expectedEvent = FileEvent.FileAdded(
-          provider = Provider.Id("provider-1"),
+          provider = Provider.Id(1L),
           id = fileId,
           name = IngestionFile.Name("file-name"),
           metadata = metadata,

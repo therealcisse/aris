@@ -2,7 +2,7 @@
 DROP TABLE IF EXISTS migrations CASCADE;
 
 CREATE TABLE IF NOT EXISTS migrations (
-  id TEXT NOT NULL,
+  id BIGINT NOT NULL,
   state BYTEA NOT NULL,
   timestamp BIGINT NOT NULL,
   PRIMARY KEY (id)

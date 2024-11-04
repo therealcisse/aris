@@ -13,8 +13,8 @@ object FileCommandHandlerSpec extends ZIOSpecDefault {
     test("should produce FileAdded event when AddFile command is applied") {
       // Prepare the command
       val cmd = FileCommand.AddFile(
-        provider = Provider.Id("provider-1"),
-        id = IngestionFile.Id("file-1"),
+        provider = Provider.Id(0L),
+        id = IngestionFile.Id(0L),
         name = IngestionFile.Name("file-name"),
         metadata = IngestionFile.Metadata.File(0L, Timestamp(0L)),
         sig = IngestionFile.Sig("signature"),
@@ -25,8 +25,8 @@ object FileCommandHandlerSpec extends ZIOSpecDefault {
 
       // Expected event
       val expectedEvent = FileEvent.FileAdded(
-        provider = Provider.Id("provider-1"),
-        id = IngestionFile.Id("file-1"),
+        provider = Provider.Id(0L),
+        id = IngestionFile.Id(0L),
         name = IngestionFile.Name("file-name"),
         metadata = IngestionFile.Metadata.File(0L, Timestamp(0L)),
         sig = IngestionFile.Sig("signature"),
@@ -38,7 +38,7 @@ object FileCommandHandlerSpec extends ZIOSpecDefault {
     test("should produce ProviderAdded event when AddProvider command is applied") {
       // Prepare the command
       val cmd = FileCommand.AddProvider(
-        id = Provider.Id("provider-1"),
+        id = Provider.Id(0L),
         name = Provider.Name("provider-name"),
         location = Provider.Location.File("provider-location"),
       )
@@ -48,7 +48,7 @@ object FileCommandHandlerSpec extends ZIOSpecDefault {
 
       // Expected event
       val expectedEvent = FileEvent.ProviderAdded(
-        id = Provider.Id("provider-1"),
+        id = Provider.Id(0L),
         name = Provider.Name("provider-name"),
         location = Provider.Location.File("provider-location"),
       )

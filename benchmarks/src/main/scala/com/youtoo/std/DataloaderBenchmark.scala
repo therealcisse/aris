@@ -13,7 +13,7 @@ import zio.profiling.jmh.BenchmarkUtils
 class DataloaderBenchmark {
   import DataloaderBenchmark.*
 
-  var runtime: Runtime.Scoped[Dataloader[String]] = scala.compiletime.uninitialized
+  var runtime: Runtime.Scoped[Dataloader[Long]] = scala.compiletime.uninitialized
 
   @Setup(Level.Trial)
   def setup(): Unit =
@@ -28,13 +28,13 @@ class DataloaderBenchmark {
     }
 
   @Param(Array("10", "100", "1000", "10000"))
-  var numFetchCalls: Int = scala.compiletime.uninitialized
+  var numFetchCalls: Long = scala.compiletime.uninitialized
 
   @Benchmark
   def benchmarkDataloaderFetch(): Unit = execute {
-    val l = runtime.environment.get[Dataloader[String]]
+    val l = runtime.environment.get[Dataloader[Long]]
 
-    val fetchAllKeys = ZIO.foreachPar(1 to numFetchCalls)(id => l.fetch(Key(s"$id")))
+    val fetchAllKeys = ZIO.foreachPar(1L to numFetchCalls)(id => l.fetch(Key(id)))
 
     fetchAllKeys
   }
@@ -42,16 +42,16 @@ class DataloaderBenchmark {
 }
 
 object DataloaderBenchmark {
-  class MockBulkLoader() extends Dataloader.BulkLoader[String] {
-    def loadMany(ids: NonEmptyChunk[Key]): Task[List[String]] =
+  class MockBulkLoader() extends Dataloader.BulkLoader[Long] {
+    def loadMany(ids: NonEmptyChunk[Key]): Task[List[Long]] =
       ZIO.succeed(ids.map(_.value).toList)
   }
 
-  given Dataloader.Keyed[String] with {
-    extension (a: String) def id: Key = Key(a)
+  given Dataloader.Keyed[Long] with {
+    extension (a: Long) def id: Key = Key(a)
   }
 
-  val dataloaderLayer: ZLayer[Dataloader.Factory, Throwable, Dataloader[String]] =
+  val dataloaderLayer: ZLayer[Dataloader.Factory, Throwable, Dataloader[Long]] =
     ZLayer.scoped {
       for {
         factory <- ZIO.service[Dataloader.Factory]
@@ -60,6 +60,6 @@ object DataloaderBenchmark {
     }
 
   private def execute(query: ZIO[Any, Throwable, ?]): Unit =
-    BenchmarkUtils.unsafeRun(query.fork)
+    BenchmarkUtils.unsafeRun(query)
 
 }

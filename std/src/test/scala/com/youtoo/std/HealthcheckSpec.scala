@@ -12,7 +12,7 @@ object HealthcheckSpec extends ZIOSpecDefault {
       for {
         ref <- Ref.Synchronized.make(Map.empty[Key, (Timestamp, Fiber[Nothing, Any])])
         healthcheck = new Healthcheck.Live(ref)
-        id = Key("service1")
+        id = Key(1L)
         _ <- healthcheck.start(id, Schedule.spaced(1.second))
         isRunning <- healthcheck.isRunning(id)
       } yield assert(isRunning)(isTrue)
@@ -21,7 +21,7 @@ object HealthcheckSpec extends ZIOSpecDefault {
       for {
         ref <- Ref.Synchronized.make(Map.empty[Key, (Timestamp, Fiber[Nothing, Any])])
         healthcheck = new Healthcheck.Live(ref)
-        id = Key("service1")
+        id = Key(1L)
         handle <- healthcheck.start(id, Schedule.spaced(1.second))
         _ <- handle.stop
         isRunning <- healthcheck.isRunning(id)
@@ -31,7 +31,7 @@ object HealthcheckSpec extends ZIOSpecDefault {
       for {
         ref <- Ref.Synchronized.make(Map.empty[Key, (Timestamp, Fiber[Nothing, Any])])
         healthcheck = new Healthcheck.Live(ref)
-        id = Key("service1")
+        id = Key(1L)
         h <- healthcheck.start(id, Schedule.spaced(1.second))
         _ <- TestClock.adjust(500.millis)
         hb1 <- healthcheck.getHeartbeat(id)
@@ -49,7 +49,7 @@ object HealthcheckSpec extends ZIOSpecDefault {
       for {
         ref <- Ref.Synchronized.make(Map.empty[Key, (Timestamp, Fiber[Nothing, Any])])
         healthcheck = new Healthcheck.Live(ref)
-        id = Key("service1")
+        id = Key(1L)
         hb <- healthcheck.getHeartbeat(id)
       } yield assert(hb)(isNone)
     },
@@ -57,7 +57,7 @@ object HealthcheckSpec extends ZIOSpecDefault {
       for {
         ref <- Ref.Synchronized.make(Map.empty[Key, (Timestamp, Fiber[Nothing, Any])])
         healthcheck = new Healthcheck.Live(ref)
-        id = Key("service1")
+        id = Key(1L)
         handle <- healthcheck.start(id, Schedule.spaced(1.second))
         _ <- TestClock.adjust(1.second)
         hb1 <- healthcheck.getHeartbeat(id)

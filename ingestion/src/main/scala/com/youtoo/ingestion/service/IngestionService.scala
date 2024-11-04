@@ -65,7 +65,7 @@ object IngestionService {
                         inn = events map { es =>
                           (
                             EventHandler.applyEvents(es),
-                            es.maxBy(_.version),
+                            es.toList.maxBy(_.version),
                             es.size,
                             None,
                           )
@@ -79,7 +79,7 @@ object IngestionService {
                       events map (_.map { es =>
                         (
                           EventHandler.applyEvents(in, es),
-                          es.maxBy(_.version),
+                          es.toList.maxBy(_.version),
                           es.size,
                           version.some,
                         )

@@ -30,10 +30,10 @@ object DataMigrationSpec extends MockSpecDefault {
     for {
       processingStarted <- Promise.make[Nothing, Unit]
       proceed <- Promise.make[Nothing, Unit]
-      key = Key("migration1")
+      key = Key(11L)
       migrationId = Migration.Id(key)
-      key1 = Key("key1")
-      key2 = Key("key2")
+      key1 = Key(21L)
+      key2 = Key(22L)
 
       cmds <- Ref.make(List.empty[MigrationCommand])
 
@@ -88,7 +88,7 @@ object DataMigrationSpec extends MockSpecDefault {
 
   val testExecutionRecordsCreation = test("Execution Records Creation") {
     check(migrationIdGen, timestampGen, Gen.int(100, 1000)) { case (migrationId, now, n) =>
-      val keys = NonEmptyChunk(Key("key1"), (2 to n).map(i => Key(s"key$i")).toList*)
+      val keys = NonEmptyChunk(Key(1L), (2L to n).map(i => Key(i)).toList*)
 
       val initialMigration = Migration(
         id = migrationId,
@@ -117,7 +117,7 @@ object DataMigrationSpec extends MockSpecDefault {
 
   val testIncompleteMigrationResumption = test("Incomplete Migration Resumption") {
     check(migrationIdGen, timestampGen, Gen.int(100, 1000)) { case (migrationId, now, n) =>
-      val allKeys = NonEmptyChunk(Key("key1"), (2 to n).map(i => Key(s"key$i")).toList*)
+      val allKeys = NonEmptyChunk(Key(1L), (2L to n).map(i => Key(i)).toList*)
 
       val (processedKeys, remainingKeys) = allKeys.splitAt(n / 2)
 
@@ -128,13 +128,12 @@ object DataMigrationSpec extends MockSpecDefault {
       )
 
       val previousExecution = Execution.Stopped(
-        processing =
-          Execution.Processing(Execution.Id(Key("exec1")), initialStats, Timestamp(now.value - (3600L * 1000L))),
+        processing = Execution.Processing(Execution.Id(Key(1L)), initialStats, Timestamp(now.value - (3600L * 1000L))),
         timestamp = Timestamp(now.value - (1800L * 1000L)),
       )
       val initialMigration = Migration(
         id = migrationId,
-        state = Migration.State(Map(Execution.Id(Key("exec1")) -> previousExecution)),
+        state = Migration.State(Map(Execution.Id(Key(1L)) -> previousExecution)),
         timestamp = Timestamp(now.value - (3600L * 1000L)),
       )
 

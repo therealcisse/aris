@@ -21,12 +21,12 @@ object Provider {
 
     def gen: Task[Id] = Key.gen.map(wrap)
 
-    def apply(value: String): Id = Id(Key(value))
+    def apply(value: Long): Id = Id(Key(value))
 
     extension (a: Id) inline def asKey: Key = Id.unwrap(a)
 
     given Schema[Id] = Schema
-      .primitive[String]
+      .primitive[Long]
       .transform(
         Key.wrap `andThen` wrap,
         unwrap `andThen` Key.unwrap,
