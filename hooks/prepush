@@ -1,0 +1,20 @@
+#!/bin/sh
+
+# Run Scala formatting in the root directory
+scala fmt .
+
+# Check if there are any unstaged changes after running scalafmt
+if [[ -n $(git status --porcelain) ]]; then
+  echo "Unstaged changes detected after running scalafmt. Please commit formatted changes."
+  exit 1
+fi
+
+# Run sbt tests
+sbt test
+if [[ $? -ne 0 ]]; then
+  echo "Tests failed. Aborting push."
+  exit 1
+fi
+
+# If everything is clean, proceed with the push
+exit 0

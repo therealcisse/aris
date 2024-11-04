@@ -10,6 +10,29 @@ ThisBuild / resolvers ++= Resolver.sonatypeOssRepos("snapshots")
 
 ThisBuild / version := "0.1.0-SNAPSHOT"
 
+// Define onLoad task to copy the hook into .git/hooks/pre-push
+def installGitHook: Unit = {
+  import java.nio.file.{Files, Paths, StandardCopyOption}
+
+  val hookSource = Paths.get("hooks/prepush")
+  val hookTarget = Paths.get(".git/hooks/pre-push")
+
+  if (Files.exists(hookSource)) {
+    Files.copy(hookSource, hookTarget, StandardCopyOption.REPLACE_EXISTING)
+    println("Git pre-push hook installed successfully.")
+  } else {
+    println("Git hook source not found. Skipping installation.")
+  }
+}
+
+// Register the onLoad command to install the hook
+onLoad in Global := {
+  val previousOnLoad = (onLoad in Global).value
+  state => {
+    installGitHook
+    previousOnLoad(state)
+  }
+}
 // Setting default log level to INFO
 val _ = sys.props += ("YOUTOO_LOG_LEVEL" -> sys.env.getOrElse("YOUTOO_LOG_LEVEL", Debug.LogLevel))
 
