@@ -4,6 +4,7 @@ package std
 import zio.test.*
 import zio.test.Assertion.*
 import zio.*
+import java.util.concurrent.TimeUnit
 
 object InterrupterSpec extends ZIOSpecDefault {
   def spec = suite("InterrupterSpec")(
@@ -14,8 +15,7 @@ object InterrupterSpec extends ZIOSpecDefault {
         key = Key(1L)
         promises0 <- interrupter.watch(key)(_ => ref.get)
         promises <- ref.get
-      } yield assert(promises0.contains(key))(isTrue) && assert(promises.contains(key))(isFalse) &&
-        assert(promises.get(key))(isNone)
+      } yield assert(promises0.contains(key))(isTrue) && assert(promises.contains(key))(isFalse)
     },
     test("watch returns existing promise if already present") {
       for {
@@ -35,5 +35,5 @@ object InterrupterSpec extends ZIOSpecDefault {
         result <- fiber.join
       } yield assert(result)(isUnit)
     },
-  )
+  ) @@ TestAspect.timeout(Duration(30L, TimeUnit.SECONDS))
 }

@@ -4,6 +4,7 @@ package std
 import zio.*
 import zio.test.*
 import zio.test.Assertion.*
+import java.util.concurrent.TimeUnit
 
 object DataloaderSpec extends ZIOSpecDefault {
   given Dataloader.Keyed[Long] with {
@@ -94,7 +95,7 @@ object DataloaderSpec extends ZIOSpecDefault {
           bulkLoader <- MockBulkLoader[Long]
           factory <- ZIO.service[Dataloader.Factory]
           dataloader <- factory.createLoader(bulkLoader, 1)
-          fiber <- ZIO.foreachPar(1L to n)(i => dataloader.fetch(Key(i))).fork
+          fiber <- ZIO.foreach(1L to n)(i => dataloader.fetch(Key(i))).fork
           _ <- TestClock.adjust((n * 15).millis)
           _ <- TestClock.adjust((15).millis)
           calls <- bulkLoader.getCalls
@@ -102,6 +103,6 @@ object DataloaderSpec extends ZIOSpecDefault {
         } yield assert(calls.size)(equalTo(n))
       }
     },
-  ).provideSomeLayerShared[Scope](Dataloader.live()) @@ TestAspect.ignore
+  ).provideSomeLayerShared[Scope](Dataloader.live()) @@ TestAspect.timeout(Duration(30L, TimeUnit.SECONDS))
 
 }

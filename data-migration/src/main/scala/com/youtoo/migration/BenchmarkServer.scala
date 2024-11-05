@@ -41,8 +41,6 @@ object BenchmarkServer extends ZIOApp {
 
   inline val FetchSize = 1_000L
 
-  val logger = Runtime.setConfigProvider(ConfigProvider.envProvider) >>> Runtime.removeDefaultLoggers >>> SLF4J.slf4j
-
   type Environment =
     FlywayMigration & ZConnectionPool & CQRSPersistence & SnapshotStore & MigrationEventStore & MigrationCQRS & Server & Server.Config & NettyConfig & MigrationService & MigrationRepository & PrometheusPublisher & MetricsConfig & SnapshotStrategy.Factory & DataMigration & Interrupter & Healthcheck
 
@@ -58,7 +56,11 @@ object BenchmarkServer extends ZIOApp {
   private val nettyConfigLayer = ZLayer.succeed(nettyConfig)
 
   val bootstrap: ZLayer[Any, Nothing, Environment] =
-    logger ++
+    Runtime.disableFlags(
+      RuntimeFlag.FiberRoots,
+    ) ++ Runtime.enableRuntimeMetrics ++ Runtime.enableAutoBlockingExecutor ++ Runtime.enableFlags(
+      RuntimeFlag.EagerShiftBack,
+    ) ++ Runtime.removeDefaultLoggers >>> SLF4J.slf4j ++
       ZLayer
         .make[Environment](
           DatabaseConfig.pool,

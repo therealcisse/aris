@@ -53,7 +53,11 @@ object BenchmarkServer extends ZIOApp {
   private val nettyConfigLayer = ZLayer.succeed(nettyConfig)
 
   val bootstrap: ZLayer[Any, Nothing, Environment] =
-    Runtime.removeDefaultLoggers >>> SLF4J.slf4j ++
+    Runtime.disableFlags(
+      RuntimeFlag.FiberRoots,
+    ) ++ Runtime.enableRuntimeMetrics ++ Runtime.enableAutoBlockingExecutor ++ Runtime.enableFlags(
+      RuntimeFlag.EagerShiftBack,
+    ) ++ Runtime.removeDefaultLoggers >>> SLF4J.slf4j ++
       ZLayer
         .make[Environment](
           DatabaseConfig.pool,

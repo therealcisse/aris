@@ -109,6 +109,7 @@ lazy val std = (project in file("std"))
   .dependsOn(kernel)
   .settings(stdSettings("std"))
   .settings(
+    Test / parallelExecution := false,
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
     libraryDependencies ++= Seq(
       cats,
