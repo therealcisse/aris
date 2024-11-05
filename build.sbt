@@ -67,6 +67,9 @@ lazy val kernel = (project in file("kernel"))
     libraryDependencies ++= Seq(
       `scala-collection-contrib`,
       // pprint,
+      `slf4j-api`,
+      `slf4j-simple`,
+      `slf4j-log4j12`,
       junit,
       `junit-interface`,
       `junit-jupiter`,
@@ -175,6 +178,10 @@ lazy val ingestion = (project in file("ingestion"))
   .settings(
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
     libraryDependencies ++= Seq(
+      netty,
+      `slf4j-api`,
+      `slf4j-simple`,
+      `slf4j-log4j12`,
       `hadoop-client`,
       `hadoop-aws`,
       `zio-metrics`,

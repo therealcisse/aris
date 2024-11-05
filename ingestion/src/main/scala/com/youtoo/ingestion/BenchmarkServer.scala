@@ -38,8 +38,6 @@ object BenchmarkServer extends ZIOApp {
 
   inline val FetchSize = 1_000L
 
-  val jvmMetricsLayer = zio.metrics.jvm.DefaultJvmMetrics.live
-
   type Environment =
     FlywayMigration & ZConnectionPool & CQRSPersistence & SnapshotStore & IngestionEventStore & IngestionCQRS & Server & Server.Config & NettyConfig & IngestionService & IngestionRepository & PrometheusPublisher & MetricsConfig & SnapshotStrategy.Factory
 
@@ -127,7 +125,7 @@ object BenchmarkServer extends ZIOApp {
 
     },
     Method.GET / "ingestion" / long("id") -> handler { (id: Long, req: Request) =>
-      val key = Key.wrap(id)
+      val key = Key(id)
 
       IngestionService.load(Ingestion.Id(key)) map {
         case Some(ingestion) =>
@@ -144,7 +142,7 @@ object BenchmarkServer extends ZIOApp {
 
     },
     Method.PUT / "ingestion" / long("id") -> handler { (id: Long, req: Request) =>
-      val key = Key.wrap(id)
+      val key = Key(id)
 
       req.body.fromBody[IngestionCommand] foldZIO (
         failure = _ => ZIO.succeed(Response.notFound),
@@ -172,13 +170,13 @@ object BenchmarkServer extends ZIOApp {
     Method.POST / "ingestion" -> handler {
 
       for {
-        id <- Key.gen
+        id <- Ingestion.Id.gen
 
         timestamp <- Timestamp.now
 
-        _ <- IngestionCQRS.add(id, IngestionCommand.StartIngestion(Ingestion.Id(id), timestamp))
+        _ <- IngestionCQRS.add(id.asKey, IngestionCommand.StartIngestion(id, timestamp))
 
-        opt <- IngestionService.load(Ingestion.Id(id))
+        opt <- IngestionService.load(id)
 
         _ <- opt.fold(ZIO.unit) { ingestion =>
           atomically {
@@ -191,13 +189,11 @@ object BenchmarkServer extends ZIOApp {
     },
   ).sandbox
 
-  val run: URIO[Environment, ExitCode] =
-    (
-      for {
-        config <- ZIO.config[DatabaseConfig]
-        _ <- FlywayMigration.run(config)
-        _ <- Server.serve(routes)
-      } yield ()
-    ).exitCode
+  def run: RIO[Environment, Unit] =
+    for {
+      config <- ZIO.config[DatabaseConfig]
+      _ <- FlywayMigration.run(config)
+      _ <- Server.serve(routes)
+    } yield ()
 
 }

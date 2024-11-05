@@ -27,7 +27,6 @@ object PostgresCQRSPersistenceSpec extends PgSpec {
   object DummyEvent {
     given Schema[DummyEvent] = DeriveSchema.gen[DummyEvent]
 
-    val discriminator = Discriminator("DummyEvent")
   }
 
   given MetaInfo[DummyEvent] with {
@@ -40,131 +39,140 @@ object PostgresCQRSPersistenceSpec extends PgSpec {
   def spec: Spec[ZConnectionPool & DatabaseConfig & FlywayMigration & TestEnvironment & Scope, Any] =
     suite("PostgresCQRSPersistenceSpec")(
       test("should save and retrieve events correctly by hierarchy") {
-        check(keyGen, versionGen, keyGen, keyGen) { (key, version, grandParentId, parentId) =>
+        check(keyGen, versionGen, keyGen, keyGen, discriminatorGen) {
+          (key, version, grandParentId, parentId, discriminator) =>
 
-          given MetaInfo[DummyEvent] with {
-            extension (self: DummyEvent) def namespace: Namespace = Namespace(0)
-            extension (self: DummyEvent)
-              def hierarchy: Option[Hierarchy] = Hierarchy.Descendant(grandParentId, parentId).some
-            extension (self: DummyEvent) def props: Chunk[EventProperty] = Chunk(EventProperty("type", "DummyEvent"))
+            given MetaInfo[DummyEvent] with {
+              extension (self: DummyEvent) def namespace: Namespace = Namespace(0)
+              extension (self: DummyEvent)
+                def hierarchy: Option[Hierarchy] = Hierarchy.Descendant(grandParentId, parentId).some
+              extension (self: DummyEvent) def props: Chunk[EventProperty] = Chunk(EventProperty("type", "DummyEvent"))
 
-          }
+            }
 
-          for {
-            persistence <- ZIO.service[CQRSPersistence]
+            for {
+              // _ <- atomically(SqlFragment.deleteFrom("events").delete)
 
-            event = Change(version = version, DummyEvent("test"))
+              persistence <- ZIO.service[CQRSPersistence]
 
-            saveResult <- atomically(persistence.saveEvent(key, DummyEvent.discriminator, event))
+              event = Change(version = version, DummyEvent("test"))
 
-            a = assert(saveResult)(equalTo(1L))
+              saveResult <- atomically(persistence.saveEvent(key, discriminator, event))
 
-            events0 <- atomically(persistence.readEvents[DummyEvent](key, DummyEvent.discriminator))
-            b = assert(events0)(isNonEmpty)
+              a = assert(saveResult)(equalTo(1L))
 
-            c <- (
-              for {
-                events0 <- atomically(persistence.readEvents[DummyEvent](key, DummyEvent.discriminator))
-                events1 <- atomically(
-                  persistence.readEvents[DummyEvent](
-                    DummyEvent.discriminator,
-                    ns = None,
-                    hierarchy = Hierarchy.Descendant(grandParentId, parentId).some,
-                    props = None,
-                  ),
-                )
-                events2 <- atomically(
-                  persistence.readEvents[DummyEvent](
-                    DummyEvent.discriminator,
-                    ns = None,
-                    hierarchy = Hierarchy.Descendant(Key(grandParentIdXXX), parentId).some,
-                    props = None,
-                  ),
-                )
-                events3 <- atomically(
-                  persistence.readEvents[DummyEvent](
-                    DummyEvent.discriminator,
-                    ns = None,
-                    hierarchy = Hierarchy.Descendant(grandParentId, Key(parentIdXXX)).some,
-                    props = None,
-                  ),
-                )
+              events0 <- atomically(persistence.readEvents[DummyEvent](key, discriminator))
+              b = assert(events0)(isNonEmpty)
 
-              } yield assert(events0)(isNonEmpty) && assert(events1)(isNonEmpty) && assert(events2)(isEmpty) && assert(
-                events3,
-              )(isEmpty) && assert(
-                events0,
-              )(equalTo(events1))
-            )
+              c <- (
+                for {
+                  events0 <- atomically(persistence.readEvents[DummyEvent](key, discriminator))
+                  events1 <- atomically(
+                    persistence.readEvents[DummyEvent](
+                      discriminator,
+                      ns = None,
+                      hierarchy = Hierarchy.Descendant(grandParentId, parentId).some,
+                      props = None,
+                    ),
+                  )
+                  events2 <- atomically(
+                    persistence.readEvents[DummyEvent](
+                      discriminator,
+                      ns = None,
+                      hierarchy = Hierarchy.Descendant(Key(grandParentIdXXX), parentId).some,
+                      props = None,
+                    ),
+                  )
+                  events3 <- atomically(
+                    persistence.readEvents[DummyEvent](
+                      discriminator,
+                      ns = None,
+                      hierarchy = Hierarchy.Descendant(grandParentId, Key(parentIdXXX)).some,
+                      props = None,
+                    ),
+                  )
 
-            d <- (
-              for {
-                events0 <- atomically(persistence.readEvents[DummyEvent](key, DummyEvent.discriminator))
-                events1 <- atomically(
-                  persistence.readEvents[DummyEvent](
-                    DummyEvent.discriminator,
-                    ns = None,
-                    hierarchy = Hierarchy.GrandChild(grandParentId).some,
-                    props = None,
-                  ),
-                )
-                events2 <- atomically(
-                  persistence.readEvents[DummyEvent](
-                    DummyEvent.discriminator,
-                    ns = None,
-                    hierarchy = Hierarchy.GrandChild(Key(grandParentIdXXX)).some,
-                    props = None,
-                  ),
-                )
+                } yield assert(events0)(isNonEmpty) && assert(events1)(isNonEmpty) && assert(events2)(
+                  isEmpty,
+                ) && assert(
+                  events3,
+                )(isEmpty) && assert(
+                  events0,
+                )(equalTo(events1))
+              )
 
-              } yield assert(events0)(isNonEmpty) && assert(events1)(isNonEmpty) && assert(events2)(isEmpty) && assert(
-                events0,
-              )(equalTo(events1))
-            )
+              d <- (
+                for {
+                  events0 <- atomically(persistence.readEvents[DummyEvent](key, discriminator))
+                  events1 <- atomically(
+                    persistence.readEvents[DummyEvent](
+                      discriminator,
+                      ns = None,
+                      hierarchy = Hierarchy.GrandChild(grandParentId).some,
+                      props = None,
+                    ),
+                  )
+                  events2 <- atomically(
+                    persistence.readEvents[DummyEvent](
+                      discriminator,
+                      ns = None,
+                      hierarchy = Hierarchy.GrandChild(Key(grandParentIdXXX)).some,
+                      props = None,
+                    ),
+                  )
 
-            e <- (
-              for {
-                events0 <- atomically(persistence.readEvents[DummyEvent](key, DummyEvent.discriminator))
-                events1 <- atomically(
-                  persistence.readEvents[DummyEvent](
-                    DummyEvent.discriminator,
-                    ns = None,
-                    hierarchy = Hierarchy.Child(parentId).some,
-                    props = None,
-                  ),
-                )
-                events2 <- atomically(
-                  persistence.readEvents[DummyEvent](
-                    DummyEvent.discriminator,
-                    ns = None,
-                    hierarchy = Hierarchy.Child(Key(parentIdXXX)).some,
-                    props = None,
-                  ),
-                )
+                } yield assert(events0)(isNonEmpty) && assert(events1)(isNonEmpty) && assert(events2)(
+                  isEmpty,
+                ) && assert(
+                  events0,
+                )(equalTo(events1))
+              )
 
-              } yield assert(events0)(isNonEmpty) && assert(events1)(isNonEmpty) && assert(events2)(isEmpty) && assert(
-                events0,
-              )(equalTo(events1))
-            )
+              e <- (
+                for {
+                  events0 <- atomically(persistence.readEvents[DummyEvent](key, discriminator))
+                  events1 <- atomically(
+                    persistence.readEvents[DummyEvent](
+                      discriminator,
+                      ns = None,
+                      hierarchy = Hierarchy.Child(parentId).some,
+                      props = None,
+                    ),
+                  )
+                  events2 <- atomically(
+                    persistence.readEvents[DummyEvent](
+                      discriminator,
+                      ns = None,
+                      hierarchy = Hierarchy.Child(Key(parentIdXXX)).some,
+                      props = None,
+                    ),
+                  )
 
-          } yield a && b && c && d && e
+                } yield assert(events0)(isNonEmpty) && assert(events1)(isNonEmpty) && assert(events2)(
+                  isEmpty,
+                ) && assert(
+                  events0,
+                )(equalTo(events1))
+              )
+
+            } yield a && b && c && d && e
         }
       },
       test("should save and retrieve events correctly by props") {
-        check(keyGen, versionGen) { (key, version) =>
+        check(keyGen, versionGen, discriminatorGen) { (key, version, discriminator) =>
           for {
             persistence <- ZIO.service[CQRSPersistence]
 
             event = Change(version = version, DummyEvent("test"))
 
-            saveResult <- atomically(persistence.saveEvent(key, DummyEvent.discriminator, event))
+            saveResult <- atomically(persistence.saveEvent(key, discriminator, event))
 
             a = assert(saveResult)(equalTo(1L))
 
-            events0 <- atomically(persistence.readEvents[DummyEvent](key, DummyEvent.discriminator))
+            events0 <- atomically(persistence.readEvents[DummyEvent](key, discriminator))
             events1 <- atomically(
               persistence.readEvents[DummyEvent](
-                DummyEvent.discriminator,
+                discriminator,
                 ns = None,
                 hierarchy = None,
                 props = NonEmptyList(EventProperty("type", "DummyEvent")).some,
@@ -172,7 +180,7 @@ object PostgresCQRSPersistenceSpec extends PgSpec {
             )
             events2 <- atomically(
               persistence.readEvents[DummyEvent](
-                DummyEvent.discriminator,
+                discriminator,
                 ns = None,
                 hierarchy = None,
                 props = NonEmptyList(EventProperty("type", "DummyEventXXX")).some,
@@ -184,42 +192,42 @@ object PostgresCQRSPersistenceSpec extends PgSpec {
         }
       },
       test("should save and retrieve events correctly") {
-        check(keyGen, versionGen) { (key, version) =>
+        check(keyGen, versionGen, discriminatorGen) { (key, version, discriminator) =>
           for {
             persistence <- ZIO.service[CQRSPersistence]
 
             event = Change(version = version, DummyEvent("test"))
 
-            saveResult <- atomically(persistence.saveEvent(key, DummyEvent.discriminator, event))
+            saveResult <- atomically(persistence.saveEvent(key, discriminator, event))
 
             a = assert(saveResult)(equalTo(1L))
 
-            events <- atomically(persistence.readEvents[DummyEvent](key, DummyEvent.discriminator))
+            events <- atomically(persistence.readEvents[DummyEvent](key, discriminator))
             b = assert(events)(isNonEmpty) && assert(events)(equalTo(Chunk(event)))
 
           } yield a && b
         }
       },
       test("should save and retrieve events by namespace correctly") {
-        check(keyGen, versionGen) { (key, version) =>
+        check(keyGen, versionGen, discriminatorGen) { (key, version, discriminator) =>
           for {
             persistence <- ZIO.service[CQRSPersistence]
 
             event = Change(version = version, DummyEvent("test"))
 
-            saveResult <- atomically(persistence.saveEvent(key, DummyEvent.discriminator, event))
+            saveResult <- atomically(persistence.saveEvent(key, discriminator, event))
 
             a = assert(saveResult)(equalTo(1L))
 
             events0 <- atomically(
               persistence
-                .readEvents[DummyEvent](DummyEvent.discriminator, ns = NonEmptyList(Namespace(0)).some, None, None),
+                .readEvents[DummyEvent](discriminator, ns = NonEmptyList(Namespace(0)).some, None, None),
             )
             b = assert(events0)(isNonEmpty)
 
             events1 <- atomically(
               persistence
-                .readEvents[DummyEvent](DummyEvent.discriminator, ns = NonEmptyList(Namespace(1)).some, None, None),
+                .readEvents[DummyEvent](discriminator, ns = NonEmptyList(Namespace(1)).some, None, None),
             )
             c = assert(events1)(isEmpty)
 
@@ -227,7 +235,7 @@ object PostgresCQRSPersistenceSpec extends PgSpec {
         }
       },
       test("should retrieve events in sorted order") {
-        check(keyGen, Gen.listOfN(100)(versionGen)) { (key, versions) =>
+        check(keyGen, Gen.listOfN(100)(versionGen), discriminatorGen) { (key, versions, discriminator) =>
           for {
             persistence <- ZIO.service[CQRSPersistence]
 
@@ -237,14 +245,11 @@ object PostgresCQRSPersistenceSpec extends PgSpec {
 
             _ <- atomically {
               ZIO.foreachDiscard(events) { e =>
-                persistence.saveEvent(key, DummyEvent.discriminator, e)
+                persistence.saveEvent(key, discriminator, e)
               }
             }
 
-            es <- atomically(persistence.readEvents[DummyEvent](key, DummyEvent.discriminator))
-            _ = println()
-            _ = println(es)
-            _ = println()
+            es <- atomically(persistence.readEvents[DummyEvent](key, discriminator))
 
             a = assert(es)(equalTo(es.sorted)) && assert(es)(equalTo(events.sorted))
 
@@ -252,54 +257,55 @@ object PostgresCQRSPersistenceSpec extends PgSpec {
         }
       },
       test("should retrieve events from given version") {
-        check(keyGen, Gen.listOfN(100)(versionGen), Gen.listOfN(100)(versionGen)) { (key, versions, moreVersions) =>
-          for {
-            persistence <- ZIO.service[CQRSPersistence]
+        check(keyGen, Gen.listOfN(100)(versionGen), Gen.listOfN(100)(versionGen), discriminatorGen) {
+          (key, versions, moreVersions, discriminator) =>
+            for {
+              persistence <- ZIO.service[CQRSPersistence]
 
-            events = versions.zipWithIndex.map { case (version, i) =>
-              Change(version = version, payload = DummyEvent(s"${i + 1}"))
-            }
-
-            _ <- atomically {
-              ZIO.foreachDiscard(events) { e =>
-                persistence.saveEvent(key, DummyEvent.discriminator, e)
+              events = versions.zipWithIndex.map { case (version, i) =>
+                Change(version = version, payload = DummyEvent(s"${i + 1}"))
               }
-            }
 
-            es <- atomically(persistence.readEvents[DummyEvent](key, DummyEvent.discriminator))
-
-            a = assert((es))(equalTo((events.sorted)))
-
-            max = es.maxBy(_.version)
-
-            es1 <- atomically(
-              persistence.readEvents[DummyEvent](key, DummyEvent.discriminator, snapshotVersion = max.version),
-            )
-
-            b = assert(es1)(isEmpty)
-
-            events1 = moreVersions.zipWithIndex.map { case (version, i) =>
-              Change(version = version, payload = DummyEvent(s"${i + 1}"))
-            }
-
-            _ <- atomically {
-              ZIO.foreachDiscard(events1) { e =>
-                persistence.saveEvent(key, DummyEvent.discriminator, e)
+              _ <- atomically {
+                ZIO.foreachDiscard(events) { e =>
+                  persistence.saveEvent(key, discriminator, e)
+                }
               }
-            }
 
-            es2 <- atomically(
-              persistence.readEvents[DummyEvent](key, DummyEvent.discriminator, snapshotVersion = max.version),
-            )
+              es <- atomically(persistence.readEvents[DummyEvent](key, discriminator))
 
-            c = assert(es2)(equalTo(events1.sorted))
+              a = assert((es))(equalTo((events.sorted)))
 
-            max1 = es2.maxBy(_.version)
-            es3 <- atomically(
-              persistence.readEvents[DummyEvent](key, DummyEvent.discriminator, snapshotVersion = max1.version),
-            )
-            d = assert(es3)(isEmpty)
-          } yield a && b && c && d
+              max = es.maxBy(_.version)
+
+              es1 <- atomically(
+                persistence.readEvents[DummyEvent](key, discriminator, snapshotVersion = max.version),
+              )
+
+              b = assert(es1)(isEmpty)
+
+              events1 = moreVersions.zipWithIndex.map { case (version, i) =>
+                Change(version = version, payload = DummyEvent(s"${i + 1}"))
+              }
+
+              _ <- atomically {
+                ZIO.foreachDiscard(events1) { e =>
+                  persistence.saveEvent(key, discriminator, e)
+                }
+              }
+
+              es2 <- atomically(
+                persistence.readEvents[DummyEvent](key, discriminator, snapshotVersion = max.version),
+              )
+
+              c = assert(es2)(equalTo(events1.sorted))
+
+              max1 = es2.maxBy(_.version)
+              es3 <- atomically(
+                persistence.readEvents[DummyEvent](key, discriminator, snapshotVersion = max1.version),
+              )
+              d = assert(es3)(isEmpty)
+            } yield a && b && c && d
         }
       },
       test("should handle snapshot storage correctly") {
@@ -332,9 +338,9 @@ object PostgresCQRSPersistenceSpec extends PgSpec {
         }
       },
       test("read all events is optimized") {
-        check(keyGen) { key =>
+        check(keyGen, discriminatorGen) { (key, discriminator) =>
 
-          val query = PostgresCQRSPersistence.Queries.READ_EVENTS[DummyEvent](key, DummyEvent.discriminator)
+          val query = PostgresCQRSPersistence.Queries.READ_EVENTS[DummyEvent](key, discriminator)
           for {
 
             executionTime <- atomically(query.selectAll).timed.map(_._1)
@@ -347,8 +353,8 @@ object PostgresCQRSPersistenceSpec extends PgSpec {
         }
       },
       test("read snapshot events is optimized") {
-        check(keyGen, versionGen) { case (key, version) =>
-          val query = PostgresCQRSPersistence.Queries.READ_EVENTS[DummyEvent](key, DummyEvent.discriminator, version)
+        check(keyGen, versionGen, discriminatorGen) { case (key, version, discriminator) =>
+          val query = PostgresCQRSPersistence.Queries.READ_EVENTS[DummyEvent](key, discriminator, version)
           for {
 
             executionTime <- atomically(query.selectAll).timed.map(_._1)
@@ -361,11 +367,11 @@ object PostgresCQRSPersistenceSpec extends PgSpec {
         }
       },
       test("read all events by args is optimized") {
-        check(Gen.option(namespacesGen), Gen.option(hierarchyGen), Gen.option(eventPropertiesGen)) {
-          case (ns, hierarchy, props) =>
+        check(Gen.option(namespacesGen), Gen.option(hierarchyGen), Gen.option(eventPropertiesGen), discriminatorGen) {
+          case (ns, hierarchy, props, discriminator) =>
             val query =
               PostgresCQRSPersistence.Queries
-                .READ_EVENTS[DummyEvent](DummyEvent.discriminator, ns, hierarchy, props)
+                .READ_EVENTS[DummyEvent](discriminator, ns, hierarchy, props)
             for {
 
               executionTime <- atomically(query.selectAll).timed.map(_._1)
@@ -378,37 +384,40 @@ object PostgresCQRSPersistenceSpec extends PgSpec {
         }
       },
       test("read snapshot events by args is optimized") {
-        check(versionGen, Gen.option(namespacesGen), Gen.option(hierarchyGen), Gen.option(eventPropertiesGen)) {
-          case (version, ns, hierarchy, props) =>
-            val query =
-              PostgresCQRSPersistence.Queries
-                .READ_EVENTS[DummyEvent](DummyEvent.discriminator, version, ns, hierarchy, props)
-            for {
+        check(
+          versionGen,
+          Gen.option(namespacesGen),
+          Gen.option(hierarchyGen),
+          Gen.option(eventPropertiesGen),
+          discriminatorGen,
+        ) { case (version, ns, hierarchy, props, discriminator) =>
+          val query =
+            PostgresCQRSPersistence.Queries
+              .READ_EVENTS[DummyEvent](discriminator, version, ns, hierarchy, props)
+          for {
 
-              executionTime <- atomically(query.selectAll).timed.map(_._1)
-              timeAssertion = assert(executionTime.toMillis)(isLessThanEqualTo(100L))
+            executionTime <- atomically(query.selectAll).timed.map(_._1)
+            timeAssertion = assert(executionTime.toMillis)(isLessThanEqualTo(100L))
 
-              executionPlan <- atomically(query.sql.getExecutionPlan)
-              planAssertion = assert(executionPlan)(containsString("Index Scan"))
+            executionPlan <- atomically(query.sql.getExecutionPlan)
+            planAssertion = assert(executionPlan)(containsString("Index Scan"))
 
-            } yield planAssertion && timeAssertion
+          } yield planAssertion && timeAssertion
         }
       },
     ).provideSomeLayerShared(
       PostgresCQRSPersistence.live(),
-    ) @@ TestAspect.sequential @@ TestAspect.withLiveClock @@ TestAspect.beforeAll {
+    ) @@ TestAspect.withLiveClock @@ TestAspect.beforeAll {
       for {
         config <- ZIO.service[DatabaseConfig]
         _ <- FlywayMigration.run(config)
 
       } yield ()
 
-    } @@ TestAspect.after {
-      val q = SqlFragment.deleteFrom("events").delete
+    }
 
-      atomically(q)
-
-    } @@ TestAspect.ignore
+  val discriminatorGen: Gen[Any, Discriminator] =
+    Gen.alphaNumericStringBounded(5, 5).map(Discriminator(_))
 
   val keyGen: Gen[Any, Key] = Gen.fromZIO(Key.gen.orDie)
   val versionGen: Gen[Any, Version] = Gen.fromZIO(Version.gen.orDie)

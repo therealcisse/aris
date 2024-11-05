@@ -39,7 +39,6 @@
     </appender>
 
     <!-- Root Logger Configuration -->
-    <!-- <root level="${YOUTOO_LOG_LEVEL:-DEBUG}"> -->
     <root level="${LOG_LEVEL}">
         <appender-ref ref="CONSOLE"/>
         <!-- <appender-ref ref="ROLLING_FILE"/> -->

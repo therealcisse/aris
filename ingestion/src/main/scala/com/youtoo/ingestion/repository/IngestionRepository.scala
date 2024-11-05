@@ -55,9 +55,8 @@ object IngestionRepository {
 
   object Queries extends JdbcCodecs {
     given JdbcDecoder[Ingestion.Status] = byteArrayDecoder[Ingestion.Status]
+
     given JdbcDecoder[Ingestion.Id] = JdbcDecoder[Long].map(n => Ingestion.Id(Key(n)))
-    given JdbcDecoder[Key] = JdbcDecoder[Long].map(Key.apply)
-    given JdbcDecoder[Timestamp] = JdbcDecoder[Long].map(long => Timestamp(long))
 
     given SqlFragment.Setter[Ingestion.Id] = SqlFragment.Setter[Long].contramap(_.asKey.value)
 

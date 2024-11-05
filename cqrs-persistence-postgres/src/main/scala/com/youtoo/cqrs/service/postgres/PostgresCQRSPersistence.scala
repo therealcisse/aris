@@ -11,7 +11,6 @@ import zio.schema.codec.*
 
 import zio.prelude.*
 
-import com.youtoo.cqrs.Codecs.given
 import java.nio.charset.StandardCharsets
 
 trait PostgresCQRSPersistence extends CQRSPersistence {}
@@ -71,9 +70,10 @@ object PostgresCQRSPersistence {
     }
 
   object Queries extends JdbcCodecs {
-    given [E: BinaryCodec]: JdbcDecoder[E] = byteArrayDecoder[E]
 
     def READ_EVENTS[Event: BinaryCodec](id: Key, discriminator: Discriminator): Query[Change[Event]] =
+      given JdbcDecoder[Event] = byteArrayDecoder[Event]
+
       sql"""
       SELECT
         version,
@@ -88,6 +88,8 @@ object PostgresCQRSPersistence {
       discriminator: Discriminator,
       snapshotVersion: Version,
     ): Query[Change[Event]] =
+      given JdbcDecoder[Event] = byteArrayDecoder[Event]
+
       sql"""
       SELECT
         version,
@@ -103,6 +105,7 @@ object PostgresCQRSPersistence {
       hierarchy: Option[Hierarchy],
       props: Option[NonEmptyList[EventProperty]],
     ): Query[Change[Event]] =
+      given JdbcDecoder[Event] = byteArrayDecoder[Event]
 
       @scala.annotation.tailrec
       def propsQuery(
@@ -144,6 +147,8 @@ object PostgresCQRSPersistence {
       hierarchy: Option[Hierarchy],
       props: Option[NonEmptyList[EventProperty]],
     ): Query[Change[Event]] =
+      given JdbcDecoder[Event] = byteArrayDecoder[Event]
+
       @scala.annotation.tailrec
       def propsQuery(
         props: Option[NonEmptyList[EventProperty]],

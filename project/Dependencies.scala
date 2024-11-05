@@ -29,6 +29,7 @@ object Dependencies {
 
   val `slf4j-api` = "org.slf4j" % "slf4j-api" % "2.0.13"
   val `slf4j-simple` = "org.slf4j" % "slf4j-simple" % "2.0.13"
+  val `slf4j-log4j12` = "org.slf4j" % "slf4j-log4j12" % "2.0.16"
 
   val `postgres-driver` = "org.postgresql" % "postgresql" % PostgresVersion
 
@@ -83,4 +84,6 @@ object Dependencies {
   val junit = "junit" % "junit" % "4.13.2" % Test
   val `junit-interface` = "com.novocode" % "junit-interface" % "0.11" % Test
   val `junit-jupiter` = "org.junit.jupiter" % "junit-jupiter-api" % "5.11.3" % Test
+
+  val netty = "io.netty" % "netty-all" % "4.1.92.Final"
 }

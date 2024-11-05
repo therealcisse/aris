@@ -58,9 +58,8 @@ object MigrationRepository {
 
   object Queries extends JdbcCodecs {
     given JdbcDecoder[Migration.State] = byteArrayDecoder[Migration.State]
+
     given JdbcDecoder[Migration.Id] = JdbcDecoder[Long].map(s => Migration.Id(Key(s)))
-    given JdbcDecoder[Key] = JdbcDecoder[Long].map(Key.apply)
-    given JdbcDecoder[Timestamp] = JdbcDecoder[Long].map(Timestamp.apply)
 
     given SqlFragment.Setter[Migration.Id] = SqlFragment.Setter[Long].contramap(_.asKey.value)
 
