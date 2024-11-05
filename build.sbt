@@ -62,7 +62,6 @@ lazy val kernel = (project in file("kernel"))
   .settings(buildInfoSettings("youtoo"))
   .enablePlugins(BuildInfoPlugin)
   .settings(
-    testFrameworks += new TestFramework("com.novocode.junit.JUnitFramework"),
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
     libraryDependencies ++= Seq(
       `scala-collection-contrib`,
@@ -70,9 +69,6 @@ lazy val kernel = (project in file("kernel"))
       `slf4j-api`,
       `slf4j-simple`,
       `slf4j-log4j12`,
-      junit,
-      `junit-interface`,
-      `junit-jupiter`,
       zio,
       cats,
       `zio-prelude`,
