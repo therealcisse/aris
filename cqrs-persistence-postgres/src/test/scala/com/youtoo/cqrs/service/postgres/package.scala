@@ -16,6 +16,7 @@ extension (sql: SqlFragment)
         def getSql(sql: SqlFragment) =
           val sb: StringBuilder = StringBuilder()
 
+          @scala.annotation.nowarn
           def go(segments: Chunk[SqlFragment.Segment]): Unit =
             sql.segments.foreach {
               case SqlFragment.Segment.Empty => ()
@@ -38,6 +39,7 @@ extension (sql: SqlFragment)
         def setParams(sql: SqlFragment, statement: PreparedStatement) =
           var paramIndex = 1
 
+          @scala.annotation.nowarn
           def go(segments: Chunk[SqlFragment.Segment]): Unit =
             sql.segments.foreach {
               case SqlFragment.Segment.Empty => ()

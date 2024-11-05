@@ -32,9 +32,8 @@ object IngestionCQRS {
 
   }
 
-  inline def add(id: Key, cmd: IngestionCommand)(using
-    Cmd: IngestionCommandHandler,
-  ): RIO[IngestionCQRS, Unit] = ZIO.serviceWithZIO[IngestionCQRS](_.add(id, cmd)) @@ metrics.addition.trackDuration
+  inline def add(id: Key, cmd: IngestionCommand): RIO[IngestionCQRS, Unit] =
+    ZIO.serviceWithZIO[IngestionCQRS](_.add(id, cmd)) @@ metrics.addition.trackDuration
 
   def live(): ZLayer[
     ZConnectionPool & IngestionEventStore & SnapshotStore &
@@ -55,11 +54,10 @@ object IngestionCQRS {
             strategy <- factory.create(IngestionEvent.discriminator)
 
           } yield new IngestionCQRS {
-            private val Cmd = summon[CmdHandler[IngestionCommand, IngestionEvent]]
 
             def add(id: Key, cmd: IngestionCommand): Task[Unit] =
               atomically {
-                val evnts = Cmd.applyCmd(cmd)
+                val evnts = CmdHandler.applyCmd(cmd)
 
                 ZIO.foreachDiscard(evnts) { e =>
                   for {

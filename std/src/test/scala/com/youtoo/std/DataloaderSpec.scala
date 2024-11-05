@@ -32,7 +32,7 @@ object DataloaderSpec extends ZIOSpecDefault {
         _ <- fiber.join
         calls <- bulkLoader.getCalls
       } yield assert(calls)(hasSize(isWithin(3, 4))) // Expect 3-4 calls given the timing adjustments
-    } @@ TestAspect.ignore,
+    },
     test("should complete promises with Some if found, None if not found") {
       for {
         bulkLoader <- MockBulkLoader.withData(Map(Key(1L) -> 1L, Key(3L) -> 3L))
@@ -101,7 +101,7 @@ object DataloaderSpec extends ZIOSpecDefault {
           _ <- fiber.join
         } yield assert(calls.size)(equalTo(n))
       }
-    } @@ TestAspect.ignore,
-  ).provideSomeLayerShared[Scope](Dataloader.live())
+    },
+  ).provideSomeLayerShared[Scope](Dataloader.live()) @@ TestAspect.ignore
 
 }
