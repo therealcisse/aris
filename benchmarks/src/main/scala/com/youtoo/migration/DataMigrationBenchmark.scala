@@ -70,7 +70,14 @@ class DataMigrationBenchmark {
   @Benchmark
   def benchmarkDataMigrationFetch(): Unit = execute {
     val layer = deps >+> MockProcessor(table, numRows) ++ migrationLayer
-    DataMigration.run(id).provideLayer(layer)
+
+    (
+      for {
+        f <- DataMigration.run(id).fork
+
+        _ <- f.join
+      } yield ()
+    ).provideLayer(layer)
   }
 
 }
@@ -79,23 +86,22 @@ object DataMigrationBenchmark {
   import zio.logging.*
   import zio.logging.backend.*
 
-  val deps =
-    Runtime.disableFlags(
-      RuntimeFlag.FiberRoots,
-    ) ++ Runtime.enableRuntimeMetrics ++ Runtime.enableAutoBlockingExecutor ++ Runtime.enableFlags(
-      RuntimeFlag.EagerShiftBack,
-    ) ++ Runtime.removeDefaultLoggers >>> SLF4J.slf4j ++ ZLayer
-      .make[MigrationCQRS & FlywayMigration & MigrationService & ZConnectionPool](
-        SnapshotStrategy.live(),
-        DatabaseConfig.pool,
-        SnapshotStore.live(),
-        MigrationEventStore.live(),
-        MigrationRepository.live(),
-        MigrationService.live(),
-        MigrationCQRS.live(),
-        PostgresCQRSPersistence.live(),
-        FlywayMigration.live(),
-      )
+  val deps = Runtime.disableFlags(
+    RuntimeFlag.FiberRoots,
+  ) ++ Runtime.enableRuntimeMetrics ++ Runtime.enableAutoBlockingExecutor ++ Runtime.enableFlags(
+    RuntimeFlag.EagerShiftBack,
+  ) ++ Runtime.removeDefaultLoggers >>> SLF4J.slf4j ++ ZLayer
+    .make[MigrationCQRS & FlywayMigration & MigrationService & ZConnectionPool](
+      SnapshotStrategy.live(),
+      DatabaseConfig.pool,
+      SnapshotStore.live(),
+      MigrationEventStore.live(),
+      MigrationRepository.live(),
+      MigrationService.live(),
+      MigrationCQRS.live(),
+      PostgresCQRSPersistence.live(),
+      FlywayMigration.live(),
+    )
 
   val createMigration: Task[(Migration.Id, String)] =
     for {
@@ -179,12 +185,8 @@ object DataMigrationBenchmark {
     }
 
   class MockInterrupter() extends Interrupter {
-    def watch[R, A](id: Key)(f: Promise[Throwable, Unit] => ZIO[R, Throwable, A]): ZIO[R, Throwable, A] =
-      ZIO.uninterruptibleMask { restore =>
-        Promise.make[Throwable, Unit] flatMap { p =>
-          restore(f(p))
-        }
-      }
+    def watch[R](id: Key): ZIO[R, Throwable, Promise[Throwable, Unit]] =
+      Promise.make[Throwable, Unit]
 
     def interrupt(id: Key): Task[Unit] = ZIO.unit
 

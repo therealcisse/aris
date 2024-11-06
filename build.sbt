@@ -67,8 +67,8 @@ lazy val kernel = (project in file("kernel"))
       `scala-collection-contrib`,
       // pprint,
       `slf4j-api`,
-      `slf4j-simple`,
-      `slf4j-log4j12`,
+      // `slf4j-simple`,
+      // `slf4j-log4j12`,
       zio,
       cats,
       `zio-prelude`,
@@ -177,11 +177,10 @@ lazy val ingestion = (project in file("ingestion"))
     libraryDependencies ++= Seq(
       netty,
       `slf4j-api`,
-      `slf4j-simple`,
-      `slf4j-log4j12`,
+      // `slf4j-simple`,
+      // `slf4j-log4j12`,
       `hadoop-client`,
       `hadoop-aws`,
-      `zio-metrics`,
       `zio-metrics-connectors-prometheus`,
       `testcontainers-scala-postgresql`,
       `zio-test`,
@@ -189,7 +188,7 @@ lazy val ingestion = (project in file("ingestion"))
       `zio-test-magnolia`,
       `zio-mock`,
       `zio-http`,
-      `zio-json`,
+      // `zio-json`,
     ),
   )
 
@@ -230,7 +229,6 @@ lazy val dataMigration = (project in file("data-migration"))
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
     libraryDependencies ++= Seq(
       // `zio-config-typesafe`,
-      `zio-metrics`,
       `zio-metrics-connectors-prometheus`,
       `testcontainers-scala-postgresql`,
       `zio-test`,
@@ -238,7 +236,7 @@ lazy val dataMigration = (project in file("data-migration"))
       `zio-test-magnolia`,
       `zio-mock`,
       `zio-http`,
-      `zio-json`,
+      // `zio-json`,
     ),
   )
 

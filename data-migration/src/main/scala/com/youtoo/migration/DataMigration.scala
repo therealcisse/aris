@@ -75,8 +75,10 @@ object DataMigration {
               IllegalStateException("Migration already processed"),
             )
           else
-            interrupter.watch(migrationKey) { p =>
+            ZIO.scoped {
               for {
+                p <- interrupter.watch(migrationKey)
+
                 h <- healthcheck.start(migrationKey, Schedule.spaced(5.seconds))
 
                 executionId <- ((Execution.Id.gen <&> Timestamp.now) flatMap ((executionId, timestamp) =>
@@ -144,7 +146,6 @@ object DataMigration {
                 _ <- h.stop
 
               } yield ()
-
             }
 
       }
