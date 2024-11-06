@@ -9,7 +9,7 @@ import zio.schema.codec.*
 import com.youtoo.cqrs.Codecs.json.given
 import com.youtoo.ingestion.model.*
 import java.nio.charset.StandardCharsets
-import com.youtoo.ingestion.BenchmarkServer
+import com.youtoo.ingestion.IngestionBenchmarkServer
 
 import zio.prelude.*
 
@@ -19,8 +19,8 @@ class IngestionLoadTest extends Simulation {
   val baseUrl = s"http://localhost:$port"
 
   val numCommandsPerIngestion: Int = Integer.getInteger("numCommandsPerIngestion", 10)
-  val concurrentUsers: Int = Integer.getInteger("concurrentUsers", 10)
-  val testDuration: Int = Integer.getInteger("testDuration", 5)
+  val concurrentUsers: Int = Integer.getInteger("concurrentUsers", 1)
+  val testDuration: Int = Integer.getInteger("testDuration", 60)
 
   val httpProtocol = http
     .baseUrl(baseUrl)
@@ -134,7 +134,7 @@ class IngestionLoadTest extends Simulation {
         val fetchedIds = session("fetchedIds").asOption[Vector[String]].getOrElse(Vector())
         allIds = allIds ++ fetchedIds
 
-        if fetchedIds.size < BenchmarkServer.FetchSize then session.set("offset", "end")
+        if fetchedIds.size < IngestionBenchmarkServer.FetchSize then session.set("offset", "end")
         else
           allIds.minOption match {
             case None => session.set("offset", "end")
@@ -161,8 +161,8 @@ class IngestionLoadTest extends Simulation {
     }
 
   setUp(
-    process.inject(constantUsersPerSec(concurrentUsers) during (testDuration.minutes)),
-    fetch.inject(constantUsersPerSec(concurrentUsers) during (testDuration.minutes)),
+    process.inject(constantUsersPerSec(concurrentUsers) during (testDuration.seconds)),
+    fetch.inject(constantUsersPerSec(concurrentUsers) during (testDuration.seconds)),
   ).protocols(httpProtocol)
 
 }

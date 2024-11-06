@@ -3,6 +3,7 @@
 
 # sbt specific
 .scala-build
+docker.env
 .env
 dist/*
 target/

@@ -103,6 +103,8 @@ object DataloaderSpec extends ZIOSpecDefault {
         } yield assert(calls.size)(equalTo(n))
       }
     },
-  ).provideSomeLayerShared[Scope](Dataloader.live()) @@ TestAspect.timeout(Duration(30L, TimeUnit.SECONDS)) @@ TestAspect.ignore
+  ).provideSomeLayerShared[Scope](Dataloader.live()) @@ TestAspect.timeout(
+    Duration(30L, TimeUnit.SECONDS),
+  ) @@ TestAspect.ignore
 
 }

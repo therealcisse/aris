@@ -18,3 +18,8 @@ extension (body: Body)
       }
 
     } yield a
+
+inline def boundary[R, E, A](tag: String)(effect: ZIO[R, E, A]): ZIO[R, E, A] =
+  effect.tapErrorCause { e =>
+    ZIO.logErrorCause(s"- [$tag] - Found error", e)
+  }

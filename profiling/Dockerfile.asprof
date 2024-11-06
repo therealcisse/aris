@@ -1,0 +1,58 @@
+FROM hseeberger/scala-sbt:eclipse-temurin-17.0.2_1.6.2_3.1.1 AS builder
+
+WORKDIR /youtoo
+
+COPY profiling/src src
+COPY profiling/project project
+COPY profiling/build.sbt build.sbt
+COPY . youtoo-src
+
+RUN sbt stage
+
+FROM eclipse-temurin:17.0.13_11-jdk
+
+ARG PROFILING_DATABASE_URL
+ARG PROFILING_DATABASE_USERNAME
+ARG PROFILING_DATABASE_PASSWORD
+
+ENV DATABASE_URL=${PROFILING_DATABASE_URL}
+ENV DATABASE_USERNAME=${PROFILING_DATABASE_USERNAME}
+ENV DATABASE_PASSWORD=${PROFILING_DATABASE_PASSWORD}
+
+RUN apt-get update && \
+    apt-get install -y wget unzip && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN wget https://github.com/async-profiler/async-profiler/releases/download/v3.0/async-profiler-3.0-linux-arm64.tar.gz -O /tmp/async-profiler.tar.gz && \
+    tar -xzf /tmp/async-profiler.tar.gz -C /opt && \
+    rm /tmp/async-profiler.tar.gz
+
+ENV ASYNC_PROFILER_HOME=/opt/async-profiler-3.0-linux-arm64
+ENV JAVA_OPTS="-agentpath:${ASYNC_PROFILER_HOME}/lib/libasyncProfiler.so -XX:+UnlockDiagnosticVMOptions -XX:+DebugNonSafepoints -XX:+UseG1GC -Xms2G -Xmx2G -server"
+
+HEALTHCHECK --interval=5s --timeout=3s --start-period=30s --retries=3 \
+  CMD curl --silent --fail http://localhost:8181/health || exit 1
+
+COPY profiling/start-profiling_cpu.sh /start-profiling_cpu.sh
+COPY profiling/start-profiling_alloc.sh /start-profiling_alloc.sh
+COPY profiling/start-profiling_wall.sh /start-profiling_wall.sh
+
+COPY profiling/status-profiling.sh /status-profiling.sh
+
+COPY profiling/stop-profiling.sh /stop-profiling.sh
+
+RUN chmod +x /start-profiling_cpu.sh
+RUN chmod +x /start-profiling_alloc.sh
+RUN chmod +x /start-profiling_wall.sh
+RUN chmod +x /stop-profiling.sh
+RUN chmod +x /status-profiling.sh
+
+RUN mkdir -p /output
+
+WORKDIR /youtoo
+COPY --from=builder /youtoo/target/universal/stage /youtoo
+
+EXPOSE 8181
+
+CMD ["./bin/youtoo-profiling"]
+

@@ -33,7 +33,7 @@ import zio.schema.codec.BinaryCodec
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.TimeUnit
 
-object BenchmarkServer extends ZIOApp {
+object IngestionBenchmarkServer extends ZIOApp {
   import com.youtoo.cqrs.Codecs.json.given
 
   inline val FetchSize = 1_000L
@@ -80,10 +80,11 @@ object BenchmarkServer extends ZIOApp {
 
   val routes: Routes[Environment, Response] = Routes(
     Method.GET / "metrics" -> handler(ZIO.serviceWithZIO[PrometheusPublisher](_.get.map(Response.text))),
+    Method.GET / "health" -> handler((_: Request) => Response.ok),
     Method.POST / "dataload" / "ingestion" -> handler { (req: Request) =>
-      req.body.fromBody[List[Key]] foldZIO (
-        failure = _ => ZIO.succeed(Response.notFound),
-        success = ids =>
+      boundary("POST /dataload/ingestion") {
+
+        req.body.fromBody[List[Key]] flatMap (ids =>
           for {
             ingestions <- ZIO.foreachPar(ids) { key =>
               IngestionService.load(Ingestion.Id(key))
@@ -102,93 +103,101 @@ object BenchmarkServer extends ZIOApp {
             )
 
           } yield resp,
-      )
+        )
+      }
 
     },
     Method.GET / "ingestion" -> handler { (req: Request) =>
-      val offset = req.queryParamTo[Long]("offset").toOption
-      val limit = req.queryParamToOrElse[Long]("limit", FetchSize)
+      boundary("GET /ingestion") {
+        val offset = req.queryParamTo[Long]("offset").toOption
+        val limit = req.queryParamToOrElse[Long]("limit", FetchSize)
 
-      atomically {
+        atomically {
 
-        IngestionService.loadMany(offset = offset.map(Key.apply), limit) map { ids =>
-          val bytes = String(summon[BinaryCodec[Chunk[Key]]].encode(ids).toArray, StandardCharsets.UTF_8.name)
+          IngestionService.loadMany(offset = offset.map(Key.apply), limit) map { ids =>
+            val bytes = String(summon[BinaryCodec[Chunk[Key]]].encode(ids).toArray, StandardCharsets.UTF_8.name)
 
-          val nextOffset =
-            (if ids.size < limit then None else ids.minOption).map(id => s""","nextOffset":"$id"""").getOrElse("")
+            val nextOffset =
+              (if ids.size < limit then None else ids.minOption).map(id => s""","nextOffset":"$id"""").getOrElse("")
 
-          Response(
-            Status.Ok,
-            Headers(Header.ContentType(MediaType.application.json).untyped),
-            Body.fromCharSequence(s"""{"ids":$bytes$nextOffset}"""),
-          )
+            Response(
+              Status.Ok,
+              Headers(Header.ContentType(MediaType.application.json).untyped),
+              Body.fromCharSequence(s"""{"ids":$bytes$nextOffset}"""),
+            )
+
+          }
 
         }
-
       }
 
     },
     Method.GET / "ingestion" / long("id") -> handler { (id: Long, req: Request) =>
-      val key = Key(id)
+      boundary(s"GET /ingestion/$id") {
+        val key = Key(id)
 
-      IngestionService.load(Ingestion.Id(key)) map {
-        case Some(ingestion) =>
-          val bytes = summon[BinaryCodec[Ingestion]].encode(ingestion)
+        IngestionService.load(Ingestion.Id(key)) map {
+          case Some(ingestion) =>
+            val bytes = summon[BinaryCodec[Ingestion]].encode(ingestion)
 
-          Response(
-            Status.Ok,
-            Headers(Header.ContentType(MediaType.application.json).untyped),
-            Body.fromChunk(bytes),
-          )
+            Response(
+              Status.Ok,
+              Headers(Header.ContentType(MediaType.application.json).untyped),
+              Body.fromChunk(bytes),
+            )
 
-        case None => Response.notFound
+          case None => Response.notFound
+        }
       }
 
     },
     Method.PUT / "ingestion" / long("id") -> handler { (id: Long, req: Request) =>
-      val key = Key(id)
+      boundary(s"GET /ingestion/$id") {
+        val key = Key(id)
 
-      req.body.fromBody[IngestionCommand] foldZIO (
-        failure = _ => ZIO.succeed(Response.notFound),
-        success = cmd => IngestionCQRS.add(key, cmd) `as` Response.ok
-      )
+        req.body.fromBody[IngestionCommand] flatMap (cmd => IngestionCQRS.add(key, cmd) `as` Response.ok)
+      }
 
     },
     Method.GET / "ingestion" / long("id") / "validate" -> handler { (id: Long, req: Request) =>
-      val numFiles = req.queryParamTo[Long]("numFiles")
-      val status = req.queryParamToOrElse[String]("status", "initial")
+      boundary(s"GET /ingestion/$id/validate") {
+        val numFiles = req.queryParamTo[Long]("numFiles")
+        val status = req.queryParamToOrElse[String]("status", "initial")
 
-      numFiles match {
-        case Left(_) => ZIO.succeed(Response.notFound)
-        case Right(n) =>
-          IngestionService.load(id = Ingestion.Id(Key(id))) map {
-            case None => Response.notFound
-            case Some(ingestion) =>
-              if ingestion.status.totalFiles.fold(false)(_.size == n) && (ingestion.status is status) then Response.ok
-              else Response.notFound
-          }
+        numFiles match {
+          case Left(_) => ZIO.succeed(Response.notFound)
+          case Right(n) =>
+            IngestionService.load(id = Ingestion.Id(Key(id))) map {
+              case None => Response.notFound
+              case Some(ingestion) =>
+                if ingestion.status.totalFiles.fold(false)(_.size == n) && (ingestion.status is status) then Response.ok
+                else Response.notFound
+            }
 
+        }
       }
 
     },
     Method.POST / "ingestion" -> handler {
 
-      for {
-        id <- Ingestion.Id.gen
+      boundary(s"POST /ingestion") {
+        for {
+          id <- Ingestion.Id.gen
 
-        timestamp <- Timestamp.now
+          timestamp <- Timestamp.now
 
-        _ <- IngestionCQRS.add(id.asKey, IngestionCommand.StartIngestion(id, timestamp))
+          _ <- IngestionCQRS.add(id.asKey, IngestionCommand.StartIngestion(id, timestamp))
 
-        opt <- IngestionService.load(id)
+          opt <- IngestionService.load(id)
 
-        _ <- opt.fold(ZIO.unit) { ingestion =>
-          atomically {
-            IngestionService.save(ingestion)
+          _ <- opt.fold(ZIO.unit) { ingestion =>
+            atomically {
+              IngestionService.save(ingestion)
+            }
           }
-        }
 
-      } yield Response.json(s"""{"id":"$id"}""")
+        } yield Response.json(s"""{"id":"$id"}""")
+      }
 
     },
   ).sandbox

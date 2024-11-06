@@ -36,7 +36,7 @@ import zio.schema.codec.BinaryCodec
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.TimeUnit
 
-object BenchmarkServer extends ZIOApp {
+object MigrationBenchmarkServer extends ZIOApp {
   import com.youtoo.cqrs.Codecs.json.given
 
   inline val FetchSize = 1_000L
@@ -87,113 +87,126 @@ object BenchmarkServer extends ZIOApp {
   val routes: Routes[Environment & Scope, Response] = Routes(
     Method.GET / "metrics" -> handler(ZIO.serviceWithZIO[PrometheusPublisher](_.get.map(Response.text))),
     Method.POST / "dataload" / "migration" -> handler { (req: Request) =>
-      req.body.fromBody[List[Key]] foldZIO (
-        failure = _ => ZIO.succeed(Response.notFound),
-        success = ids =>
-          for {
-            ingestions <- ZIO.foreachPar(ids) { key =>
-              MigrationService.load(Migration.Id(key))
-            }
+      boundary("POST /dataload/migration") {
+        req.body.fromBody[List[Key]] foldZIO (
+          failure = _ => ZIO.succeed(Response.notFound),
+          success = ids =>
+            for {
+              ingestions <- ZIO.foreachPar(ids) { key =>
+                MigrationService.load(Migration.Id(key))
+              }
 
-            ins = ingestions.mapFilter(identity)
+              ins = ingestions.mapFilter(identity)
 
-            bytes = ins
-              .map(in => String(summon[BinaryCodec[Migration]].encode(in).toArray, StandardCharsets.UTF_8.name))
-              .mkString("[", ",", "]")
+              bytes = ins
+                .map(in => String(summon[BinaryCodec[Migration]].encode(in).toArray, StandardCharsets.UTF_8.name))
+                .mkString("[", ",", "]")
 
-            resp = Response(
-              Status.Ok,
-              Headers(Header.ContentType(MediaType.application.json).untyped),
-              Body.fromCharSequence(s"""{"ingestions":$bytes}"""),
-            )
+              resp = Response(
+                Status.Ok,
+                Headers(Header.ContentType(MediaType.application.json).untyped),
+                Body.fromCharSequence(s"""{"ingestions":$bytes}"""),
+              )
 
-          } yield resp,
-      )
-
-    },
-    Method.GET / "migration" -> handler { (req: Request) =>
-      val offset = req.queryParamTo[Long]("offset").toOption
-      val limit = req.queryParamToOrElse[Long]("limit", FetchSize)
-
-      atomically {
-
-        MigrationService.loadMany(offset = offset.map(Key.apply), limit) map { ids =>
-          val bytes = String(summon[BinaryCodec[Chunk[Key]]].encode(ids).toArray, StandardCharsets.UTF_8.name)
-
-          val nextOffset =
-            (if ids.size < limit then None else ids.minOption).map(id => s""","nextOffset":"$id"""").getOrElse("")
-
-          Response(
-            Status.Ok,
-            Headers(Header.ContentType(MediaType.application.json).untyped),
-            Body.fromCharSequence(s"""{"ids":$bytes$nextOffset}"""),
-          )
-
-        }
+            } yield resp,
+        )
 
       }
 
     },
+    Method.GET / "migration" -> handler { (req: Request) =>
+      boundary("GET /migration") {
+        val offset = req.queryParamTo[Long]("offset").toOption
+        val limit = req.queryParamToOrElse[Long]("limit", FetchSize)
+
+        atomically {
+
+          MigrationService.loadMany(offset = offset.map(Key.apply), limit) map { ids =>
+            val bytes = String(summon[BinaryCodec[Chunk[Key]]].encode(ids).toArray, StandardCharsets.UTF_8.name)
+
+            val nextOffset =
+              (if ids.size < limit then None else ids.minOption).map(id => s""","nextOffset":"$id"""").getOrElse("")
+
+            Response(
+              Status.Ok,
+              Headers(Header.ContentType(MediaType.application.json).untyped),
+              Body.fromCharSequence(s"""{"ids":$bytes$nextOffset}"""),
+            )
+
+          }
+
+        }
+      }
+
+    },
     Method.GET / "migration" / long("id") -> handler { (id: Long, req: Request) =>
-      val key = Key.wrap(id)
+      boundary(s"GET /migration/$id") {
+        val key = Key(id)
 
-      MigrationService.load(Migration.Id(key)) map {
-        case Some(migration) =>
-          val bytes = summon[BinaryCodec[Migration]].encode(migration)
+        MigrationService.load(Migration.Id(key)) map {
+          case Some(migration) =>
+            val bytes = summon[BinaryCodec[Migration]].encode(migration)
 
-          Response(
-            Status.Ok,
-            Headers(Header.ContentType(MediaType.application.json).untyped),
-            Body.fromChunk(bytes),
-          )
+            Response(
+              Status.Ok,
+              Headers(Header.ContentType(MediaType.application.json).untyped),
+              Body.fromChunk(bytes),
+            )
 
-        case None => Response.notFound
+          case None => Response.notFound
+        }
       }
 
     },
     Method.POST / "migration" -> handler {
 
-      for {
-        id <- Key.gen
+      boundary("POST /migration") {
+        for {
+          id <- Key.gen
 
-        timestamp <- Timestamp.now
+          timestamp <- Timestamp.now
 
-        _ <- MigrationCQRS.add(id, MigrationCommand.RegisterMigration(Migration.Id(id), timestamp))
+          _ <- MigrationCQRS.add(id, MigrationCommand.RegisterMigration(Migration.Id(id), timestamp))
 
-        opt <- MigrationService.load(Migration.Id(id))
+          opt <- MigrationService.load(Migration.Id(id))
 
-        _ <- opt.fold(ZIO.unit) { migration =>
-          atomically {
-            MigrationService.save(migration)
+          _ <- opt.fold(ZIO.unit) { migration =>
+            atomically {
+              MigrationService.save(migration)
+            }
+          }
+
+        } yield Response.json(s"""{"id":"$id"}""")
+
+      }
+    },
+    Method.POST / "migration" / long("id") / "run" -> handler { (id: Long, req: Request) =>
+      boundary(s"POST /migration/$id/run") {
+        val numKeys = req.queryParamToOrElse[Long]("numKeys", 10L)
+
+        val processor: ZLayer[Any, Nothing, DataMigration.Processor] = ZLayer.succeed {
+
+          new DataMigration.Processor {
+            def count(): Task[Long] = ZIO.succeed(numKeys)
+            def load(): ZStream[Any, Throwable, Key] = ZStream((0L until numKeys).map(i => Key(i))*)
+            def process(key: Key): Task[Unit] = ZIO.logInfo(s"Processed $key")
+
           }
         }
 
-      } yield Response.json(s"""{"id":"$id"}""")
+        val op =
+          DataMigration
+            .run(id = Migration.Id(Key(id)))
+            .provideSomeLayer[MigrationCQRS & DataMigration & MigrationService & Scope](processor)
 
-    },
-    Method.POST / "migration" / long("id") / "run" -> handler { (id: Long, req: Request) =>
-      val numKeys = req.queryParamToOrElse[Long]("numKeys", 10L)
-
-      val processor: ZLayer[Any, Nothing, DataMigration.Processor] = ZLayer.succeed {
-
-        new DataMigration.Processor {
-          def count(): Task[Long] = ZIO.succeed(numKeys)
-          def load(): ZStream[Any, Throwable, Key] = ZStream((0L until numKeys).map(i => Key(i))*)
-          def process(key: Key): Task[Unit] = ZIO.logInfo(s"Processed $key")
-
-        }
+        op `as` Response.ok
       }
-
-      val op =
-        DataMigration
-          .run(id = Migration.Id(Key(id)))
-          .provideSomeLayer[MigrationCQRS & DataMigration & MigrationService & Scope](processor)
-
-      op `as` Response.ok
 
     },
     Method.DELETE / "migration" / long("id") / "stop" -> handler { (id: Long, req: Request) =>
-      Interrupter.interrupt(id = Key(id)) `as` Response.ok
+      boundary(s"DELETE /migration/$id/stop") {
+        Interrupter.interrupt(id = Key(id)) `as` Response.ok
+      }
 
     },
   ).sandbox

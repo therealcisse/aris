@@ -18,3 +18,8 @@ extension (body: Body)
       }
 
     } yield a
+
+inline def boundary[R, E](tag: String)(effect: ZIO[R, E, Response]): ZIO[R, Nothing, Response] =
+  effect.catchAllCause { e =>
+    ZIO.logErrorCause(s"- [$tag] - Found error", e) `as` Response.notFound
+  }

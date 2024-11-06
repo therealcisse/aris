@@ -9,6 +9,9 @@ lazy val postgres = ProjectRef(file("/youtoo/youtoo-src"), "postgres")
 lazy val ingestion = ProjectRef(file("/youtoo/youtoo-src"), "ingestion")
 lazy val migration = ProjectRef(file("/youtoo/youtoo-src"), "dataMigration")
 
+ThisBuild / scalacOptions += "-g:source"
+ThisBuild / javacOptions += "-g"
+
 lazy val root = (project in file("."))
   .settings(
     name := "youtoo-profiling",

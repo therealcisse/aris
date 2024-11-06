@@ -1,9 +1,5 @@
 FROM hseeberger/scala-sbt:eclipse-temurin-17.0.2_1.6.2_3.1.1 AS builder
 
-RUN wget https://www.yourkit.com/download/docker/YourKit-JavaProfiler-2024.9-docker.zip -P /tmp/ && \
-    unzip /tmp/YourKit-JavaProfiler-2024.9-docker.zip -d /usr/local && \
-    rm /tmp/YourKit-JavaProfiler-2024.9-docker.zip
-
 WORKDIR /youtoo
 
 COPY profiling/src src
@@ -13,7 +9,7 @@ COPY . youtoo-src
 
 RUN sbt stage
 
-FROM eclipse-temurin:17-jre-slim
+FROM eclipse-temurin:17.0.13_11-jre
 
 ARG PROFILING_DATABASE_URL
 ARG PROFILING_DATABASE_USERNAME
@@ -23,14 +19,19 @@ ENV DATABASE_URL=${PROFILING_DATABASE_URL}
 ENV DATABASE_USERNAME=${PROFILING_DATABASE_USERNAME}
 ENV DATABASE_PASSWORD=${PROFILING_DATABASE_PASSWORD}
 
-COPY --from=builder /usr/local/YourKit-JavaProfiler-2024.9 /usr/local/YourKit-JavaProfiler-2024.9
-ARG ARCH
-ENV JAVA_OPTS="-agentpath:/usr/local/YourKit-JavaProfiler-2024.9/bin/${ARCH}/libyjpagent.so=port=10001,listen=all,sampling -XX:+UseG1GC -Xms2G -Xmx2G -server "
+RUN mkdir -p /datadog && \
+    wget -O /datadog/dd-java-agent.jar https://dtdg.co/latest-java-tracer
+
+ENV DD_AGENT_HOST=datadog-agent
+ENV DD_ENV=production
+ENV DD_SERVICE=youtoo-profiling
+ENV DD_VERSION=1.0.0
+
+ENV JAVA_OPTS="-Ddd.agent.host=$DD_AGENT_HOST -javaagent:/datadog/dd-java-agent.jar -XX:+UseG1GC -Xms2G -Xmx2G -server -Ddd.profiling.enabled=true -Ddd.integration.zio.experimental.enabled=true -Ddd.integration.throwables.enabled=false"
 
 WORKDIR /youtoo
 COPY --from=builder /youtoo/target/universal/stage /youtoo
 
 EXPOSE 8181
-EXPOSE 10001
 
 CMD ["./bin/youtoo-profiling"]

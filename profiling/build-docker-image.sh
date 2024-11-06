@@ -29,11 +29,11 @@ fi
 case "$1" in
   ingestion)
     echo "Building ingestion"
-    cp ../ingestion/src/main/scala/com/youtoo/ingestion/BenchmarkServer.scala ./src/main/scala/com/youtoo/Main.scala
+    cp ../ingestion/src/main/scala/com/youtoo/ingestion/IngestionBenchmarkServer.scala ./src/main/scala/com/youtoo/Main.scala
     ;;
   migration)
     echo "Building migration"
-    cp ../data-migration/src/main/scala/com/youtoo/migration/BenchmarkServer.scala ./src/main/scala/com/youtoo/Main.scala
+    cp ../data-migration/src/main/scala/com/youtoo/migration/MigratonBenchmarkServer.scala ./src/main/scala/com/youtoo/Main.scala
     ;;
   *)
     echo "Invalid option: $1"
@@ -45,6 +45,6 @@ esac
 
 cd "$(dirname "$0")/../"
 BUILD_ARGS=$(grep -v '^#' .env | xargs -I {} echo --build-arg {} | xargs)
-docker build $BUILD_ARGS -f ./profiling/Dockerfile --build-arg ARCH=$ARCH -t $TAG .
+docker build $BUILD_ARGS --platform linux/arm64 -f ./profiling/Dockerfile.asprof --build-arg ARCH=$ARCH -t $TAG .
 docker tag $TAG youtoo-profiling:latest
 
