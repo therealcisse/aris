@@ -91,6 +91,7 @@ lazy val core = (project in file("cqrs-core"))
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
     libraryDependencies ++= Seq(
       // pprint,
+      `slf4j-api`,
       `zio-logging`,
       `zio-logging-slf4j2`,
       logback,
@@ -176,9 +177,13 @@ lazy val ingestion = (project in file("ingestion"))
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
     libraryDependencies ++= Seq(
       netty,
-      `slf4j-api`,
       // `slf4j-simple`,
       // `slf4j-log4j12`,
+      `slf4j-api`,
+      `zio-logging`,
+      `zio-logging-slf4j2`,
+      logback,
+
       `hadoop-client`,
       `hadoop-aws`,
       `zio-metrics-connectors-prometheus`,
@@ -228,6 +233,10 @@ lazy val dataMigration = (project in file("data-migration"))
   .settings(
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
     libraryDependencies ++= Seq(
+      // `slf4j-api`,
+      // `zio-logging`,
+      `zio-logging-slf4j2`,
+      // logback,
       // `zio-config-typesafe`,
       `zio-metrics-connectors-prometheus`,
       `testcontainers-scala-postgresql`,

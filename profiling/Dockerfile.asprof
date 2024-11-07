@@ -28,7 +28,7 @@ RUN wget https://github.com/async-profiler/async-profiler/releases/download/v3.0
     rm /tmp/async-profiler.tar.gz
 
 ENV ASYNC_PROFILER_HOME=/opt/async-profiler-3.0-linux-arm64
-ENV JAVA_OPTS="-agentpath:${ASYNC_PROFILER_HOME}/lib/libasyncProfiler.so -XX:+UnlockDiagnosticVMOptions -XX:+DebugNonSafepoints -XX:+UseG1GC -Xms2G -Xmx2G -server"
+ENV JAVA_OPTS="-agentpath:${ASYNC_PROFILER_HOME}/lib/libasyncProfiler.so -XX:+UnlockDiagnosticVMOptions -XX:+DebugNonSafepoints -XX:+UseG1GC -Xms4G -Xmx2G -server"
 
 HEALTHCHECK --interval=5s --timeout=3s --start-period=30s --retries=3 \
   CMD curl --silent --fail http://localhost:8181/health || exit 1

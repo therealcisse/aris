@@ -52,12 +52,14 @@ object IngestionBenchmarkServer extends ZIOApp {
   private val configLayer = ZLayer.succeed(config)
   private val nettyConfigLayer = ZLayer.succeed(nettyConfig)
 
+  private val logging = Runtime.removeDefaultLoggers >>> SLF4J.slf4j >>> logMetrics
+
   val bootstrap: ZLayer[Any, Nothing, Environment] =
     Runtime.disableFlags(
       RuntimeFlag.FiberRoots,
     ) ++ Runtime.enableRuntimeMetrics ++ Runtime.enableAutoBlockingExecutor ++ Runtime.enableFlags(
       RuntimeFlag.EagerShiftBack,
-    ) ++ Runtime.removeDefaultLoggers >>> SLF4J.slf4j ++
+    ) ++
       ZLayer
         .make[Environment](
           DatabaseConfig.pool,
@@ -76,7 +78,7 @@ object IngestionBenchmarkServer extends ZIOApp {
           ZLayer.succeed(MetricsConfig(interval = Duration(5L, TimeUnit.SECONDS))),
           SnapshotStrategy.live(),
         )
-        .orDie ++ Runtime.setConfigProvider(ConfigProvider.envProvider)
+        .orDie ++ Runtime.setConfigProvider(ConfigProvider.envProvider) ++ logging
 
   val routes: Routes[Environment, Response] = Routes(
     Method.GET / "metrics" -> handler(ZIO.serviceWithZIO[PrometheusPublisher](_.get.map(Response.text))),
@@ -181,26 +183,28 @@ object IngestionBenchmarkServer extends ZIOApp {
     Method.POST / "ingestion" -> handler {
 
       boundary(s"POST /ingestion") {
-        for {
-          id <- Ingestion.Id.gen
+        // for {
+        //   id <- Ingestion.Id.gen
+        //
+        //   timestamp <- Timestamp.now
+        //
+        //   _ <- IngestionCQRS.add(id.asKey, IngestionCommand.StartIngestion(id, timestamp))
+        //
+        //   opt <- IngestionService.load(id)
+        //
+        //   _ <- opt.fold(ZIO.unit) { ingestion =>
+        //     atomically {
+        //       IngestionService.save(ingestion)
+        //     }
+        //   }
+        //
+        // } yield Response.json(s"""{"id":"$id"}""")
 
-          timestamp <- Timestamp.now
-
-          _ <- IngestionCQRS.add(id.asKey, IngestionCommand.StartIngestion(id, timestamp))
-
-          opt <- IngestionService.load(id)
-
-          _ <- opt.fold(ZIO.unit) { ingestion =>
-            atomically {
-              IngestionService.save(ingestion)
-            }
-          }
-
-        } yield Response.json(s"""{"id":"$id"}""")
+        ZIO.fail(Exception("Hello"))
       }
 
     },
-  ).sandbox
+  )
 
   def run: RIO[Environment, Unit] =
     for {

@@ -19,7 +19,15 @@ extension (body: Body)
 
     } yield a
 
-inline def boundary[R, E](tag: String)(effect: ZIO[R, E, Response]): ZIO[R, Nothing, Response] =
-  effect.catchAllCause { e =>
-    ZIO.logErrorCause(s"- [$tag] - Found error", e) `as` Response.notFound
+inline def boundary[R, E](tag: String)(effect: ZIO[R, E, Response]): URIO[R, Response] =
+  effect.catchAllCause {
+    _.failureOrCause.fold(
+      { case e =>
+        ZIO.logErrorCause(s"- [$tag] - Found error", Cause.fail(e)) `as` Response.internalServerError
+
+      },
+      Exit.failCause,
+    )
+
   }
+

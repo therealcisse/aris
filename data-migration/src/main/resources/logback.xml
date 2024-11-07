@@ -3,7 +3,7 @@
     <property name="LOG_LEVEL" value="${YOUTOO_LOG_LEVEL:-${env:YOUTOO_LOG_LEVEL:-DEBUG}}" />
 
     <!-- Define the pattern for the log output -->
-    <property name="LOG_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"/>
+    <property name="LOG_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss} [%thread] [%kvp] %-5level %logger{36} - %msg%n"/>
 
     <!-- Define the log file location -->
     <property name="LOG_FILE" value="logs/application.log"/>
@@ -45,11 +45,12 @@
     </root>
 
     <!-- Logger for your application packages -->
-    <!-- <logger name="com.youtoo" level="INFO" additivity="false"> -->
-    <!--     <appender-ref ref="CONSOLE"/> -->
-    <!--     <appender-ref ref="FILE"/> -->
-    <!-- </logger> -->
+    <logger name="com.youtoo" level="${LOG_LEVEL}" additivity="false">
+        <appender-ref ref="CONSOLE"/>
+        <!-- <appender-ref ref="FILE"/> -->
+    </logger>
 
 </configuration>
+
 
 

@@ -3,7 +3,7 @@ import sbt.*
 object Dependencies {
 
   val ZioJdbcVersion = "0.1.2"
-  val ZioVersion = "2.1.9"
+  val ZioVersion = "2.1.12"
   val ZioCliVersion = "0.5.0"
   val ZioParserVersion = "0.1.10"
   val ZioSchemaVersion = "1.5.0"
@@ -27,7 +27,7 @@ object Dependencies {
   val flyway = "org.flywaydb" % "flyway-core" % "9.8.1"
   val hicariCP = "com.zaxxer" % "HikariCP" % HikariCPVersion
 
-  val `slf4j-api` = "org.slf4j" % "slf4j-api" % "2.0.13"
+  val `slf4j-api` = "org.slf4j" % "slf4j-api" % "2.0.16"
   val `slf4j-simple` = "org.slf4j" % "slf4j-simple" % "2.0.13"
   val `slf4j-log4j12` = "org.slf4j" % "slf4j-log4j12" % "2.0.16"
 
@@ -58,13 +58,13 @@ object Dependencies {
   val `zio-test` = "dev.zio" %% "zio-test" % ZioVersion % Test
   val `zio-test-sbt` = "dev.zio" %% "zio-test-sbt" % ZioVersion % Test
   val `zio-mock` = "dev.zio" %% "zio-mock" % "1.0.0-RC12" % Test
-  val `zio-test-magnolia` = "dev.zio" %% "zio-test-magnolia" % "2.1.9" % Test
+  val `zio-test-magnolia` = "dev.zio" %% "zio-test-magnolia" % ZioVersion % Test
   val `testcontainers-scala-postgresql` = "com.dimafeng" %% "testcontainers-scala-postgresql" % "0.41.4" % Test
   val `zio-http` = "dev.zio" %% "zio-http" % "3.0.1"
   val `zio-logging` = "dev.zio" %% "zio-logging" % "2.3.2"
   val `zio-logging-slf4j` = "dev.zio" %% "zio-logging-slf4j" % "2.3.1"
   val `zio-logging-slf4j2` = "dev.zio" %% "zio-logging-slf4j2" % "2.3.2"
-  val logback = "ch.qos.logback" % "logback-classic" % "1.5.11"
+  val logback = "ch.qos.logback" % "logback-classic" % "1.5.12"
 
   val `gatling-charts-highcharts` = "io.gatling.highcharts" % "gatling-charts-highcharts" % GatlingVersion % Test
   val `gatling-test-framework` = "io.gatling" % "gatling-test-framework" % GatlingVersion % Test
@@ -81,5 +81,5 @@ object Dependencies {
   val `hadoop-aws` = "org.apache.hadoop" % "hadoop-aws" % "3.4.1"
   val `hadoop-client` = "org.apache.hadoop" % "hadoop-client" % "3.4.1"
 
-  val netty = "io.netty" % "netty-all" % "4.1.92.Final"
+  val netty = "io.netty" % "netty-all" % "4.1.114.Final"
 }

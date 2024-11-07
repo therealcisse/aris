@@ -55,12 +55,14 @@ object MigrationBenchmarkServer extends ZIOApp {
   private val configLayer = ZLayer.succeed(config)
   private val nettyConfigLayer = ZLayer.succeed(nettyConfig)
 
+  private val logging = Runtime.removeDefaultLoggers >>> SLF4J.slf4j >>> logMetrics
+
   val bootstrap: ZLayer[Any, Nothing, Environment] =
     Runtime.disableFlags(
       RuntimeFlag.FiberRoots,
     ) ++ Runtime.enableRuntimeMetrics ++ Runtime.enableAutoBlockingExecutor ++ Runtime.enableFlags(
       RuntimeFlag.EagerShiftBack,
-    ) ++ Runtime.removeDefaultLoggers >>> SLF4J.slf4j ++
+    ) ++
       ZLayer
         .make[Environment](
           DatabaseConfig.pool,
@@ -82,7 +84,7 @@ object MigrationBenchmarkServer extends ZIOApp {
           Interrupter.live(),
           Healthcheck.live(),
         )
-        .orDie
+        .orDie ++ Runtime.setConfigProvider(ConfigProvider.envProvider) ++ logging
 
   val routes: Routes[Environment & Scope, Response] = Routes(
     Method.GET / "metrics" -> handler(ZIO.serviceWithZIO[PrometheusPublisher](_.get.map(Response.text))),
@@ -210,7 +212,7 @@ object MigrationBenchmarkServer extends ZIOApp {
       }
 
     },
-  ).sandbox
+  )
 
   val run: URIO[Environment & Scope, ExitCode] =
     (

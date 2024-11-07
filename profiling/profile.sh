@@ -7,8 +7,7 @@ if [ $# -ne 1 ]; then
   exit 1
 fi
 
-COMMIT_SHA=$(git rev-parse --short HEAD)
-tag=youtoo-profiling:$COMMIT_SHA
+tag=youtoo-profiling:latest
 
 CONTAINER_ID=$(docker ps -q --filter "ancestor=$tag")
 echo "Container ID: $CONTAINER_ID"
