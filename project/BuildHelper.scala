@@ -114,7 +114,7 @@ object BuildHelper extends ScalaSettings {
     // One of -Ydelambdafy:inline or -Yrepl-class-based must be given to
     // avoid deadlocking on parallel operations, see
     //   https://issues.scala-lang.org/browse/SI-9076
-    Compile / console / scalacOptions := Seq(
+    Compile / console / scalacOptions ++= Seq(
       "-language:higherKinds",
       "-language:existentials",
       "-Xsource:2.13",

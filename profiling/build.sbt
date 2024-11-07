@@ -3,14 +3,14 @@ ThisBuild / scalaVersion := "3.5.1"
 ThisBuild / organization := "com.youtoo"
 ThisBuild / organizationName := "youtoo"
 
+ThisBuild / Compile / scalacOptions += "-g:source"
+ThisBuild / Compile / javacOptions += "-g"
+
 lazy val core = ProjectRef(file("/youtoo/youtoo-src"), "core")
 lazy val std = ProjectRef(file("/youtoo/youtoo-src"), "std")
 lazy val postgres = ProjectRef(file("/youtoo/youtoo-src"), "postgres")
 lazy val ingestion = ProjectRef(file("/youtoo/youtoo-src"), "ingestion")
 lazy val migration = ProjectRef(file("/youtoo/youtoo-src"), "dataMigration")
-
-ThisBuild / scalacOptions += "-g:source"
-ThisBuild / javacOptions += "-g"
 
 lazy val root = (project in file("."))
   .settings(

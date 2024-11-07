@@ -32,6 +32,7 @@ trait ProviderService {
 }
 
 object ProviderService {
+
   inline def addProvider(
     id: Provider.Id,
     name: Provider.Name,
@@ -57,92 +58,80 @@ object ProviderService {
     Throwable,
     ProviderService,
   ] =
-    ZLayer.fromFunction {
-      (
-        pool: ZConnectionPool,
-        eventStore: FileEventStore,
-      ) =>
-        val Cmd = summon[CmdHandler[FileCommand, FileEvent]]
+    ZLayer.fromFunction(ProviderServiceLive.apply)
 
-        new ProviderService {
-          def addProvider(
-            id: Provider.Id,
-            name: Provider.Name,
-            location: Provider.Location,
-          ): Task[Unit] =
-            atomically {
-              val cmd = FileCommand.AddProvider(id, name, location)
-              val evnts = Cmd.applyCmd(cmd)
+  class ProviderServiceLive(
+    pool: ZConnectionPool,
+    eventStore: FileEventStore,
+  ) extends ProviderService {
 
-              ZIO.foreachDiscard(evnts) { e =>
-                for {
-                  version <- Version.gen
-                  ch = Change(version = version, payload = e)
-                  _ <- eventStore.save(id = id.asKey, ch)
-                } yield ()
+    def addProvider(
+      id: Provider.Id,
+      name: Provider.Name,
+      location: Provider.Location,
+    ): Task[Unit] =
+      atomically {
+        val cmd = FileCommand.AddProvider(id, name, location)
+        val evnts = CmdHandler.applyCmd(cmd)
 
-              }
-
-            }.provideEnvironment(ZEnvironment(pool))
-
-          def load(id: Provider.Id): Task[Option[Provider]] =
-            given FileEvent.LoadProvider(id)
-
-            val key = id.asKey
-
-            atomically {
-              for {
-                events <- eventStore.readEvents(key)
-                inn = events flatMap { es =>
-                  EventHandler.applyEvents(es)
-                }
-
-              } yield inn
-
-            }.provideEnvironment(ZEnvironment(pool))
-
-          def loadAll(offset: Option[Key], limit: Long): Task[List[Provider]] =
-            given FileEvent.LoadProviders()
-
-            atomically {
-              for {
-                events <- eventStore.readEvents(
-                  ns = NonEmptyList(Namespace(1)).some,
-                  hierarchy = None,
-                  props = None,
-                )
-                inn = events.fold(Nil) { es =>
-                  EventHandler.applyEvents(es)
-                }
-
-              } yield inn
-
-            }.provideEnvironment(ZEnvironment(pool))
-
-          def getFiles(
-            provider: Provider.Id,
-            offset: Option[Key],
-            limit: Long,
-          ): Task[Option[NonEmptyList[IngestionFile]]] =
-            given FileEvent.LoadFiles(provider)
-
-            atomically {
-              for {
-                events <- eventStore.readEvents(
-                  ns = NonEmptyList(Namespace(0)).some,
-                  hierarchy = Hierarchy.Child(parentId = provider.asKey).some,
-                  props = None,
-                )
-                inn = events flatMap { es =>
-                  EventHandler.applyEvents(es)
-                }
-
-              } yield inn
-
-            }.provideEnvironment(ZEnvironment(pool))
-
+        ZIO.foreachDiscard(evnts) { e =>
+          for {
+            version <- Version.gen
+            ch = Change(version = version, payload = e)
+            _ <- eventStore.save(id = id.asKey, ch)
+          } yield ()
         }
+      }.provideEnvironment(ZEnvironment(pool))
 
-    }
+    def load(id: Provider.Id): Task[Option[Provider]] =
+      given FileEvent.LoadProvider(id)
+
+      val key = id.asKey
+
+      atomically {
+        for {
+          events <- eventStore.readEvents(key)
+          inn = events flatMap { es =>
+            EventHandler.applyEvents(es)
+          }
+        } yield inn
+      }.provideEnvironment(ZEnvironment(pool))
+
+    def loadAll(offset: Option[Key], limit: Long): Task[List[Provider]] =
+      given FileEvent.LoadProviders()
+
+      atomically {
+        for {
+          events <- eventStore.readEvents(
+            ns = NonEmptyList(Namespace(1)).some,
+            hierarchy = None,
+            props = None,
+          )
+          inn = events.fold(Nil) { es =>
+            EventHandler.applyEvents(es)
+          }
+        } yield inn
+      }.provideEnvironment(ZEnvironment(pool))
+
+    def getFiles(
+      provider: Provider.Id,
+      offset: Option[Key],
+      limit: Long,
+    ): Task[Option[NonEmptyList[IngestionFile]]] =
+      given FileEvent.LoadFiles(provider)
+
+      atomically {
+        for {
+          events <- eventStore.readEvents(
+            ns = NonEmptyList(Namespace(0)).some,
+            hierarchy = Hierarchy.Child(parentId = provider.asKey).some,
+            props = None,
+          )
+          inn = events flatMap { es =>
+            EventHandler.applyEvents(es)
+          }
+        } yield inn
+      }.provideEnvironment(ZEnvironment(pool))
+  }
 
 }

@@ -8,7 +8,6 @@ import zio.prelude.*
 
 import com.youtoo.cqrs.Codecs.*
 
-import com.youtoo.cqrs.store.*
 import com.youtoo.cqrs.domain.*
 import com.youtoo.migration.model.*
 import com.youtoo.cqrs.*
@@ -32,50 +31,44 @@ object MigrationCQRS {
 
   }
 
-  inline def add(id: Key, cmd: MigrationCommand)(using
-    Cmd: MigrationCommandHandler,
-  ): RIO[MigrationCQRS, Unit] =
+  inline def add(id: Key, cmd: MigrationCommand): RIO[MigrationCQRS, Unit] =
     ZIO.serviceWithZIO[MigrationCQRS](_.add(id, cmd)) @@ metrics.addition.trackDuration
 
   def live(): ZLayer[
-    ZConnectionPool & MigrationEventStore & SnapshotStore &
-      SnapshotStrategy.Factory,
+    ZConnectionPool & MigrationEventStore,
     Throwable,
     MigrationCQRS,
   ] =
     ZLayer.fromFunction {
       (
-        factory: SnapshotStrategy.Factory,
-        eventStore: MigrationEventStore,
-        snapshotStore: SnapshotStore,
         pool: ZConnectionPool,
+        eventStore: MigrationEventStore,
       ) =>
-        ZLayer {
+        new LiveMigrationCQRS(
+          pool,
+          eventStore,
+        )
+
+    }
+
+  class LiveMigrationCQRS(
+    pool: ZConnectionPool,
+    eventStore: MigrationEventStore,
+  ) extends MigrationCQRS {
+
+    def add(id: Key, cmd: MigrationCommand): Task[Unit] =
+      atomically {
+        val evnts = CmdHandler.applyCmd(cmd)
+
+        ZIO.foreachDiscard(evnts) { payload =>
           for {
-            strategy <- factory.create(MigrationEvent.discriminator).tapErrorCause { e =>
-              ZIO.logErrorCause(s"SnapshotStrategy creation failed for ${MigrationEvent.discriminator}", e)
-            }
-
-          } yield new MigrationCQRS {
-            private val Cmd = summon[CmdHandler[MigrationCommand, MigrationEvent]]
-
-            def add(id: Key, cmd: MigrationCommand): Task[Unit] =
-              atomically {
-                val evnts = Cmd.applyCmd(cmd)
-
-                ZIO.foreachDiscard(evnts) { e =>
-                  for {
-                    version <- Version.gen
-                    ch = Change(version = version, payload = e)
-                    _ <- eventStore.save(id = id, ch)
-                  } yield ()
-                }
-              }.provideEnvironment(ZEnvironment(pool))
-
-          }
-
+            version <- Version.gen
+            ch = Change(version = version, payload = payload)
+            _ <- eventStore.save(id = id, ch)
+          } yield ()
         }
+      }.provideEnvironment(ZEnvironment(pool))
 
-    }.flatten
+  }
 
 }

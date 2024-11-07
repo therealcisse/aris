@@ -32,26 +32,24 @@ object IngestionRepository {
     ZIO.serviceWithZIO[IngestionRepository](_.save(o))
 
   def live(): ZLayer[Any, Throwable, IngestionRepository] =
-    ZLayer.succeed {
+    ZLayer.succeed(new IngestionRepositoryLive)
 
-      new IngestionRepository {
-        def load(id: Ingestion.Id): ZIO[ZConnection, Throwable, Option[Ingestion]] =
-          Queries
-            .READ_INGESTION(id)
-            .selectOne
+  class IngestionRepositoryLive extends IngestionRepository {
+    def load(id: Ingestion.Id): ZIO[ZConnection, Throwable, Option[Ingestion]] =
+      Queries
+        .READ_INGESTION(id)
+        .selectOne
 
-        def loadMany(offset: Option[Key], limit: Long): ZIO[ZConnection, Throwable, Chunk[Key]] =
-          Queries
-            .READ_INGESTIONS(offset, limit)
-            .selectAll
+    def loadMany(offset: Option[Key], limit: Long): ZIO[ZConnection, Throwable, Chunk[Key]] =
+      Queries
+        .READ_INGESTIONS(offset, limit)
+        .selectAll
 
-        def save(o: Ingestion): ZIO[ZConnection, Throwable, Long] =
-          Queries
-            .SAVE_INGESTION(o)
-            .insert
-
-      }
-    }
+    def save(o: Ingestion): ZIO[ZConnection, Throwable, Long] =
+      Queries
+        .SAVE_INGESTION(o)
+        .insert
+  }
 
   object Queries extends JdbcCodecs {
     given JdbcDecoder[Ingestion.Status] = byteArrayDecoder[Ingestion.Status]

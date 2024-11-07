@@ -9,7 +9,6 @@ import zio.prelude.*
 import com.youtoo.cqrs.Codecs.*
 
 import com.youtoo.cqrs.*
-import com.youtoo.cqrs.store.*
 import com.youtoo.cqrs.domain.*
 import com.youtoo.ingestion.model.*
 import com.youtoo.cqrs.service.*
@@ -37,34 +36,29 @@ object FileCQRS {
   ): RIO[FileCQRS, Unit] = ZIO.serviceWithZIO[FileCQRS](_.add(id, cmd)) @@ metrics.addition.trackDuration
 
   def live(): ZLayer[
-    ZConnectionPool & FileEventStore & SnapshotStore,
+    ZConnectionPool & FileEventStore,
     Throwable,
     FileCQRS,
   ] =
-    ZLayer.fromFunction {
-      (
-        eventStore: FileEventStore,
-        snapshotStore: SnapshotStore,
-        pool: ZConnectionPool,
-      ) =>
-        new FileCQRS {
-          private val Cmd = summon[CmdHandler[FileCommand, FileEvent]]
+    ZLayer.fromFunction(LiveFileCQRS.apply)
 
-          def add(id: Key, cmd: FileCommand): Task[Unit] =
-            atomically {
-              val evnts = Cmd.applyCmd(cmd)
+  class LiveFileCQRS(
+    pool: ZConnectionPool,
+    eventStore: FileEventStore,
+  ) extends FileCQRS {
 
-              ZIO.foreachDiscard(evnts) { e =>
-                for {
-                  version <- Version.gen
-                  ch = Change(version = version, payload = e)
-                  _ <- eventStore.save(id = id, ch)
-                } yield ()
-              }
-            }.provideEnvironment(ZEnvironment(pool))
+    def add(id: Key, cmd: FileCommand): Task[Unit] =
+      atomically {
+        val evnts = CmdHandler.applyCmd(cmd)
 
+        ZIO.foreachDiscard(evnts) { payload =>
+          for {
+            version <- Version.gen
+            ch = Change(version = version, payload = payload)
+            _ <- eventStore.save(id = id, ch)
+          } yield ()
         }
-
-    }
+      }.provideEnvironment(ZEnvironment(pool))
+  }
 
 }

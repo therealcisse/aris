@@ -19,7 +19,7 @@ extension (body: Body)
 
     } yield a
 
-inline def boundary[R, E, A](tag: String)(effect: ZIO[R, E, A]): ZIO[R, E, A] =
-  effect.tapErrorCause { e =>
-    ZIO.logErrorCause(s"- [$tag] - Found error", e)
+inline def boundary[R, E](tag: String)(effect: ZIO[R, E, Response]): ZIO[R, Nothing, Response] =
+  effect.catchAllCause { e =>
+    ZIO.logErrorCause(s"- [$tag] - Found error", e) `as` Response.notFound
   }

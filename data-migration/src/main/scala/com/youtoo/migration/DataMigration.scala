@@ -52,7 +52,7 @@ object DataMigration {
 
   def live(): ZLayer[Interrupter & Healthcheck, Throwable, DataMigration] =
     ZLayer.fromFunction { (interrupter: Interrupter, healthcheck: Healthcheck) =>
-      new DataMigration.Live(interrupter, healthcheck, batchSize = BATCH_SIZE)
+      new Live(interrupter, healthcheck, batchSize = BATCH_SIZE)
     }
 
   class Live(interrupter: Interrupter, healthcheck: Healthcheck, batchSize: Int) extends DataMigration {

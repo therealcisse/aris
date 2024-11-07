@@ -88,9 +88,9 @@ object MigrationBenchmarkServer extends ZIOApp {
     Method.GET / "metrics" -> handler(ZIO.serviceWithZIO[PrometheusPublisher](_.get.map(Response.text))),
     Method.POST / "dataload" / "migration" -> handler { (req: Request) =>
       boundary("POST /dataload/migration") {
-        req.body.fromBody[List[Key]] foldZIO (
-          failure = _ => ZIO.succeed(Response.notFound),
-          success = ids =>
+        boundary("POST /dataload/migration") {
+
+          req.body.fromBody[List[Key]] flatMap (ids =>
             for {
               ingestions <- ZIO.foreachPar(ids) { key =>
                 MigrationService.load(Migration.Id(key))
@@ -109,7 +109,8 @@ object MigrationBenchmarkServer extends ZIOApp {
               )
 
             } yield resp,
-        )
+          )
+        }
 
       }
 

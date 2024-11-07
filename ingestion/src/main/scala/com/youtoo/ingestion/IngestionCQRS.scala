@@ -9,7 +9,6 @@ import zio.prelude.*
 import com.youtoo.cqrs.Codecs.*
 
 import com.youtoo.cqrs.*
-import com.youtoo.cqrs.store.*
 import com.youtoo.cqrs.domain.*
 import com.youtoo.ingestion.model.*
 import com.youtoo.cqrs.service.*
@@ -36,42 +35,33 @@ object IngestionCQRS {
     ZIO.serviceWithZIO[IngestionCQRS](_.add(id, cmd)) @@ metrics.addition.trackDuration
 
   def live(): ZLayer[
-    ZConnectionPool & IngestionEventStore & SnapshotStore &
-      SnapshotStrategy.Factory,
+    ZConnectionPool & IngestionEventStore,
     Throwable,
     IngestionCQRS,
   ] =
     ZLayer.fromFunction {
-      (
-        factory: SnapshotStrategy.Factory,
-        eventStore: IngestionEventStore,
-        snapshotStore: SnapshotStore,
-        pool: ZConnectionPool,
-      ) =>
-        ZLayer {
+      LiveIngestionCQRS.apply
+    }
 
+  class LiveIngestionCQRS(
+    pool: ZConnectionPool,
+    eventStore: IngestionEventStore,
+  ) extends IngestionCQRS {
+
+    def add(id: Key, cmd: IngestionCommand): Task[Unit] =
+      atomically {
+        val evnts = CmdHandler.applyCmd(cmd)
+
+        ZIO.foreachDiscard(evnts) { payload =>
           for {
-            strategy <- factory.create(IngestionEvent.discriminator)
-
-          } yield new IngestionCQRS {
-
-            def add(id: Key, cmd: IngestionCommand): Task[Unit] =
-              atomically {
-                val evnts = CmdHandler.applyCmd(cmd)
-
-                ZIO.foreachDiscard(evnts) { e =>
-                  for {
-                    version <- Version.gen
-                    ch = Change(version = version, payload = e)
-                    _ <- eventStore.save(id = id, ch)
-                  } yield ()
-                }
-              }.provideEnvironment(ZEnvironment(pool))
-
-          }
-
+            version <- Version.gen
+            ch = Change(version = version, payload = payload)
+            _ <- eventStore.save(id = id, ch)
+          } yield ()
         }
 
-    }.flatten
+      }.provideEnvironment(ZEnvironment(pool))
+
+  }
 
 }

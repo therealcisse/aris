@@ -36,25 +36,26 @@ object MigrationRepository {
 
   def live(): ZLayer[Any, Throwable, MigrationRepository] =
     ZLayer.succeed {
-
-      new MigrationRepository {
-        def load(id: Migration.Id): ZIO[ZConnection, Throwable, Option[Migration]] =
-          Queries
-            .READ_MIGRATION(id)
-            .selectOne
-
-        def loadMany(offset: Option[Key], limit: Long): ZIO[ZConnection, Throwable, Chunk[Key]] =
-          Queries
-            .READ_MIGRATIONS(offset, limit)
-            .selectAll
-
-        def save(o: Migration): ZIO[ZConnection, Throwable, Long] =
-          Queries
-            .SAVE_MIGRATION(o)
-            .insert
-
-      }
+      new MigrationRepositoryLive()
     }
+
+  class MigrationRepositoryLive() extends MigrationRepository {
+    def load(id: Migration.Id): ZIO[ZConnection, Throwable, Option[Migration]] =
+      Queries
+        .READ_MIGRATION(id)
+        .selectOne
+
+    def loadMany(offset: Option[Key], limit: Long): ZIO[ZConnection, Throwable, Chunk[Key]] =
+      Queries
+        .READ_MIGRATIONS(offset, limit)
+        .selectAll
+
+    def save(o: Migration): ZIO[ZConnection, Throwable, Long] =
+      Queries
+        .SAVE_MIGRATION(o)
+        .insert
+
+  }
 
   object Queries extends JdbcCodecs {
     given JdbcDecoder[Migration.State] = byteArrayDecoder[Migration.State]
