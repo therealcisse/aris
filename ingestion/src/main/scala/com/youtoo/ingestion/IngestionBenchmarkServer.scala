@@ -62,6 +62,7 @@ object IngestionBenchmarkServer extends ZIOApp {
     ) ++
       ZLayer
         .make[Environment](
+          zio.metrics.jvm.DefaultJvmMetrics.live.unit,
           DatabaseConfig.pool,
           PostgresCQRSPersistence.live(),
           FlywayMigration.live(),
@@ -183,24 +184,23 @@ object IngestionBenchmarkServer extends ZIOApp {
     Method.POST / "ingestion" -> handler {
 
       boundary(s"POST /ingestion") {
-        // for {
-        //   id <- Ingestion.Id.gen
-        //
-        //   timestamp <- Timestamp.now
-        //
-        //   _ <- IngestionCQRS.add(id.asKey, IngestionCommand.StartIngestion(id, timestamp))
-        //
-        //   opt <- IngestionService.load(id)
-        //
-        //   _ <- opt.fold(ZIO.unit) { ingestion =>
-        //     atomically {
-        //       IngestionService.save(ingestion)
-        //     }
-        //   }
-        //
-        // } yield Response.json(s"""{"id":"$id"}""")
+        for {
+          id <- Ingestion.Id.gen
 
-        ZIO.fail(Exception("Hello"))
+          timestamp <- Timestamp.now
+
+          _ <- IngestionCQRS.add(id.asKey, IngestionCommand.StartIngestion(id, timestamp))
+
+          opt <- IngestionService.load(id)
+
+          _ <- opt.fold(ZIO.unit) { ingestion =>
+            atomically {
+              IngestionService.save(ingestion)
+            }
+          }
+
+        } yield Response.json(s"""{"id":"$id"}""")
+
       }
 
     },

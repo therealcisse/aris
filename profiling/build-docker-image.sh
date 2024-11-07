@@ -19,13 +19,6 @@ rm -f ./src/main/scala/com/youtoo/Main.scala
 
 mkdir -p ./src/main/scala/com/youtoo/
 
-# Check if exactly one argument is provided
-if [ $# -ne 1 ]; then
-  echo "Usage: $0 {ingestion|migration}"
-  exit 1
-fi
-
-# Use a case statement to match the argument
 case "$1" in
   ingestion)
     echo "Building ingestion"
@@ -37,7 +30,7 @@ case "$1" in
     ;;
   *)
     echo "Invalid option: $1"
-    echo "Usage: $0 {ingestion|migration}"
+    echo "Usage: $0 {ingestion|migration} {datadog|asprof|yourkit|jfr}"
     exit 1
     ;;
 esac
@@ -45,6 +38,30 @@ esac
 
 cd "$(dirname "$0")/../"
 BUILD_ARGS=$(grep -v '^#' .env | xargs -I {} echo --build-arg {} | xargs)
-docker build $BUILD_ARGS --platform linux/arm64 -f ./profiling/Dockerfile.asprof --build-arg ARCH=$ARCH -t $TAG .
+
+case "$2" in
+  datadog)
+    echo "Building image for Datadog"
+    docker build $BUILD_ARGS --platform linux/arm64 -f ./profiling/Dockerfile.datadog --build-arg ARCH=$ARCH -t $TAG .
+    ;;
+  asprof)
+    echo "Building image for Async-Profiler"
+    docker build $BUILD_ARGS --platform linux/arm64 -f ./profiling/Dockerfile.asprof --build-arg ARCH=$ARCH -t $TAG .
+    ;;
+  yourkit)
+    echo "Building image for YourKit"
+    docker build $BUILD_ARGS --platform linux/arm64 -f ./profiling/Dockerfile.yourkit --build-arg ARCH=$ARCH -t $TAG .
+    ;;
+  jfr)
+    echo "Building image for JFR"
+    docker build $BUILD_ARGS --platform linux/arm64 -f ./profiling/Dockerfile.jfr --build-arg ARCH=$ARCH -t $TAG .
+    ;;
+  *)
+    echo "Invalid option: $2"
+    echo "Usage: $0 {ingestion|migration} {datadog|asprof|yourkit|jfr}"
+    exit 1
+    ;;
+esac
+
 docker tag $TAG youtoo-profiling:latest
 

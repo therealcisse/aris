@@ -30,4 +30,3 @@ inline def boundary[R, E](tag: String)(effect: ZIO[R, E, Response]): URIO[R, Res
     )
 
   }
-

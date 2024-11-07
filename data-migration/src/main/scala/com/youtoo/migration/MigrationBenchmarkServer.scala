@@ -65,6 +65,7 @@ object MigrationBenchmarkServer extends ZIOApp {
     ) ++
       ZLayer
         .make[Environment](
+          zio.metrics.jvm.DefaultJvmMetrics.live.unit,
           DatabaseConfig.pool,
           PostgresCQRSPersistence.live(),
           FlywayMigration.live(),

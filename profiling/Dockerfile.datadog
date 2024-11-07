@@ -27,7 +27,7 @@ ENV DD_ENV=production
 ENV DD_SERVICE=youtoo-profiling
 ENV DD_VERSION=1.0.0
 
-ENV JAVA_OPTS="-Ddd.agent.host=$DD_AGENT_HOST -javaagent:/datadog/dd-java-agent.jar -XX:+UseG1GC -Xms4G -Xmx2G -server -Ddd.profiling.enabled=true -Ddd.integration.zio.experimental.enabled=true -Ddd.integration.throwables.enabled=false"
+ENV JAVA_OPTS="-Ddd.agent.host=$DD_AGENT_HOST -javaagent:/datadog/dd-java-agent.jar -XX:+UseG1GC -Xms2G -Xmx4G -server -Ddd.profiling.enabled=true -Ddd.integration.zio.experimental.enabled=true -Ddd.integration.throwables.enabled=false"
 
 WORKDIR /youtoo
 COPY --from=builder /youtoo/target/universal/stage /youtoo

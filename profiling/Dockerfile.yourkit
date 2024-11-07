@@ -25,7 +25,7 @@ ENV DATABASE_PASSWORD=${PROFILING_DATABASE_PASSWORD}
 
 COPY --from=builder /usr/local/YourKit-JavaProfiler-2024.9 /usr/local/YourKit-JavaProfiler-2024.9
 ARG ARCH
-ENV JAVA_OPTS="-agentpath:/usr/local/YourKit-JavaProfiler-2024.9/bin/${ARCH}/libyjpagent.so=port=10001,listen=all,sampling -XX:+UseG1GC -Xms4G -Xmx2G -server "
+ENV JAVA_OPTS="-agentpath:/usr/local/YourKit-JavaProfiler-2024.9/bin/${ARCH}/libyjpagent.so=port=10001,listen=all,sampling -XX:+UseG1GC -Xms2G -Xmx4G -server "
 
 WORKDIR /youtoo
 COPY --from=builder /youtoo/target/universal/stage /youtoo

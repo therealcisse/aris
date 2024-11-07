@@ -28,18 +28,18 @@ RUN wget https://github.com/async-profiler/async-profiler/releases/download/v3.0
     rm /tmp/async-profiler.tar.gz
 
 ENV ASYNC_PROFILER_HOME=/opt/async-profiler-3.0-linux-arm64
-ENV JAVA_OPTS="-agentpath:${ASYNC_PROFILER_HOME}/lib/libasyncProfiler.so -XX:+UnlockDiagnosticVMOptions -XX:+DebugNonSafepoints -XX:+UseG1GC -Xms4G -Xmx2G -server"
+ENV JAVA_OPTS="-agentpath:${ASYNC_PROFILER_HOME}/lib/libasyncProfiler.so -XX:+UnlockDiagnosticVMOptions -XX:+DebugNonSafepoints -XX:+UseG1GC -Xms2G -Xmx4G -server"
 
 HEALTHCHECK --interval=5s --timeout=3s --start-period=30s --retries=3 \
   CMD curl --silent --fail http://localhost:8181/health || exit 1
 
-COPY profiling/start-profiling_cpu.sh /start-profiling_cpu.sh
-COPY profiling/start-profiling_alloc.sh /start-profiling_alloc.sh
-COPY profiling/start-profiling_wall.sh /start-profiling_wall.sh
+COPY profiling/asprof/start-profiling_cpu.sh /start-profiling_cpu.sh
+COPY profiling/asprof/start-profiling_alloc.sh /start-profiling_alloc.sh
+COPY profiling/asprof/start-profiling_wall.sh /start-profiling_wall.sh
 
-COPY profiling/status-profiling.sh /status-profiling.sh
+COPY profiling/asprof/status-profiling.sh /status-profiling.sh
 
-COPY profiling/stop-profiling.sh /stop-profiling.sh
+COPY profiling/asprof/stop-profiling.sh /stop-profiling.sh
 
 RUN chmod +x /start-profiling_cpu.sh
 RUN chmod +x /start-profiling_alloc.sh
