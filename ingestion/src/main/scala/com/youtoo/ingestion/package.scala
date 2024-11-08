@@ -23,7 +23,7 @@ inline def boundary[R, E](tag: String)(effect: ZIO[R, E, Response]): URIO[R, Res
   effect.catchAllCause {
     _.failureOrCause.fold(
       { case e =>
-        Log.error(s"- [$tag] - Found error", e) `as` Response.internalServerError
+        Log.error(s"[$tag] - Found error", e) `as` Response.internalServerError
 
       },
       Exit.failCause,

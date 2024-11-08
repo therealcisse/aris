@@ -83,4 +83,8 @@ object Dependencies {
   val `hadoop-client` = "org.apache.hadoop" % "hadoop-client" % "3.4.1"
 
   val netty = "io.netty" % "netty-all" % "4.1.114.Final"
+
+  val `spring-boot` = "org.springframework.boot" % "spring-boot" % "3.3.5"
+
+  val jansi = "org.fusesource.jansi" % "jansi" % "2.4.0"
 }

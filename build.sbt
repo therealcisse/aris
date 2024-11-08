@@ -71,6 +71,8 @@ lazy val log = (project in file("log"))
   .settings(buildInfoSettings("com.youtoo"))
   .settings(
     libraryDependencies ++= Seq(
+      jansi,
+      `spring-boot`,
       `slf4j-api`,
       `zio-logging`,
       `zio-logging-slf4j2`,
@@ -215,6 +217,7 @@ lazy val dataMigration = (project in file("data-migration"))
     std % "compile->compile;test->test",
     postgres % "compile->compile;test->test",
     core % "compile->compile;test->test",
+    log % "compile->compile",
   )
   .settings(stdSettings("data-migration"))
   // .settings(publishSetting(false))

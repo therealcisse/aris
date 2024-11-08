@@ -2,16 +2,21 @@
 <configuration>
     <property name="LOG_LEVEL" value="${YOUTOO_LOG_LEVEL:-${env:YOUTOO_LOG_LEVEL:-DEBUG}}" />
 
-    <!-- Define the pattern for the log output -->
-    <property name="LOG_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss} [%thread] [%kvp] %-5level %logger{36} - %msg%n"/>
+    <property name="APPLICATION_NAME" value="ingestion"/>
+    <property name="APPLICATION_GROUP" value="youtoo"/>
+
+    <property name="CONSOLE_LOG_PATTERN" value="%clr(%d{${LOG_DATEFORMAT_PATTERN:-yyyy-MM-dd'T'HH:mm:ss.SSSXXX}}){faint} %clr(${LOG_LEVEL_PATTERN:-%5p}) %clr(${PID:- }){magenta} %clr(---){faint} %clr(${APPLICATION_NAME} %-23.23t{23}){faint} %clr([%kvp]){faint} %clr(%-40.40logger{39}){cyan} %clr(:){faint} %m%n${LOG_EXCEPTION_CONVERSION_WORD:-%wEx}"/>
+
+    <include resource="org/springframework/boot/logging/logback/defaults.xml" />
 
     <!-- Define the log file location -->
     <property name="LOG_FILE" value="logs/application.log"/>
 
     <!-- Console Appender Configuration -->
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <withJansi>true</withJansi>
         <encoder>
-            <pattern>${LOG_PATTERN}</pattern>
+            <pattern>${CONSOLE_LOG_PATTERN}</pattern>
         </encoder>
     </appender>
 
@@ -20,7 +25,7 @@
         <file>${LOG_FILE}</file>
         <append>true</append>
         <encoder>
-            <pattern>${LOG_PATTERN}</pattern>
+            <pattern>${FILE_LOG_PATTERN}</pattern>
         </encoder>
     </appender>
 
@@ -34,7 +39,7 @@
             <maxHistory>30</maxHistory>
         </rollingPolicy>
         <encoder>
-            <pattern>${LOG_PATTERN}</pattern>
+            <pattern>${FILE_LOG_PATTERN}</pattern>
         </encoder>
     </appender>
 
@@ -51,6 +56,4 @@
     </logger>
 
 </configuration>
-
-
 
