@@ -5,8 +5,6 @@ import scala.language.future
 
 import zio.*
 import zio.jdbc.*
-import zio.logging.*
-import zio.logging.backend.*
 
 import zio.metrics.*
 import zio.metrics.connectors.prometheus.*
@@ -52,10 +50,8 @@ object IngestionBenchmarkServer extends ZIOApp {
   private val configLayer = ZLayer.succeed(config)
   private val nettyConfigLayer = ZLayer.succeed(nettyConfig)
 
-  private val logging = Runtime.removeDefaultLoggers >>> SLF4J.slf4j >>> logMetrics
-
   val bootstrap: ZLayer[Any, Nothing, Environment] =
-    Runtime.disableFlags(
+    Log.layer >>> Runtime.disableFlags(
       RuntimeFlag.FiberRoots,
     ) ++ Runtime.enableRuntimeMetrics ++ Runtime.enableAutoBlockingExecutor ++ Runtime.enableFlags(
       RuntimeFlag.EagerShiftBack,
@@ -79,11 +75,11 @@ object IngestionBenchmarkServer extends ZIOApp {
           ZLayer.succeed(MetricsConfig(interval = Duration(5L, TimeUnit.SECONDS))),
           SnapshotStrategy.live(),
         )
-        .orDie ++ Runtime.setConfigProvider(ConfigProvider.envProvider) ++ logging
+        .orDie ++ Runtime.setConfigProvider(ConfigProvider.envProvider)
 
   val routes: Routes[Environment, Response] = Routes(
     Method.GET / "metrics" -> handler(ZIO.serviceWithZIO[PrometheusPublisher](_.get.map(Response.text))),
-    Method.GET / "health" -> handler((_: Request) => Response.ok),
+    Method.GET / "health" -> handler(Response.json(YouToo.toJson)),
     Method.POST / "dataload" / "ingestion" -> handler { (req: Request) =>
       boundary("POST /dataload/ingestion") {
 

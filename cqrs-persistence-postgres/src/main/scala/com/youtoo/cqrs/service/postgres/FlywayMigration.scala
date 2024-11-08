@@ -20,8 +20,8 @@ object FlywayMigration {
     ZLayer.succeed {
       new FlywayMigration {
         def run(config: DatabaseConfig): Task[Unit] =
-          runMigration(config).tapErrorCause { e =>
-            ZIO.logErrorCause("Migration failed", e)
+          runMigration(config).tapError { e =>
+            Log.error("Migration failed", e)
           }
 
       }

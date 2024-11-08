@@ -60,9 +60,9 @@ object DataMigration {
       val migrationKey = id.asKey
 
       inline def logInfo(msg: => String): Task[Unit] =
-        ZIO.logInfo(msg)
+        Log.info(msg)
       inline def logError(msg: => String, e: => Throwable): Task[Unit] =
-        ZIO.logErrorCause(msg, Cause.die(e))
+        Log.error(msg, Cause.fail(e))
 
       (DataMigration.count() <&> MigrationService.load(id = id)) flatMap {
         case (_, None) => ZIO.fail(IllegalArgumentException("Migration not found"))

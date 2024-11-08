@@ -1,6 +1,11 @@
 import BuildHelper.*
 import Dependencies.*
 
+import com.github.sbt.git.SbtGit.git
+
+import sbtbuildinfo.BuildInfoKey
+import sbtbuildinfo.BuildInfoPlugin.autoImport.*
+
 import com.typesafe.sbt.packager.docker.DockerPlugin.autoImport.*
 import com.typesafe.sbt.packager.docker.*
 
@@ -46,21 +51,40 @@ lazy val aggregatedProjects: Seq[ProjectReference] =
     dataMigration,
     loadtests,
     benchmarks,
+    log,
   )
 
 inThisBuild(replSettings)
 
 lazy val root = (project in file("."))
+  .settings(git.useGitDescribe := true)
+  .enablePlugins(BuildInfoPlugin)
   .settings(stdSettings("youtoo-root"))
   // .settings(publishSetting(false))
   .settings(meta)
   .aggregate(aggregatedProjects *)
 
+lazy val log = (project in file("log"))
+  .settings(stdSettings("log"))
+  // .settings(publishSetting(false))
+  .enablePlugins(BuildInfoPlugin)
+  .settings(buildInfoSettings("com.youtoo"))
+  .settings(
+    libraryDependencies ++= Seq(
+      `slf4j-api`,
+      `zio-logging`,
+      `zio-logging-slf4j2`,
+      logback,
+      `logback-core`,
+    ),
+  )
+
 lazy val kernel = (project in file("kernel"))
   .settings(stdSettings("kernel"))
   // .settings(publishSetting(false))
-  .settings(buildInfoSettings("youtoo"))
   .enablePlugins(BuildInfoPlugin)
+  .settings(buildInfoSettings("com.youtoo"))
+  .dependsOn(log % "compile->compile")
   .settings(
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
     libraryDependencies ++= Seq(
@@ -85,16 +109,12 @@ lazy val core = (project in file("cqrs-core"))
   .dependsOn(kernel)
   .settings(stdSettings("cqrs-core"))
   // .settings(publishSetting(false))
-  .settings(buildInfoSettings("youtoo"))
   .enablePlugins(BuildInfoPlugin)
+  .settings(buildInfoSettings("com.youtoo"))
   .settings(
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
     libraryDependencies ++= Seq(
       // pprint,
-      `slf4j-api`,
-      `zio-logging`,
-      `zio-logging-slf4j2`,
-      logback,
       `zio-jdbc`,
       `zio-schema-protobuf`,
       `zio-schema-json`,
@@ -145,7 +165,7 @@ lazy val postgres = (project in file("cqrs-persistence-postgres"))
   )
 
 lazy val ingestion = (project in file("ingestion"))
-  .dependsOn(postgres % "compile->compile;test->test", core % "compile->compile;test->test")
+  .dependsOn(postgres % "compile->compile;test->test", core % "compile->compile;test->test", log % "compile->compile")
   .settings(stdSettings("ingestion"))
   // .settings(publishSetting(false))
   // .settings(
@@ -177,13 +197,6 @@ lazy val ingestion = (project in file("ingestion"))
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
     libraryDependencies ++= Seq(
       netty,
-      // `slf4j-simple`,
-      // `slf4j-log4j12`,
-      `slf4j-api`,
-      `zio-logging`,
-      `zio-logging-slf4j2`,
-      logback,
-
       `hadoop-client`,
       `hadoop-aws`,
       `zio-metrics-connectors-prometheus`,
@@ -233,10 +246,6 @@ lazy val dataMigration = (project in file("data-migration"))
   .settings(
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
     libraryDependencies ++= Seq(
-      // `slf4j-api`,
-      // `zio-logging`,
-      `zio-logging-slf4j2`,
-      // logback,
       // `zio-config-typesafe`,
       `zio-metrics-connectors-prometheus`,
       `testcontainers-scala-postgresql`,

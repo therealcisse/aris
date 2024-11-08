@@ -16,6 +16,7 @@ addSbtPlugin("com.thesamet" % "sbt-protoc-gen-project" % "0.1.8")
 addSbtPlugin("io.gatling" % "gatling-sbt" % "4.10.1")
 addSbtPlugin("com.github.sbt" % "sbt-native-packager" % "1.10.4")
 addSbtPlugin("pl.project13.scala" % "sbt-jmh" % "0.4.2")
+addSbtPlugin("com.github.sbt" % "sbt-git" % "2.1.0")
 
 addSbtPlugin("org.jetbrains.scala" % "sbt-ide-settings" % "1.1.2")
 

@@ -1,3 +1,4 @@
+import com.github.sbt.git.SbtGit.git
 import de.heikoseeberger.sbtheader.HeaderPlugin.autoImport.{headerLicense, HeaderLicense}
 import sbt.*
 import sbt.Keys.*
@@ -68,6 +69,10 @@ object BuildHelper extends ScalaSettings {
     Seq(
       // BuildInfoOption.ConstantValue required to disable assertions in FiberRuntime!
       buildInfoOptions += BuildInfoOption.ConstantValue,
+      buildInfoOptions += BuildInfoOption.ToJson,
+      buildInfoOptions += BuildInfoOption.ToMap,
+      buildInfoOptions += BuildInfoOption.BuildTime,
+      buildInfoObject := "YouToo",
       buildInfoKeys := Seq[BuildInfoKey](
         organization,
         moduleName,
@@ -76,6 +81,9 @@ object BuildHelper extends ScalaSettings {
         scalaVersion,
         sbtVersion,
         isSnapshot,
+        BuildInfoKey.action("gitCommitHash") {
+          git.formattedShaVersion.value.getOrElse("No commit hash available")
+        },
       ),
       buildInfoPackage := packageName,
     )
@@ -114,12 +122,12 @@ object BuildHelper extends ScalaSettings {
     // One of -Ydelambdafy:inline or -Yrepl-class-based must be given to
     // avoid deadlocking on parallel operations, see
     //   https://issues.scala-lang.org/browse/SI-9076
-    Compile / console / scalacOptions ++= Seq(
-      "-language:higherKinds",
-      "-language:existentials",
-      "-Xsource:2.13",
-      "-Yrepl-class-based",
-    ),
+    // Compile / console / scalacOptions ++= Seq(
+    //   "-language:higherKinds",
+    //   "-language:existentials",
+    //   "-Xsource:2.13",
+    //   "-Yrepl-class-based",
+    // ),
     Compile / console / initialCommands := initialCommandsStr,
   )
   def stdSettings(prjName: String) = Seq(
@@ -152,6 +160,7 @@ object BuildHelper extends ScalaSettings {
       if (scalaVersion.value == Scala3) semanticdbVersion.value
       else scalafixSemanticdb.revision
     },
+    git.formattedShaVersion := git.gitHeadCommit.value map { sha => s"v$sha" },
   )
 
   def runSettings(className: String = "example.HelloWorld") = Seq(

@@ -13,8 +13,8 @@ extension (body: Body)
       a <- ZIO.fromEither {
         summon[BinaryCodec[A]].decode(ch)
 
-      }.tapErrorCause { e =>
-        ZIO.logErrorCause(s"Error decoding entity ${Tag[A]}", e)
+      }.tapError { e =>
+        Log.error(s"Error decoding entity ${Tag[A]}", e)
       }
 
     } yield a
@@ -23,7 +23,7 @@ inline def boundary[R, E](tag: String)(effect: ZIO[R, E, Response]): URIO[R, Res
   effect.catchAllCause {
     _.failureOrCause.fold(
       { case e =>
-        ZIO.logErrorCause(s"- [$tag] - Found error", Cause.fail(e)) `as` Response.internalServerError
+        Log.error(s"- [$tag] - Found error", e) `as` Response.internalServerError
 
       },
       Exit.failCause,

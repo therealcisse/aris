@@ -65,6 +65,7 @@ object Dependencies {
   val `zio-logging-slf4j` = "dev.zio" %% "zio-logging-slf4j" % "2.3.1"
   val `zio-logging-slf4j2` = "dev.zio" %% "zio-logging-slf4j2" % "2.3.2"
   val logback = "ch.qos.logback" % "logback-classic" % "1.5.12"
+  val `logback-core` = "ch.qos.logback" % "logback-core" % "1.5.12"
 
   val `gatling-charts-highcharts` = "io.gatling.highcharts" % "gatling-charts-highcharts" % GatlingVersion % Test
   val `gatling-test-framework` = "io.gatling" % "gatling-test-framework" % GatlingVersion % Test
