@@ -12,7 +12,7 @@ tag=youtoo-profiling:latest
 CONTAINER_ID=$(docker ps -q --filter "ancestor=$tag")
 echo "Container ID: $CONTAINER_ID"
 
-PID=$(docker exec $CONTAINER_ID jps | grep BenchmarkServer | awk '{print $1}')
+PID=$(docker exec $CONTAINER_ID jps | grep App | awk '{print $1}')
 echo "Found PID: $PID"
 
 # Use a case statement to match the argument

@@ -2,6 +2,8 @@ package com.youtoo
 package ingestion
 package service
 
+import zio.telemetry.opentelemetry.tracing.*
+
 import cats.implicits.*
 
 import com.youtoo.cqrs.service.*
@@ -25,14 +27,27 @@ trait IngestionService {
 }
 
 object IngestionService {
-  inline def loadMany(offset: Option[Key], limit: Long): RIO[IngestionService & ZConnection, Chunk[Key]] =
-    ZIO.serviceWithZIO[IngestionService](_.loadMany(offset, limit))
+  inline def loadMany(offset: Option[Key], limit: Long): RIO[IngestionService & Tracing, Chunk[Key]] =
+    ZIO.serviceWithZIO[IngestionService] { service =>
+      ZIO.serviceWithZIO[Tracing] { tracing =>
+        service.loadMany(offset, limit) @@ tracing.aspects.span("IngestionService.loadMany")
 
-  inline def load(id: Ingestion.Id): RIO[IngestionService, Option[Ingestion]] =
-    ZIO.serviceWithZIO[IngestionService](_.load(id))
+      }
+    }
 
-  inline def save(o: Ingestion): RIO[IngestionService & ZConnection, Long] =
-    ZIO.serviceWithZIO[IngestionService](_.save(o))
+  inline def load(id: Ingestion.Id): RIO[IngestionService & Tracing, Option[Ingestion]] =
+    ZIO.serviceWithZIO[IngestionService] { service =>
+      ZIO.serviceWithZIO[Tracing] { tracing =>
+        service.load(id) @@ tracing.aspects.span("IngestionService.load")
+      }
+    }
+
+  inline def save(o: Ingestion): RIO[IngestionService & Tracing, Long] =
+    ZIO.serviceWithZIO[IngestionService] { service =>
+      ZIO.serviceWithZIO[Tracing] { tracing =>
+        service.save(o) @@ tracing.aspects.span("IngestionService.save")
+      }
+    }
 
   def live(): ZLayer[
     ZConnectionPool & IngestionRepository & IngestionEventStore & IngestionRepository & SnapshotStore & SnapshotStrategy.Factory,

@@ -168,6 +168,7 @@ lazy val ingestion = (project in file("ingestion"))
   .settings(stdSettings("ingestion"))
   .settings(
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
+    libraryDependencies ++= openTelemetry,
     libraryDependencies ++= Seq(
       netty,
       `hadoop-client`,
@@ -192,7 +193,6 @@ lazy val dataMigration = (project in file("data-migration"))
   .settings(stdSettings("data-migration"))
   .settings(
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
-    libraryDependencies ++= openTelemetry,
     libraryDependencies ++= Seq(
       // `zio-config-typesafe`,
       `zio-metrics-connectors-prometheus`,

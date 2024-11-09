@@ -23,11 +23,11 @@ mkdir -p ./src/main/scala/com/youtoo/
 case "$1" in
   ingestion)
     echo "Building ingestion"
-    cp ../ingestion/src/main/scala/com/youtoo/ingestion/IngestionBenchmarkServer.scala ./src/main/scala/com/youtoo/Main.scala
+    cp ../ingestion/src/main/scala/com/youtoo/ingestion/IngestionApp.scala ./src/main/scala/com/youtoo/Main.scala
     ;;
   migration)
     echo "Building migration"
-    cp ../data-migration/src/main/scala/com/youtoo/migration/MigratonBenchmarkServer.scala ./src/main/scala/com/youtoo/Main.scala
+    cp ../data-migration/src/main/scala/com/youtoo/migration/MigrationApp.scala ./src/main/scala/com/youtoo/Main.scala
     ;;
   *)
     echo "Invalid option: $1"

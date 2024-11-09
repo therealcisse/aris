@@ -9,7 +9,7 @@ import zio.schema.codec.*
 import com.youtoo.cqrs.Codecs.json.given
 import com.youtoo.ingestion.model.*
 import java.nio.charset.StandardCharsets
-import com.youtoo.ingestion.IngestionBenchmarkServer
+import com.youtoo.ingestion.IngestionApp
 
 import zio.prelude.*
 
@@ -134,7 +134,7 @@ class IngestionLoadTest extends Simulation {
         val fetchedIds = session("fetchedIds").asOption[Vector[String]].getOrElse(Vector())
         allIds = allIds ++ fetchedIds
 
-        if fetchedIds.size < IngestionBenchmarkServer.FetchSize then session.set("offset", "end")
+        if fetchedIds.size < IngestionApp.FetchSize then session.set("offset", "end")
         else
           allIds.minOption match {
             case None => session.set("offset", "end")

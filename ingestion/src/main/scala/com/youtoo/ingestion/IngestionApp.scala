@@ -1,16 +1,246 @@
 package com.youtoo
 package ingestion
 
+import scala.language.future
+
 import zio.*
+import zio.jdbc.*
+
+import zio.metrics.*
+import zio.metrics.connectors.prometheus.*
+import zio.metrics.connectors.prometheus.PrometheusPublisher
+import zio.metrics.connectors.MetricsConfig
+import zio.metrics.connectors.prometheus
+
+import cats.implicits.*
+
+import com.youtoo.cqrs.*
+import com.youtoo.cqrs.store.*
+import com.youtoo.cqrs.service.*
 
 import com.youtoo.ingestion.model.*
+import com.youtoo.ingestion.service.*
+import com.youtoo.ingestion.repository.*
+import com.youtoo.cqrs.service.postgres.*
+import com.youtoo.ingestion.store.*
+import com.youtoo.cqrs.config.*
 
-trait IngestionApp {
-  type Environment
+import zio.http.{Version as _, *}
+import zio.http.netty.NettyConfig
+import zio.schema.codec.BinaryCodec
+import java.nio.charset.StandardCharsets
+import java.util.concurrent.TimeUnit
 
-  def loadIds(ids: List[Key]): ZIO[Environment, Throwable, List[Ingestion]]
-  def loadAll(offset: Option[Key], limit: Long): ZIO[Environment, Throwable, List[Key]]
-  def load(id: Key): ZIO[Environment, Throwable, Option[Ingestion]]
-  def addCmd(cmd: IngestionCommand): ZIO[Environment, Throwable, Unit]
-  def addIngestion(): ZIO[Environment, Throwable, Key]
+import com.youtoo.otel.OtelSdk
+
+import zio.telemetry.opentelemetry.OpenTelemetry
+import zio.telemetry.opentelemetry.tracing.Tracing
+import zio.telemetry.opentelemetry.baggage.Baggage
+
+object IngestionApp extends ZIOApp {
+  import com.youtoo.cqrs.Codecs.json.given
+
+  inline val FetchSize = 1_000L
+
+  type Environment =
+    FlywayMigration & ZConnectionPool & CQRSPersistence & SnapshotStore & IngestionEventStore & IngestionCQRS & Server & Server.Config & NettyConfig & IngestionService & IngestionRepository & PrometheusPublisher & MetricsConfig & SnapshotStrategy.Factory & Tracing & Baggage
+
+  given environmentTag: EnvironmentTag[Environment] = EnvironmentTag[Environment]
+
+  private val config = Server.Config.default
+    .port(8181)
+
+  private val nettyConfig = NettyConfig.default
+    .leakDetection(NettyConfig.LeakDetectionLevel.DISABLED)
+
+  private val configLayer = ZLayer.succeed(config)
+  private val nettyConfigLayer = ZLayer.succeed(nettyConfig)
+
+  private val instrumentationScopeName = "com.youtoo.ingestion.IngestionApp"
+  private val resourceName = "ingestion"
+
+  val bootstrap: ZLayer[Any, Nothing, Environment] =
+    Log.layer >>> Runtime.disableFlags(
+      RuntimeFlag.FiberRoots,
+    ) ++ Runtime.enableRuntimeMetrics ++ Runtime.enableAutoBlockingExecutor ++ Runtime.enableFlags(
+      RuntimeFlag.EagerShiftBack,
+    ) ++
+      ZLayer
+        .make[Environment](
+          zio.metrics.jvm.DefaultJvmMetrics.live.unit,
+          DatabaseConfig.pool,
+          PostgresCQRSPersistence.live(),
+          FlywayMigration.live(),
+          SnapshotStore.live(),
+          IngestionEventStore.live(),
+          IngestionService.live(),
+          IngestionRepository.live(),
+          IngestionCQRS.live(),
+          configLayer,
+          nettyConfigLayer,
+          Server.customized,
+          prometheus.publisherLayer,
+          prometheus.prometheusLayer,
+          ZLayer.succeed(MetricsConfig(interval = Duration(5L, TimeUnit.SECONDS))),
+          SnapshotStrategy.live(),
+          OtelSdk.custom(resourceName),
+          OpenTelemetry.tracing(instrumentationScopeName),
+          OpenTelemetry.metrics(instrumentationScopeName),
+          OpenTelemetry.logging(instrumentationScopeName),
+          OpenTelemetry.baggage(),
+          OpenTelemetry.zioMetrics,
+          OpenTelemetry.contextZIO,
+        )
+        .orDie ++ Runtime.setConfigProvider(ConfigProvider.envProvider)
+
+  def loadIds(ids: List[Key]): ZIO[Environment, Throwable, List[Ingestion]] =
+    ZIO
+      .foreachPar(ids) { key =>
+        IngestionService.load(Ingestion.Id(key))
+      }
+      .map(_.mapFilter(identity))
+
+  def loadAll(offset: Option[Key], limit: Long): ZIO[Environment, Throwable, Chunk[Key]] =
+    IngestionService.loadMany(offset, limit)
+
+  def load(key: Key): ZIO[Environment, Throwable, Option[Ingestion]] = IngestionService.load(Ingestion.Id(key))
+
+  def addCmd(key: Key, cmd: IngestionCommand): ZIO[Environment, Throwable, Unit] = IngestionCQRS.add(key, cmd)
+
+  def addIngestion(): ZIO[Environment, Throwable, Ingestion.Id] =
+    for {
+      id <- Ingestion.Id.gen
+
+      timestamp <- Timestamp.now
+
+      _ <- IngestionCQRS.add(id.asKey, IngestionCommand.StartIngestion(id, timestamp))
+
+      opt <- IngestionService.load(id)
+
+      _ <- opt.fold(ZIO.unit) { ingestion =>
+        atomically {
+          IngestionService.save(ingestion)
+        }
+      }
+
+    } yield id
+
+  val routes: Routes[Environment, Response] = Routes(
+    Method.GET / "metrics" -> handler(ZIO.serviceWithZIO[PrometheusPublisher](_.get.map(Response.text))),
+    Method.GET / "health" -> handler(Response.json(YouToo.toJson)),
+    Method.POST / "dataload" / "ingestion" -> handler { (req: Request) =>
+      boundary("dataload_ingestions", req) {
+
+        req.body.fromBody[List[Key]] flatMap (ids =>
+          for {
+            ins <- loadIds(ids)
+
+            bytes = ins
+              .map(in => String(summon[BinaryCodec[Ingestion]].encode(in).toArray, StandardCharsets.UTF_8.name))
+              .mkString("[", ",", "]")
+
+            resp = Response(
+              Status.Ok,
+              Headers(Header.ContentType(MediaType.application.json).untyped),
+              Body.fromCharSequence(s"""{"ingestions":$bytes}"""),
+            )
+
+          } yield resp,
+        )
+      }
+
+    },
+    Method.GET / "ingestion" -> handler { (req: Request) =>
+      boundary("get_ingestions_keys", req) {
+        val offset = req.queryParamTo[Long]("offset").toOption
+        val limit = req.queryParamToOrElse[Long]("limit", FetchSize)
+
+        atomically {
+
+          loadAll(offset = offset.map(Key.apply), limit) map { ids =>
+            val bytes = String(summon[BinaryCodec[Chunk[Key]]].encode(ids).toArray, StandardCharsets.UTF_8.name)
+
+            val nextOffset =
+              (if ids.size < limit then None else ids.minOption).map(id => s""","nextOffset":"$id"""").getOrElse("")
+
+            Response(
+              Status.Ok,
+              Headers(Header.ContentType(MediaType.application.json).untyped),
+              Body.fromCharSequence(s"""{"ids":$bytes$nextOffset}"""),
+            )
+
+          }
+
+        }
+      }
+
+    },
+    Method.GET / "ingestion" / long("id") -> handler { (id: Long, req: Request) =>
+      boundary("get_ingestion", req) {
+        val key = Key(id)
+
+        load(key) map {
+          case Some(ingestion) =>
+            val bytes = summon[BinaryCodec[Ingestion]].encode(ingestion)
+
+            Response(
+              Status.Ok,
+              Headers(Header.ContentType(MediaType.application.json).untyped),
+              Body.fromChunk(bytes),
+            )
+
+          case None => Response.notFound
+        }
+      }
+
+    },
+    Method.PUT / "ingestion" / long("id") -> handler { (id: Long, req: Request) =>
+      boundary("add_ingestion_cmd", req) {
+        val key = Key(id)
+
+        for {
+          cmd <- req.body.fromBody[IngestionCommand]
+          _ <- addCmd(key, cmd)
+
+        } yield Response.ok
+
+      }
+
+    },
+    Method.GET / "ingestion" / long("id") / "validate" -> handler { (id: Long, req: Request) =>
+      boundary("validate_ingestion", req) {
+        val numFiles = req.queryParamTo[Long]("numFiles")
+        val status = req.queryParamToOrElse[String]("status", "initial")
+
+        numFiles match {
+          case Left(_) => ZIO.succeed(Response.notFound)
+          case Right(n) =>
+            load(key = Key(id)) map {
+              case None => Response.notFound
+              case Some(ingestion) =>
+                if ingestion.status.totalFiles.fold(false)(_.size == n) && (ingestion.status is status) then Response.ok
+                else Response.notFound
+            }
+
+        }
+      }
+
+    },
+    Method.POST / "ingestion" -> handler { (req: Request) =>
+      boundary("add_ingestion", req) {
+        addIngestion() map (id => Response.json(s"""{"id":"$id"}"""))
+
+      }
+
+    },
+  )
+
+  def run: RIO[Environment, Unit] =
+    for {
+      config <- ZIO.config[DatabaseConfig]
+      _ <- FlywayMigration.run(config)
+
+      _ <- Server.serve(routes)
+    } yield ()
+
 }

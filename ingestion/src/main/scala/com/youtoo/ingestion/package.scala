@@ -1,6 +1,11 @@
 package com.youtoo
 package ingestion
 
+import zio.telemetry.opentelemetry.tracing.*
+import zio.telemetry.opentelemetry.baggage.*
+import zio.telemetry.opentelemetry.context.*
+import io.opentelemetry.api.common.{AttributeKey, Attributes}
+
 import zio.*
 import zio.http.*
 
@@ -19,14 +24,25 @@ extension (body: Body)
 
     } yield a
 
-inline def boundary[R, E](tag: String)(effect: ZIO[R, E, Response]): URIO[R, Response] =
-  effect.catchAllCause {
-    _.failureOrCause.fold(
-      { case e =>
-        Log.error(s"[$tag] - Found error", e) `as` Response.internalServerError
+inline def boundary[R, E](tag: String, request: Request)(
+  body: ZIO[R, E, Response],
+): URIO[R & Baggage & Tracing, Response] =
+  ZIO.serviceWithZIO[Tracing] { (tracing: Tracing) =>
 
-      },
-      Exit.failCause,
+    val effect = body @@ tracing.aspects.root(
+      tag,
+      attributes = Attributes.of(AttributeKey.stringKey("git_commit_hash"), YouToo.gitCommitHash),
     )
+
+    effect.catchAllCause {
+      _.failureOrCause.fold(
+        { case e =>
+          Log.error(s"[$tag] - Found error", e) `as` Response.internalServerError
+
+        },
+        Exit.failCause,
+      )
+
+    }
 
   }

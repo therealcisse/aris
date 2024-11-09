@@ -36,7 +36,7 @@ import zio.schema.codec.BinaryCodec
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.TimeUnit
 
-object MigrationBenchmarkServer extends ZIOApp {
+object MigrationApp extends ZIOApp {
   import com.youtoo.cqrs.Codecs.json.given
 
   inline val FetchSize = 1_000L
