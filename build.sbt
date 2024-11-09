@@ -92,9 +92,6 @@ lazy val kernel = (project in file("kernel"))
     libraryDependencies ++= Seq(
       `scala-collection-contrib`,
       // pprint,
-      `slf4j-api`,
-      // `slf4j-simple`,
-      // `slf4j-log4j12`,
       zio,
       cats,
       `zio-prelude`,
@@ -169,32 +166,6 @@ lazy val postgres = (project in file("cqrs-persistence-postgres"))
 lazy val ingestion = (project in file("ingestion"))
   .dependsOn(postgres % "compile->compile;test->test", core % "compile->compile;test->test", log % "compile->compile")
   .settings(stdSettings("ingestion"))
-  // .settings(publishSetting(false))
-  // .settings(
-  //   dockerBaseImage := "openjdk:11",
-  //   dockerExposedPorts := Seq(8181, 10001),
-  //
-  //   dockerEnvVars := Map(
-  //     "DATABASE_URL" -> sys.env.getOrElse("DATABASE_URL", ""),
-  //     "DATABASE_USERNAME" -> sys.env.getOrElse("DATABASE_USERNAME", ""),
-  //     "DATABASE_PASSWORD" -> sys.env.getOrElse("DATABASE_PASSWORD", ""),
-  //     // "JAVA_OPTS" -> s"-agentpath:/usr/local/YourKit-JavaProfiler-2024.9/bin/${sys.props.getOrElse("ARCH", "linux-arm-64")}/libyjpagent.so=port=10001,listen=all -Xms2G -Xmx2G -server",
-  //   ),
-  //
-  //   dockerBuildxPlatforms := Seq("linux/arm64/v8", "linux/amd64"),
-  //
-  //   Docker / dockerCommands ++= Seq(
-  //     Cmd("USER", "root"),
-  //     Cmd("RUN", "wget https://www.yourkit.com/download/docker/YourKit-JavaProfiler-2024.9-docker.zip -P /tmp/"),
-  //     Cmd("RUN", "unzip /tmp/YourKit-JavaProfiler-2024.9-docker.zip -d /usr/local"),
-  //     Cmd("RUN", "rm /tmp/YourKit-JavaProfiler-2024.9-docker.zip"),
-  //   ),
-  //
-  //   dockerEntrypoint := Seq("./bin/ingestion"),
-  //
-  //   bashScriptExtraDefines += s"""addJava "-agentpath:/usr/local/YourKit-JavaProfiler-2024.9/bin/${sys.props.getOrElse("ARCH", "linux-arm-64")}/libyjpagent.so=port=10001,listen=all,sampling -Xms2G -Xmx4G -server"""",
-  // )
-  // .enablePlugins(JavaAppPackaging, DockerPlugin)
   .settings(
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
     libraryDependencies ++= Seq(
@@ -208,7 +179,6 @@ lazy val ingestion = (project in file("ingestion"))
       `zio-test-magnolia`,
       `zio-mock`,
       `zio-http`,
-      // `zio-json`,
     ),
   )
 
@@ -220,34 +190,9 @@ lazy val dataMigration = (project in file("data-migration"))
     log % "compile->compile",
   )
   .settings(stdSettings("data-migration"))
-  // .settings(publishSetting(false))
-  // .settings(
-  //   dockerBaseImage := "openjdk:11",
-  //   dockerExposedPorts := Seq(8181, 10001),
-  //
-  //   dockerEnvVars := Map(
-  //     "DATABASE_URL" -> sys.env.getOrElse("DATABASE_URL", ""),
-  //     "DATABASE_USERNAME" -> sys.env.getOrElse("DATABASE_USERNAME", ""),
-  //     "DATABASE_PASSWORD" -> sys.env.getOrElse("DATABASE_PASSWORD", ""),
-  //     // "JAVA_OPTS" -> s"-agentpath:/usr/local/YourKit-JavaProfiler-2024.9/bin/${sys.props.getOrElse("ARCH", "linux-arm-64")}/libyjpagent.so=port=10001,listen=all -Xms2G -Xmx2G -server",
-  //   ),
-  //
-  //   dockerBuildxPlatforms := Seq("linux/arm64/v8", "linux/amd64"),
-  //
-  //   Docker / dockerCommands ++= Seq(
-  //     Cmd("USER", "root"),
-  //     Cmd("RUN", "wget https://www.yourkit.com/download/docker/YourKit-JavaProfiler-2024.9-docker.zip -P /tmp/"),
-  //     Cmd("RUN", "unzip /tmp/YourKit-JavaProfiler-2024.9-docker.zip -d /usr/local"),
-  //     Cmd("RUN", "rm /tmp/YourKit-JavaProfiler-2024.9-docker.zip"),
-  //   ),
-  //
-  //   dockerEntrypoint := Seq("./bin/ingestion"),
-  //
-  //   bashScriptExtraDefines += s"""addJava "-agentpath:/usr/local/YourKit-JavaProfiler-2024.9/bin/${sys.props.getOrElse("ARCH", "linux-arm-64")}/libyjpagent.so=port=10001,listen=all,sampling -Xms2G -Xmx4G -server"""",
-  // )
-  // .enablePlugins(JavaAppPackaging, DockerPlugin)
   .settings(
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
+    libraryDependencies ++= openTelemetry,
     libraryDependencies ++= Seq(
       // `zio-config-typesafe`,
       `zio-metrics-connectors-prometheus`,
@@ -257,7 +202,6 @@ lazy val dataMigration = (project in file("data-migration"))
       `zio-test-magnolia`,
       `zio-mock`,
       `zio-http`,
-      // `zio-json`,
     ),
   )
 

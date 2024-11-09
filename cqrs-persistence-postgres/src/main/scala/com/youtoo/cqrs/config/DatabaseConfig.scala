@@ -56,13 +56,13 @@ object DatabaseConfig {
 
   val pool: ZLayer[Any, Throwable, ZConnectionPool] = createZIOPoolConfig >>> connectionPool
 
-  given Config[DatabaseConfig] =
+  given Config[DatabaseConfig] = Node { env =>
     (
       Config.string("driver").optional ++
         Config.string("url").optional ++ Config.string("username").optional ++ Config
           .string("password")
           .optional ++ Config.string("migrations").optional
-    ).nested("database").map { case (driverClassName, jdbcUrl, username, password, migrations) =>
+    ).nested(env.name, "database") map { case (driverClassName, jdbcUrl, username, password, migrations) =>
       (
         driverClassName orElse "org.postgresql.Driver".some,
         jdbcUrl,
@@ -82,5 +82,6 @@ object DatabaseConfig {
       } getOrElse (throw IllegalArgumentException("Load database config"))
 
     }
+  }
 
 }

@@ -3,7 +3,7 @@
 set -xe
 
 tag=youtoo-profiling:latest
-docker run -d --network youtoo_app-network -e YOUTOO_LOG_LEVEL=INFO -p 8181:8181 --env-file ../docker.env -p 10001:10001 --rm $tag
+docker run -d --network youtoo_app-network -e YOUTOO_LOG_LEVEL=INFO -e youtooenvname=docker -p 8181:8181 --env-file ../.env -p 10001:10001 --rm $tag
 
 CONTAINER_ID=$(docker ps -q --filter "ancestor=$tag")
 echo "Container ID: $CONTAINER_ID"

@@ -1,4 +1,5 @@
-#!/bin/bash
+#!/bin/sh
+
 COMMIT_SHA=$(git rev-parse --short HEAD)
 TAG="youtoo-profiling:$COMMIT_SHA"
 

@@ -40,6 +40,10 @@ case "$1" in
     echo "Stop profiling"
     docker exec -it $CONTAINER_ID /stop-profiling.sh $PID
     ;;
+  sh)
+    echo "SH profiling"
+    docker exec -it $CONTAINER_ID /bin/bash
+    ;;
   *)
     echo "Invalid option: $1"
     echo "Usage: $0 {cpu|alloc|wall|status|stop}"

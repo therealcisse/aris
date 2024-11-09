@@ -87,4 +87,14 @@ object Dependencies {
   val `spring-boot` = "org.springframework.boot" % "spring-boot" % "3.3.5"
 
   val jansi = "org.fusesource.jansi" % "jansi" % "2.4.0"
+
+  val openTelemetry = Seq(
+    "io.zipkin.reporter2" % "zipkin-reporter" % "2.16.3",
+    "io.zipkin.reporter2" % "zipkin-sender-okhttp3" % "2.16.3",
+    "io.opentelemetry" % "opentelemetry-exporter-otlp" % "1.43.0",
+    "io.opentelemetry" % "opentelemetry-exporter-logging-otlp" % "1.43.0",
+    "io.opentelemetry" % "opentelemetry-sdk" % "1.43.0",
+    "io.opentelemetry.semconv" % "opentelemetry-semconv" % "1.22.0-alpha",
+    "io.grpc" % "grpc-netty-shaded" % "1.47.0",
+  )
 }
