@@ -10,6 +10,21 @@ import xerial.sbt.Sonatype.autoImport.*
 object BuildHelper extends ScalaSettings {
   val Scala3 = "3.5.1"
 
+  def getDockerEnvVars(): Map[String, String] =
+    Map(
+      "YOUTOOENVNAME" -> "docker",
+      "DOCKER_DATABASE_URL" -> sys.env
+        .getOrElse("DOCKER_DATABASE_URL", throw new IllegalStateException("No env found")),
+      "DOCKER_DATABASE_USERNAME" -> sys.env
+        .getOrElse("DOCKER_DATABASE_USERNAME", throw new IllegalStateException("No env found")),
+      "DOCKER_DATABASE_PASSWORD" -> sys.env
+        .getOrElse("DOCKER_DATABASE_PASSWORD", throw new IllegalStateException("No env found")),
+      "INGESTION_SNAPSHOTS_THRESHOLD" -> sys.env
+        .getOrElse("INGESTION_SNAPSHOTS_THRESHOLD", throw new IllegalStateException("No env found")),
+      "MIGRATION_SNAPSHOTS_THRESHOLD" -> sys.env
+        .getOrElse("MIGRATION_SNAPSHOTS_THRESHOLD", throw new IllegalStateException("No env found")),
+    )
+
   private val stdOptions = Seq(
     "-deprecation",
     "-encoding",
@@ -134,6 +149,8 @@ object BuildHelper extends ScalaSettings {
     name := prjName,
     ThisBuild / crossScalaVersions := Seq(Scala3),
     ThisBuild / scalaVersion := Scala3,
+    Compile / packageSrc / publishArtifact := false,
+    Compile / packageDoc / publishArtifact := false,
     scalacOptions ++= stdOptions ++ extraOptions(scalaVersion.value),
     ThisBuild / scalafixDependencies ++=
       List(

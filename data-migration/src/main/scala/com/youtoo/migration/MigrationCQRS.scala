@@ -14,25 +14,12 @@ import com.youtoo.cqrs.*
 import com.youtoo.cqrs.service.*
 import com.youtoo.migration.store.*
 
-import zio.metrics.*
-
-import java.time.temporal.ChronoUnit
-
 trait MigrationCQRS extends CQRS[MigrationEvent, MigrationCommand] {}
 
 object MigrationCQRS {
 
-  object metrics {
-    val addition = Metric.timer(
-      "Migration_addition_duration",
-      chronoUnit = ChronoUnit.MILLIS,
-      boundaries = Chunk.iterate(1.0, 10)(_ + 1.0),
-    )
-
-  }
-
   inline def add(id: Key, cmd: MigrationCommand): RIO[MigrationCQRS, Unit] =
-    ZIO.serviceWithZIO[MigrationCQRS](_.add(id, cmd)) @@ metrics.addition.trackDuration
+    ZIO.serviceWithZIO[MigrationCQRS](_.add(id, cmd))
 
   def live(): ZLayer[
     ZConnectionPool & MigrationEventStore,

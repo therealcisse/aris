@@ -1,4 +1,5 @@
 package com.youtoo
+package observability
 package otel
 
 import io.opentelemetry.api.common.Attributes

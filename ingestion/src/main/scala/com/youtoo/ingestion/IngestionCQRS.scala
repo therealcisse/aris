@@ -14,25 +14,12 @@ import com.youtoo.ingestion.model.*
 import com.youtoo.cqrs.service.*
 import com.youtoo.ingestion.store.*
 
-import zio.metrics.*
-
-import java.time.temporal.ChronoUnit
-
 trait IngestionCQRS extends CQRS[IngestionEvent, IngestionCommand] {}
 
 object IngestionCQRS {
 
-  object metrics {
-    val addition = Metric.timer(
-      "Ingestion_addition_duration",
-      chronoUnit = ChronoUnit.MILLIS,
-      boundaries = Chunk.iterate(1.0, 10)(_ + 1.0),
-    )
-
-  }
-
   inline def add(id: Key, cmd: IngestionCommand): RIO[IngestionCQRS, Unit] =
-    ZIO.serviceWithZIO[IngestionCQRS](_.add(id, cmd)) @@ metrics.addition.trackDuration
+    ZIO.serviceWithZIO[IngestionCQRS](_.add(id, cmd))
 
   def live(): ZLayer[
     ZConnectionPool & IngestionEventStore,

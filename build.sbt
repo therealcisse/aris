@@ -52,7 +52,7 @@ lazy val aggregatedProjects: Seq[ProjectReference] =
     loadtests,
     benchmarks,
     log,
-    otel,
+    observability,
   )
 
 inThisBuild(replSettings)
@@ -126,15 +126,16 @@ lazy val core = (project in file("cqrs-core"))
   )
   .dependsOn(kernel)
 
-lazy val otel = (project in file("otel"))
+lazy val observability = (project in file("observability"))
   .dependsOn(kernel)
-  .settings(stdSettings("otel"))
+  .settings(stdSettings("observability"))
   // .settings(publishSetting(false))
   .enablePlugins(BuildInfoPlugin)
   .settings(buildInfoSettings("com.youtoo"))
   .settings(
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
-    libraryDependencies ++= openTelemetry,
+    libraryDependencies ++= Dependencies.openTelemetry,
+    libraryDependencies += cats,
   )
 
 
@@ -144,7 +145,7 @@ lazy val std = (project in file("std"))
   .settings(
     Test / parallelExecution := false,
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
-    libraryDependencies ++= openTelemetry,
+    libraryDependencies ++= Dependencies.openTelemetry,
     libraryDependencies ++= Seq(
       cats,
       zio,
@@ -163,7 +164,7 @@ lazy val postgres = (project in file("cqrs-persistence-postgres"))
   .settings(
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
     Test / unmanagedResourceDirectories ++= (Compile / unmanagedResourceDirectories).value,
-    libraryDependencies ++= openTelemetry,
+    libraryDependencies ++= Dependencies.openTelemetry,
     libraryDependencies ++= Seq(
       flyway,
       hicariCP,
@@ -183,12 +184,20 @@ lazy val ingestion = (project in file("ingestion"))
     postgres % "compile->compile;test->test",
     core % "compile->compile;test->test",
     log % "compile->compile",
-    otel % "compile->compile",
+    observability % "compile->compile",
+  )
+  .enablePlugins(DockerPlugin, JavaAppPackaging)
+  .settings(
+    Docker / packageName := "youtoo-ingestion",
+    dockerBaseImage := "eclipse-temurin:17-jre",
+    dockerExposedPorts := Seq(8181, 9464),
+    dockerUpdateLatest := true,
+    dockerEnvVars ++= BuildHelper.getDockerEnvVars(),
+    mainClass := Some("com.youtoo.ingestion.IngestionApp")
   )
   .settings(stdSettings("ingestion"))
   .settings(
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
-    libraryDependencies ++= openTelemetry,
     libraryDependencies ++= Seq(
       netty,
       `hadoop-client`,
@@ -199,7 +208,6 @@ lazy val ingestion = (project in file("ingestion"))
       `zio-test-sbt`,
       `zio-test-magnolia`,
       `zio-mock`,
-      `zio-http`,
     ),
   )
 
@@ -209,7 +217,7 @@ lazy val dataMigration = (project in file("data-migration"))
     postgres % "compile->compile;test->test",
     core % "compile->compile;test->test",
     log % "compile->compile",
-    otel % "compile->compile",
+    observability % "compile->compile",
   )
   .settings(stdSettings("data-migration"))
   .settings(
@@ -222,7 +230,6 @@ lazy val dataMigration = (project in file("data-migration"))
       `zio-test-sbt`,
       `zio-test-magnolia`,
       `zio-mock`,
-      `zio-http`,
     ),
   )
 

@@ -6,12 +6,6 @@ import scala.language.future
 import zio.*
 import zio.jdbc.*
 
-import zio.metrics.*
-import zio.metrics.connectors.prometheus.*
-import zio.metrics.connectors.prometheus.PrometheusPublisher
-import zio.metrics.connectors.MetricsConfig
-import zio.metrics.connectors.prometheus
-
 import cats.implicits.*
 
 import com.youtoo.cqrs.*
@@ -29,10 +23,12 @@ import zio.http.{Version as _, *}
 import zio.http.netty.NettyConfig
 import zio.schema.codec.BinaryCodec
 import java.nio.charset.StandardCharsets
-import java.util.concurrent.TimeUnit
 
-import com.youtoo.otel.OtelSdk
+import com.youtoo.observability.RestEndpoint
+import com.youtoo.observability.RestEndpoint.*
+import com.youtoo.observability.otel.OtelSdk
 
+import zio.telemetry.opentelemetry.metrics.*
 import zio.telemetry.opentelemetry.OpenTelemetry
 import zio.telemetry.opentelemetry.tracing.Tracing
 import zio.telemetry.opentelemetry.baggage.Baggage
@@ -43,7 +39,7 @@ object IngestionApp extends ZIOApp {
   inline val FetchSize = 1_000L
 
   type Environment =
-    FlywayMigration & ZConnectionPool & CQRSPersistence & SnapshotStore & IngestionEventStore & IngestionCQRS & Server & Server.Config & NettyConfig & IngestionService & IngestionRepository & PrometheusPublisher & MetricsConfig & SnapshotStrategy.Factory & Tracing & Baggage
+    FlywayMigration & ZConnectionPool & CQRSPersistence & SnapshotStore & IngestionEventStore & IngestionCQRS & Server & Server.Config & NettyConfig & IngestionService & IngestionRepository & SnapshotStrategy.Factory & Tracing & Baggage & Meter
 
   given environmentTag: EnvironmentTag[Environment] = EnvironmentTag[Environment]
 
@@ -79,16 +75,13 @@ object IngestionApp extends ZIOApp {
           configLayer,
           nettyConfigLayer,
           Server.customized,
-          prometheus.publisherLayer,
-          prometheus.prometheusLayer,
-          ZLayer.succeed(MetricsConfig(interval = Duration(5L, TimeUnit.SECONDS))),
           SnapshotStrategy.live(),
           OtelSdk.custom(resourceName),
           OpenTelemetry.tracing(instrumentationScopeName),
-          // OpenTelemetry.metrics(instrumentationScopeName),
+          OpenTelemetry.metrics(instrumentationScopeName),
           // OpenTelemetry.logging(instrumentationScopeName),
           OpenTelemetry.baggage(),
-          // OpenTelemetry.zioMetrics,
+          OpenTelemetry.zioMetrics,
           OpenTelemetry.contextZIO,
         )
         .orDie ++ Runtime.setConfigProvider(ConfigProvider.envProvider)
@@ -126,10 +119,9 @@ object IngestionApp extends ZIOApp {
     } yield id
 
   val routes: Routes[Environment, Response] = Routes(
-    Method.GET / "metrics" -> handler(ZIO.serviceWithZIO[PrometheusPublisher](_.get.map(Response.text))),
     Method.GET / "health" -> handler(Response.json(YouToo.toJson)),
     Method.POST / "dataload" / "ingestion" -> handler { (req: Request) =>
-      boundary("dataload_ingestions", req) {
+      RestEndpoint.boundary("dataload_ingestions", req) {
 
         req.body.fromBody[List[Key]] flatMap (ids =>
           for {
@@ -151,7 +143,7 @@ object IngestionApp extends ZIOApp {
 
     },
     Method.GET / "ingestion" -> handler { (req: Request) =>
-      boundary("get_ingestions_keys", req) {
+      RestEndpoint.boundary("get_ingestions_keys", req) {
         val offset = req.queryParamTo[Long]("offset").toOption
         val limit = req.queryParamToOrElse[Long]("limit", FetchSize)
 
@@ -176,7 +168,7 @@ object IngestionApp extends ZIOApp {
 
     },
     Method.GET / "ingestion" / long("id") -> handler { (id: Long, req: Request) =>
-      boundary("get_ingestion", req) {
+      RestEndpoint.boundary("get_ingestion", req) {
         val key = Key(id)
 
         load(key) map {
@@ -195,7 +187,7 @@ object IngestionApp extends ZIOApp {
 
     },
     Method.PUT / "ingestion" / long("id") -> handler { (id: Long, req: Request) =>
-      boundary("add_ingestion_cmd", req) {
+      RestEndpoint.boundary("add_ingestion_cmd", req) {
         val key = Key(id)
 
         for {
@@ -208,7 +200,7 @@ object IngestionApp extends ZIOApp {
 
     },
     Method.GET / "ingestion" / long("id") / "validate" -> handler { (id: Long, req: Request) =>
-      boundary("validate_ingestion", req) {
+      RestEndpoint.boundary("validate_ingestion", req) {
         val numFiles = req.queryParamTo[Long]("numFiles")
         val status = req.queryParamToOrElse[String]("status", "initial")
 
@@ -227,7 +219,7 @@ object IngestionApp extends ZIOApp {
 
     },
     Method.POST / "ingestion" -> handler { (req: Request) =>
-      boundary("add_ingestion", req) {
+      RestEndpoint.boundary("add_ingestion", req) {
         addIngestion() map (id => Response.json(s"""{"id":"$id"}"""))
 
       }

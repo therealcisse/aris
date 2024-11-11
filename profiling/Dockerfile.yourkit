@@ -13,7 +13,7 @@ COPY . youtoo-src
 
 RUN sbt stage
 
-FROM eclipse-temurin:17-jre-slim
+FROM eclipse-temurin:17-jre
 
 COPY --from=builder /usr/local/YourKit-JavaProfiler-2024.9 /usr/local/YourKit-JavaProfiler-2024.9
 ARG ARCH
@@ -23,6 +23,7 @@ WORKDIR /youtoo
 COPY --from=builder /youtoo/target/universal/stage /youtoo
 
 EXPOSE 8181
+EXPOSE 9464
 EXPOSE 10001
 
 CMD ["./bin/youtoo-profiling"]

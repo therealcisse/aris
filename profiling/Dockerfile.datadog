@@ -9,7 +9,7 @@ COPY . youtoo-src
 
 RUN sbt stage
 
-FROM eclipse-temurin:17.0.13_11-jre
+FROM eclipse-temurin:17-jre
 
 RUN mkdir -p /datadog && \
     wget -O /datadog/dd-java-agent.jar https://dtdg.co/latest-java-tracer
@@ -25,5 +25,6 @@ WORKDIR /youtoo
 COPY --from=builder /youtoo/target/universal/stage /youtoo
 
 EXPOSE 8181
+EXPOSE 9464
 
 CMD ["./bin/youtoo-profiling"]

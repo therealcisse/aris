@@ -1,4 +1,5 @@
 package com.youtoo
+package observability
 package otel
 
 import zio.*
@@ -12,14 +13,14 @@ object OtelSdk {
     OpenTelemetry.custom(
       for {
         tracerProvider <- TracerProvider.jaeger(resourceName)
-        // meterProvider <- MeterProvider.prometheus(resourceName)
+        meterProvider <- MeterProvider.prometheus(resourceName)
         // loggerProvider <- LoggerProvider.seq(resourceName)
         openTelemetry <- ZIO.fromAutoCloseable(
           ZIO.succeed(
             OpenTelemetrySdk
               .builder()
               .setTracerProvider(tracerProvider)
-              // .setMeterProvider(meterProvider)
+              .setMeterProvider(meterProvider)
               // .setLoggerProvider(loggerProvider)
               .build,
           ),

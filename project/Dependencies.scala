@@ -60,7 +60,6 @@ object Dependencies {
   val `zio-mock` = "dev.zio" %% "zio-mock" % "1.0.0-RC12" % Test
   val `zio-test-magnolia` = "dev.zio" %% "zio-test-magnolia" % ZioVersion % Test
   val `testcontainers-scala-postgresql` = "com.dimafeng" %% "testcontainers-scala-postgresql" % "0.41.4" % Test
-  val `zio-http` = "dev.zio" %% "zio-http" % "3.0.1"
   val `zio-logging` = "dev.zio" %% "zio-logging" % "2.3.2"
   val `zio-logging-slf4j` = "dev.zio" %% "zio-logging-slf4j" % "2.3.1"
   val `zio-logging-slf4j2` = "dev.zio" %% "zio-logging-slf4j2" % "2.3.2"
@@ -89,6 +88,7 @@ object Dependencies {
   val jansi = "org.fusesource.jansi" % "jansi" % "2.4.0"
 
   val openTelemetry = Seq(
+    "dev.zio" %% "zio-http" % "3.0.1",
     "io.zipkin.reporter2" % "zipkin-reporter" % "2.16.3",
     "io.zipkin.reporter2" % "zipkin-sender-okhttp3" % "2.16.3",
     "dev.zio" %% "zio-opentelemetry" % "3.0.1",

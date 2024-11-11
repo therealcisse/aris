@@ -9,12 +9,6 @@ import zio.stream.*
 import zio.logging.*
 import zio.logging.backend.SLF4J
 
-import zio.metrics.*
-import zio.metrics.connectors.prometheus.*
-import zio.metrics.connectors.prometheus.PrometheusPublisher
-import zio.metrics.connectors.MetricsConfig
-import zio.metrics.connectors.prometheus
-
 import cats.implicits.*
 
 import com.youtoo.cqrs.*
@@ -34,10 +28,12 @@ import zio.http.{Version as _, *}
 import zio.http.netty.NettyConfig
 import zio.schema.codec.BinaryCodec
 import java.nio.charset.StandardCharsets
-import java.util.concurrent.TimeUnit
 
-import com.youtoo.otel.OtelSdk
+import com.youtoo.observability.RestEndpoint
+import com.youtoo.observability.RestEndpoint.*
+import com.youtoo.observability.otel.OtelSdk
 
+import zio.telemetry.opentelemetry.metrics.*
 import zio.telemetry.opentelemetry.OpenTelemetry
 import zio.telemetry.opentelemetry.tracing.Tracing
 import zio.telemetry.opentelemetry.baggage.Baggage
@@ -48,7 +44,7 @@ object MigrationApp extends ZIOApp {
   inline val FetchSize = 1_000L
 
   type Environment =
-    FlywayMigration & ZConnectionPool & CQRSPersistence & SnapshotStore & MigrationEventStore & MigrationCQRS & Server & Server.Config & NettyConfig & MigrationService & MigrationRepository & PrometheusPublisher & MetricsConfig & SnapshotStrategy.Factory & DataMigration & Interrupter & Healthcheck & Tracing & Baggage
+    FlywayMigration & ZConnectionPool & CQRSPersistence & SnapshotStore & MigrationEventStore & MigrationCQRS & Server & Server.Config & NettyConfig & MigrationService & MigrationRepository & SnapshotStrategy.Factory & DataMigration & Interrupter & Healthcheck & Tracing & Baggage & Meter
 
   given environmentTag: EnvironmentTag[Environment] = EnvironmentTag[Environment]
 
@@ -86,9 +82,6 @@ object MigrationApp extends ZIOApp {
           configLayer,
           nettyConfigLayer,
           Server.customized,
-          prometheus.publisherLayer,
-          prometheus.prometheusLayer,
-          ZLayer.succeed(MetricsConfig(interval = Duration(5L, TimeUnit.SECONDS))),
           SnapshotStrategy.live(),
           DataMigration.live(),
           Interrupter.live(),
@@ -104,9 +97,8 @@ object MigrationApp extends ZIOApp {
         .orDie ++ Runtime.setConfigProvider(ConfigProvider.envProvider) ++ logging
 
   val routes: Routes[Environment & Scope, Response] = Routes(
-    Method.GET / "metrics" -> handler(ZIO.serviceWithZIO[PrometheusPublisher](_.get.map(Response.text))),
     Method.POST / "dataload" / "migration" -> handler { (req: Request) =>
-      boundary("dataload_migrations", req) {
+      RestEndpoint.boundary("dataload_migrations", req) {
 
         req.body.fromBody[List[Key]] flatMap (ids =>
           for {
@@ -132,7 +124,7 @@ object MigrationApp extends ZIOApp {
 
     },
     Method.GET / "migration" -> handler { (req: Request) =>
-      boundary("get_migrations", req) {
+      RestEndpoint.boundary("get_migrations", req) {
         val offset = req.queryParamTo[Long]("offset").toOption
         val limit = req.queryParamToOrElse[Long]("limit", FetchSize)
 
@@ -157,7 +149,7 @@ object MigrationApp extends ZIOApp {
 
     },
     Method.GET / "migration" / long("id") -> handler { (id: Long, req: Request) =>
-      boundary("get_migration", req) {
+      RestEndpoint.boundary("get_migration", req) {
         val key = Key(id)
 
         MigrationService.load(Migration.Id(key)) map {
@@ -176,7 +168,7 @@ object MigrationApp extends ZIOApp {
 
     },
     Method.POST / "migration" -> handler { (req: Request) =>
-      boundary("add_migraion", req) {
+      RestEndpoint.boundary("add_migraion", req) {
         for {
           id <- Key.gen
 
@@ -197,7 +189,7 @@ object MigrationApp extends ZIOApp {
       }
     },
     Method.POST / "migration" / long("id") / "run" -> handler { (id: Long, req: Request) =>
-      boundary("run_migration", req) {
+      RestEndpoint.boundary("run_migration", req) {
         val numKeys = req.queryParamToOrElse[Long]("numKeys", 10L)
 
         val processor: ZLayer[Any, Nothing, DataMigration.Processor] = ZLayer.succeed {
@@ -220,7 +212,7 @@ object MigrationApp extends ZIOApp {
 
     },
     Method.DELETE / "migration" / long("id") / "stop" -> handler { (id: Long, req: Request) =>
-      boundary("stop_migration", req) {
+      RestEndpoint.boundary("stop_migration", req) {
         Interrupter.interrupt(id = Key(id)) `as` Response.ok
       }
 

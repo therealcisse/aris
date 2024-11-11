@@ -5,4 +5,4 @@ scrape_configs:
   - job_name: 'youtoo'
     scrape_interval: 5s
     static_configs:
-      - targets: ['host.docker.internal:8181', 'localhost:8181']
+      - targets: ['host.docker.internal:9464', 'localhost:9464']
