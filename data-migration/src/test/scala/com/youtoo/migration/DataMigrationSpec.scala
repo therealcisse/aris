@@ -23,7 +23,10 @@ object DataMigrationSpec extends MockSpecDefault {
     testIncompleteMigrationResumption,
     testStopMigration,
   ).provideSomeLayerShared(
-    (Healthcheck.live() ++ Interrupter.live()) >+> DataMigration.live(),
+    ZLayer.make[Healthcheck & Interrupter & DataMigration](
+      (Healthcheck.live() ++ Interrupter.live()) >+> DataMigration.live(),
+      (zio.telemetry.opentelemetry.OpenTelemetry.contextZIO >>> tracingMockLayer()),
+    ),
   ) @@ TestAspect.withLiveClock
 
   val testStopMigration = test("migration is stopped when Interrupter.interrupt is called") {
@@ -47,7 +50,7 @@ object DataMigrationSpec extends MockSpecDefault {
       }
 
       interrupterRef <- Ref.Synchronized.make(Map.empty[Key, Promise[Throwable, Unit]])
-      interrupter = new Interrupter.Live(interrupterRef)
+      interrupter = new Interrupter.InterrupterLive(interrupterRef)
       timestamp <- Timestamp.now
       migration = Migration(migrationId, Migration.State(Map.empty), timestamp)
 
@@ -72,7 +75,7 @@ object DataMigrationSpec extends MockSpecDefault {
       healthcheck <- ZIO.service[Healthcheck]
 
       layer = (processor ++ ZLayer.succeed(
-        new DataMigration.Live(interrupter, healthcheck, 1),
+        new DataMigration.DataMigrationLive(interrupter, healthcheck, 1),
       ) ++ migrationCQRS ++ migrationService)
       fiber <- DataMigration.run(migrationId).fork.provideLayer(layer)
       _ <- processingStarted.await

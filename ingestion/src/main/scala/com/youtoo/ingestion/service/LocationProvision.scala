@@ -6,6 +6,8 @@ import com.youtoo.ingestion.model.*
 
 import zio.*
 
+import zio.telemetry.opentelemetry.tracing.Tracing
+
 trait LocationProvision {
   def getFiles(path: String): Task[List[IngestionFile]]
 }
@@ -21,11 +23,11 @@ object LocationProvision {
 
   def hadoop(): ZLayer[Any, Throwable, LocationProvision] =
     ZLayer.succeed {
-      new Live(Configuration())
+      new LocationProvisionLive(Configuration())
 
     }
 
-  class Live(configuration: Configuration) extends LocationProvision {
+  class LocationProvisionLive(configuration: Configuration) extends LocationProvision { self =>
     def getFiles(path: String): Task[List[IngestionFile]] = ZIO.attempt {
       val fs = FileSystem.get(configuration)
       val p = new Path(path)
@@ -63,6 +65,12 @@ object LocationProvision {
     } flatMap { files =>
       ZIO.collectAllPar(files)
     }
+
+    inline def traced(tracing: Tracing): LocationProvision =
+      new LocationProvision {
+        def getFiles(path: String): Task[List[IngestionFile]] =
+          self.getFiles(path) @@ tracing.aspects.span("LocationProvision.load")
+      }
 
   }
 

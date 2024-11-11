@@ -86,7 +86,9 @@ object IngestionServiceSpec extends MockSpecDefault {
           _ <- IngestionService.load(id)
 
         } yield assertCompletes)
-          .provideSomeLayer[ZConnectionPool]((deps ++ SnapshotStrategy.live()) >>> IngestionService.live())
+          .provideSomeLayer[ZConnectionPool & zio.telemetry.opentelemetry.tracing.Tracing](
+            (deps ++ SnapshotStrategy.live()) >>> IngestionService.live(),
+          )
       }
 
     },
@@ -102,8 +104,11 @@ object IngestionServiceSpec extends MockSpecDefault {
         (for {
           effect <- atomically(IngestionService.save(ingestion))
           testResult = assert(effect)(equalTo(expected))
-        } yield testResult).provideSomeLayer[ZConnectionPool](
-          mockEnv.toLayer >>> ZLayer.makeSome[IngestionRepository & ZConnectionPool, IngestionService](
+        } yield testResult).provideSomeLayer[ZConnectionPool & zio.telemetry.opentelemetry.tracing.Tracing](
+          mockEnv.toLayer >>> ZLayer.makeSome[
+            IngestionRepository & ZConnectionPool & zio.telemetry.opentelemetry.tracing.Tracing,
+            IngestionService,
+          ](
             PostgresCQRSPersistence.live(),
             IngestionEventStore.live(),
             SnapshotStore.live(),
@@ -126,8 +131,11 @@ object IngestionServiceSpec extends MockSpecDefault {
         (for {
           effect <- atomically(IngestionService.loadMany(offset = key, limit = limit))
           testResult = assert(effect)(equalTo(expected))
-        } yield testResult).provideSomeLayer[ZConnectionPool](
-          mockEnv.toLayer >>> ZLayer.makeSome[IngestionRepository & ZConnectionPool, IngestionService](
+        } yield testResult).provideSomeLayer[ZConnectionPool & zio.telemetry.opentelemetry.tracing.Tracing](
+          mockEnv.toLayer >>> ZLayer.makeSome[
+            IngestionRepository & ZConnectionPool & zio.telemetry.opentelemetry.tracing.Tracing,
+            IngestionService,
+          ](
             PostgresCQRSPersistence.live(),
             IngestionEventStore.live(),
             SnapshotStore.live(),
@@ -138,6 +146,8 @@ object IngestionServiceSpec extends MockSpecDefault {
 
       }
     },
-  ).provideSomeLayerShared(ZConnectionMock.pool()) @@ TestAspect.withLiveClock
+  ).provideSomeLayerShared(
+    ZConnectionMock.pool() ++ (zio.telemetry.opentelemetry.OpenTelemetry.contextZIO >>> tracingMockLayer()),
+  ) @@ TestAspect.withLiveClock
 
 }

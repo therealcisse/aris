@@ -86,6 +86,14 @@ object DataMigrationBenchmark {
   import zio.logging.*
   import zio.logging.backend.*
 
+  import com.youtoo.otel.OtelSdk
+
+  import zio.telemetry.opentelemetry.OpenTelemetry
+  import zio.telemetry.opentelemetry.tracing.Tracing
+
+  private val instrumentationScopeName = "com.youtoo.migration.DataMigrationBenchmark"
+  private val resourceName = "migration-benchmark"
+
   val deps = Runtime.disableFlags(
     RuntimeFlag.FiberRoots,
   ) ++ Runtime.enableRuntimeMetrics ++ Runtime.enableAutoBlockingExecutor ++ Runtime.enableFlags(
@@ -101,6 +109,12 @@ object DataMigrationBenchmark {
       MigrationCQRS.live(),
       PostgresCQRSPersistence.live(),
       FlywayMigration.live(),
+      OtelSdk.custom(resourceName),
+      OpenTelemetry.tracing(instrumentationScopeName),
+      OpenTelemetry.metrics(instrumentationScopeName),
+      OpenTelemetry.logging(instrumentationScopeName),
+      OpenTelemetry.zioMetrics,
+      OpenTelemetry.contextZIO,
     )
 
   val createMigration: Task[(Migration.Id, String)] =
@@ -193,15 +207,15 @@ object DataMigrationBenchmark {
   }
 
   class MockHealthcheck() extends Healthcheck {
-    def start(id: Key, interval: Schedule[Any, Any, Any]): Task[Healthcheck.Handle] =
-      ZIO.succeed(Healthcheck.Handle(ZIO.unit))
+    def start(id: Key, interval: Schedule[Any, Any, Any]): RIO[Scope, Unit] =
+      ZIO.unit
     def getHeartbeat(id: Key): UIO[Option[Timestamp]] = Timestamp.now.map(_.some)
     def isRunning(id: Key): UIO[Boolean] = ZIO.succeed(true)
   }
 
   val migrationLayer: ZLayer[Any, Throwable, DataMigration] =
     ZLayer.succeed {
-      DataMigration.Live(interrupter = new MockInterrupter(), healthcheck = new MockHealthcheck(), 8)
+      DataMigration.DataMigrationLive(interrupter = new MockInterrupter(), healthcheck = new MockHealthcheck(), 8)
     }
 
   def execute(query: ZIO[Any, Throwable, ?]): Unit = BenchmarkUtils.unsafeRun(query)

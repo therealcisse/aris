@@ -36,15 +36,24 @@ import zio.schema.codec.BinaryCodec
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.TimeUnit
 
+import com.youtoo.otel.OtelSdk
+
+import zio.telemetry.opentelemetry.OpenTelemetry
+import zio.telemetry.opentelemetry.tracing.Tracing
+import zio.telemetry.opentelemetry.baggage.Baggage
+
 object MigrationApp extends ZIOApp {
   import com.youtoo.cqrs.Codecs.json.given
 
   inline val FetchSize = 1_000L
 
   type Environment =
-    FlywayMigration & ZConnectionPool & CQRSPersistence & SnapshotStore & MigrationEventStore & MigrationCQRS & Server & Server.Config & NettyConfig & MigrationService & MigrationRepository & PrometheusPublisher & MetricsConfig & SnapshotStrategy.Factory & DataMigration & Interrupter & Healthcheck
+    FlywayMigration & ZConnectionPool & CQRSPersistence & SnapshotStore & MigrationEventStore & MigrationCQRS & Server & Server.Config & NettyConfig & MigrationService & MigrationRepository & PrometheusPublisher & MetricsConfig & SnapshotStrategy.Factory & DataMigration & Interrupter & Healthcheck & Tracing & Baggage
 
   given environmentTag: EnvironmentTag[Environment] = EnvironmentTag[Environment]
+
+  private val instrumentationScopeName = "com.youtoo.migration.MigrationApp"
+  private val resourceName = "migration"
 
   private val config = Server.Config.default
     .port(8181)
@@ -84,42 +93,46 @@ object MigrationApp extends ZIOApp {
           DataMigration.live(),
           Interrupter.live(),
           Healthcheck.live(),
+          OtelSdk.custom(resourceName),
+          OpenTelemetry.tracing(instrumentationScopeName),
+          OpenTelemetry.metrics(instrumentationScopeName),
+          OpenTelemetry.logging(instrumentationScopeName),
+          OpenTelemetry.baggage(),
+          OpenTelemetry.zioMetrics,
+          OpenTelemetry.contextZIO,
         )
         .orDie ++ Runtime.setConfigProvider(ConfigProvider.envProvider) ++ logging
 
   val routes: Routes[Environment & Scope, Response] = Routes(
     Method.GET / "metrics" -> handler(ZIO.serviceWithZIO[PrometheusPublisher](_.get.map(Response.text))),
     Method.POST / "dataload" / "migration" -> handler { (req: Request) =>
-      boundary("POST /dataload/migration") {
-        boundary("POST /dataload/migration") {
+      boundary("dataload_migrations", req) {
 
-          req.body.fromBody[List[Key]] flatMap (ids =>
-            for {
-              ingestions <- ZIO.foreachPar(ids) { key =>
-                MigrationService.load(Migration.Id(key))
-              }
+        req.body.fromBody[List[Key]] flatMap (ids =>
+          for {
+            migrations <- ZIO.foreachPar(ids) { key =>
+              MigrationService.load(Migration.Id(key))
+            }
 
-              ins = ingestions.mapFilter(identity)
+            ins = migrations.mapFilter(identity)
 
-              bytes = ins
-                .map(in => String(summon[BinaryCodec[Migration]].encode(in).toArray, StandardCharsets.UTF_8.name))
-                .mkString("[", ",", "]")
+            bytes = ins
+              .map(in => String(summon[BinaryCodec[Migration]].encode(in).toArray, StandardCharsets.UTF_8.name))
+              .mkString("[", ",", "]")
 
-              resp = Response(
-                Status.Ok,
-                Headers(Header.ContentType(MediaType.application.json).untyped),
-                Body.fromCharSequence(s"""{"ingestions":$bytes}"""),
-              )
+            resp = Response(
+              Status.Ok,
+              Headers(Header.ContentType(MediaType.application.json).untyped),
+              Body.fromCharSequence(s"""{"migrations":$bytes}"""),
+            )
 
-            } yield resp,
-          )
-        }
-
+          } yield resp,
+        )
       }
 
     },
     Method.GET / "migration" -> handler { (req: Request) =>
-      boundary("GET /migration") {
+      boundary("get_migrations", req) {
         val offset = req.queryParamTo[Long]("offset").toOption
         val limit = req.queryParamToOrElse[Long]("limit", FetchSize)
 
@@ -144,7 +157,7 @@ object MigrationApp extends ZIOApp {
 
     },
     Method.GET / "migration" / long("id") -> handler { (id: Long, req: Request) =>
-      boundary(s"GET /migration/$id") {
+      boundary("get_migration", req) {
         val key = Key(id)
 
         MigrationService.load(Migration.Id(key)) map {
@@ -162,9 +175,8 @@ object MigrationApp extends ZIOApp {
       }
 
     },
-    Method.POST / "migration" -> handler {
-
-      boundary("POST /migration") {
+    Method.POST / "migration" -> handler { (req: Request) =>
+      boundary("add_migraion", req) {
         for {
           id <- Key.gen
 
@@ -185,7 +197,7 @@ object MigrationApp extends ZIOApp {
       }
     },
     Method.POST / "migration" / long("id") / "run" -> handler { (id: Long, req: Request) =>
-      boundary(s"POST /migration/$id/run") {
+      boundary("run_migration", req) {
         val numKeys = req.queryParamToOrElse[Long]("numKeys", 10L)
 
         val processor: ZLayer[Any, Nothing, DataMigration.Processor] = ZLayer.succeed {
@@ -208,7 +220,7 @@ object MigrationApp extends ZIOApp {
 
     },
     Method.DELETE / "migration" / long("id") / "stop" -> handler { (id: Long, req: Request) =>
-      boundary(s"DELETE /migration/$id/stop") {
+      boundary("stop_migration", req) {
         Interrupter.interrupt(id = Key(id)) `as` Response.ok
       }
 
@@ -220,6 +232,7 @@ object MigrationApp extends ZIOApp {
       for {
         config <- ZIO.config[DatabaseConfig]
         _ <- FlywayMigration.run(config)
+
         _ <- Server.serve(routes)
       } yield ()
     ).exitCode

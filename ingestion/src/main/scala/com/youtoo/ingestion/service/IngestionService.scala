@@ -2,14 +2,14 @@ package com.youtoo
 package ingestion
 package service
 
-import zio.telemetry.opentelemetry.tracing.*
-
 import cats.implicits.*
 
 import com.youtoo.cqrs.service.*
 
 import com.youtoo.ingestion.model.*
 import com.youtoo.ingestion.repository.*
+
+import zio.telemetry.opentelemetry.tracing.Tracing
 
 import zio.*
 
@@ -27,30 +27,17 @@ trait IngestionService {
 }
 
 object IngestionService {
-  inline def loadMany(offset: Option[Key], limit: Long): RIO[IngestionService & Tracing, Chunk[Key]] =
-    ZIO.serviceWithZIO[IngestionService] { service =>
-      ZIO.serviceWithZIO[Tracing] { tracing =>
-        service.loadMany(offset, limit) @@ tracing.aspects.span("IngestionService.loadMany")
+  inline def loadMany(offset: Option[Key], limit: Long): RIO[IngestionService, Chunk[Key]] =
+    ZIO.serviceWithZIO[IngestionService](_.loadMany(offset, limit))
 
-      }
-    }
+  inline def load(id: Ingestion.Id): RIO[IngestionService, Option[Ingestion]] =
+    ZIO.serviceWithZIO[IngestionService](_.load(id))
 
-  inline def load(id: Ingestion.Id): RIO[IngestionService & Tracing, Option[Ingestion]] =
-    ZIO.serviceWithZIO[IngestionService] { service =>
-      ZIO.serviceWithZIO[Tracing] { tracing =>
-        service.load(id) @@ tracing.aspects.span("IngestionService.load")
-      }
-    }
-
-  inline def save(o: Ingestion): RIO[IngestionService & Tracing, Long] =
-    ZIO.serviceWithZIO[IngestionService] { service =>
-      ZIO.serviceWithZIO[Tracing] { tracing =>
-        service.save(o) @@ tracing.aspects.span("IngestionService.save")
-      }
-    }
+  inline def save(o: Ingestion): RIO[IngestionService & ZConnection, Long] =
+    ZIO.serviceWithZIO[IngestionService](_.save(o))
 
   def live(): ZLayer[
-    ZConnectionPool & IngestionRepository & IngestionEventStore & IngestionRepository & SnapshotStore & SnapshotStrategy.Factory,
+    ZConnectionPool & IngestionEventStore & IngestionRepository & SnapshotStore & SnapshotStrategy.Factory & Tracing,
     Throwable,
     IngestionService,
   ] =
@@ -61,11 +48,12 @@ object IngestionService {
         snapshotStore: SnapshotStore,
         eventStore: IngestionEventStore,
         factory: SnapshotStrategy.Factory,
+        tracing: Tracing,
       ) =>
         ZLayer {
 
           factory.create(IngestionEvent.discriminator) map { strategy =>
-            new IngestionServiceLive(repository, pool, snapshotStore, eventStore, strategy)
+            new IngestionServiceLive(repository, pool, snapshotStore, eventStore, strategy).traced(tracing)
           }
 
         }
@@ -77,7 +65,7 @@ object IngestionService {
     snapshotStore: SnapshotStore,
     eventStore: IngestionEventStore,
     strategy: SnapshotStrategy,
-  ) extends IngestionService {
+  ) extends IngestionService { self =>
     def load(id: Ingestion.Id): Task[Option[Ingestion]] =
       val key = id.asKey
 
@@ -128,6 +116,16 @@ object IngestionService {
       atomically(repository.loadMany(offset, limit)).provideEnvironment(ZEnvironment(pool))
 
     def save(o: Ingestion): Task[Long] = atomically(repository.save(o)).provideEnvironment(ZEnvironment(pool))
+
+    inline def traced(tracing: Tracing): IngestionService =
+      new IngestionService {
+        def load(id: Ingestion.Id): Task[Option[Ingestion]] =
+          self.load(id) @@ tracing.aspects.span("IngestionService.load")
+        def loadMany(offset: Option[Key], limit: Long): Task[Chunk[Key]] =
+          self.loadMany(offset, limit) @@ tracing.aspects.span("IngestionService.loadMany")
+        def save(o: Ingestion): Task[Long] = self.save(o) @@ tracing.aspects.span("IngestionService.save")
+      }
+
   }
 
 }

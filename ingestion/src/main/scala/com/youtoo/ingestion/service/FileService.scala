@@ -2,6 +2,8 @@ package com.youtoo
 package ingestion
 package service
 
+import zio.telemetry.opentelemetry.tracing.Tracing
+
 import cats.implicits.*
 
 import com.youtoo.cqrs.Codecs.given
@@ -54,7 +56,7 @@ object FileService {
     ZIO.serviceWithZIO(_.load(id))
 
   def live(): ZLayer[
-    ZConnectionPool & FileEventStore,
+    ZConnectionPool & FileEventStore & Tracing,
     Throwable,
     FileService,
   ] =
@@ -62,12 +64,13 @@ object FileService {
       (
         pool: ZConnectionPool,
         eventStore: FileEventStore,
+        tracing: Tracing,
       ) =>
-        new FileService.Live(pool, eventStore)
+        new FileService.Live(pool, eventStore).traced(tracing)
 
     }
 
-  class Live(pool: ZConnectionPool, eventStore: FileEventStore) extends FileService {
+  class Live(pool: ZConnectionPool, eventStore: FileEventStore) extends FileService { self =>
     def addFile(
       provider: Provider.Id,
       id: IngestionFile.Id,
@@ -142,5 +145,25 @@ object FileService {
 
       }.provideEnvironment(ZEnvironment(pool))
 
+    inline def traced(tracing: Tracing): FileService =
+      new FileService {
+        def addFile(
+          provider: Provider.Id,
+          id: IngestionFile.Id,
+          name: IngestionFile.Name,
+          metadata: IngestionFile.Metadata,
+          sig: IngestionFile.Sig,
+        ): Task[Unit] = self.addFile(provider, id, name, metadata, sig) @@ tracing.aspects.span("FileService.addFile")
+
+        def loadNamed(name: IngestionFile.Name): Task[Option[IngestionFile]] =
+          self.loadNamed(name) @@ tracing.aspects.span("FileService.loadNamed")
+        def loadSig(sig: IngestionFile.Sig): Task[Option[IngestionFile]] =
+          self.loadSig(sig) @@ tracing.aspects.span("FileService.loadSig")
+
+        def load(id: IngestionFile.Id): Task[Option[IngestionFile]] =
+          self.load(id) @@ tracing.aspects.span("FileService.load")
+      }
+
   }
+
 }

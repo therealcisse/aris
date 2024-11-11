@@ -94,7 +94,10 @@ object MigrationRepositorySpec extends PgSpec {
         }
       } @@ TestAspect.samples(1),
     ).provideSomeLayerShared(
-      MigrationRepository.live(),
+      ZLayer.make[MigrationRepository](
+        MigrationRepository.live(),
+        (zio.telemetry.opentelemetry.OpenTelemetry.contextZIO >>> tracingMockLayer()),
+      ),
     ) @@ TestAspect.sequential @@ TestAspect.withLiveClock @@ TestAspect.beforeAll {
       for {
         config <- ZIO.service[DatabaseConfig]

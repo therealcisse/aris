@@ -10,6 +10,8 @@ import com.youtoo.migration.model.*
 import com.youtoo.migration.repository.*
 import com.youtoo.cqrs.*
 
+import zio.telemetry.opentelemetry.tracing.Tracing
+
 import zio.*
 
 import zio.jdbc.*
@@ -34,7 +36,7 @@ object MigrationService {
     ZIO.serviceWithZIO[MigrationService](_.save(o))
 
   def live(): ZLayer[
-    ZConnectionPool & MigrationEventStore & MigrationRepository & SnapshotStore & SnapshotStrategy.Factory,
+    ZConnectionPool & MigrationEventStore & MigrationRepository & SnapshotStore & SnapshotStrategy.Factory & Tracing,
     Throwable,
     MigrationService,
   ] =
@@ -45,11 +47,12 @@ object MigrationService {
         snapshotStore: SnapshotStore,
         eventStore: MigrationEventStore,
         factory: SnapshotStrategy.Factory,
+        tracing: Tracing,
       ) =>
         ZLayer {
 
           factory.create(MigrationEvent.discriminator) map { strategy =>
-            new MigrationServiceLive(repository, pool, snapshotStore, eventStore, strategy)
+            new MigrationServiceLive(repository, pool, snapshotStore, eventStore, strategy).traced(tracing)
           }
 
         }
@@ -62,7 +65,7 @@ object MigrationService {
     snapshotStore: SnapshotStore,
     eventStore: MigrationEventStore,
     strategy: SnapshotStrategy,
-  ) extends MigrationService {
+  ) extends MigrationService { self =>
     def load(id: Migration.Id): Task[Option[Migration]] =
       val key = id.asKey
 
@@ -113,6 +116,16 @@ object MigrationService {
       atomically(repository.loadMany(offset, limit)).provideEnvironment(ZEnvironment(pool))
 
     def save(o: Migration): Task[Long] = atomically(repository.save(o)).provideEnvironment(ZEnvironment(pool))
+
+    inline def traced(tracing: Tracing): MigrationService =
+      new MigrationService {
+        def load(id: Migration.Id): Task[Option[Migration]] =
+          self.load(id) @@ tracing.aspects.span("MigrationService.load")
+        def loadMany(offset: Option[Key], limit: Long): Task[Chunk[Key]] =
+          self.loadMany(offset, limit) @@ tracing.aspects.span("MigrationService.loadMany")
+        def save(o: Migration): Task[Long] = self.save(o) @@ tracing.aspects.span("MigrationService.save")
+      }
+
   }
 
 }

@@ -85,10 +85,10 @@ object IngestionApp extends ZIOApp {
           SnapshotStrategy.live(),
           OtelSdk.custom(resourceName),
           OpenTelemetry.tracing(instrumentationScopeName),
-          OpenTelemetry.metrics(instrumentationScopeName),
-          OpenTelemetry.logging(instrumentationScopeName),
+          // OpenTelemetry.metrics(instrumentationScopeName),
+          // OpenTelemetry.logging(instrumentationScopeName),
           OpenTelemetry.baggage(),
-          OpenTelemetry.zioMetrics,
+          // OpenTelemetry.zioMetrics,
           OpenTelemetry.contextZIO,
         )
         .orDie ++ Runtime.setConfigProvider(ConfigProvider.envProvider)

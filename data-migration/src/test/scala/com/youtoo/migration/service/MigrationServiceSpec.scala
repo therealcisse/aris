@@ -95,7 +95,9 @@ object MigrationServiceSpec extends MockSpecDefault {
           _ <- MigrationService.load(id)
 
         } yield assertCompletes)
-          .provideSomeLayer[ZConnectionPool]((deps ++ SnapshotStrategy.live()) >>> MigrationService.live())
+          .provideSomeLayer[ZConnectionPool & zio.telemetry.opentelemetry.tracing.Tracing](
+            (deps ++ SnapshotStrategy.live()) >>> MigrationService.live(),
+          )
       }
 
     },
@@ -111,8 +113,11 @@ object MigrationServiceSpec extends MockSpecDefault {
         (for {
           effect <- atomically(MigrationService.save(migration))
           testResult = assert(effect)(equalTo(expected))
-        } yield testResult).provideSomeLayer[ZConnectionPool](
-          mockEnv.toLayer >>> ZLayer.makeSome[MigrationRepository & ZConnectionPool, MigrationService](
+        } yield testResult).provideSomeLayer[ZConnectionPool & zio.telemetry.opentelemetry.tracing.Tracing](
+          mockEnv.toLayer >>> ZLayer.makeSome[
+            MigrationRepository & ZConnectionPool & zio.telemetry.opentelemetry.tracing.Tracing,
+            MigrationService,
+          ](
             PostgresCQRSPersistence.live(),
             MigrationEventStore.live(),
             SnapshotStore.live(),
@@ -135,8 +140,11 @@ object MigrationServiceSpec extends MockSpecDefault {
         (for {
           effect <- atomically(MigrationService.loadMany(offset = key, limit = limit))
           testResult = assert(effect)(equalTo(expected))
-        } yield testResult).provideSomeLayer[ZConnectionPool](
-          mockEnv.toLayer >>> ZLayer.makeSome[MigrationRepository & ZConnectionPool, MigrationService](
+        } yield testResult).provideSomeLayer[ZConnectionPool & zio.telemetry.opentelemetry.tracing.Tracing](
+          mockEnv.toLayer >>> ZLayer.makeSome[
+            MigrationRepository & ZConnectionPool & zio.telemetry.opentelemetry.tracing.Tracing,
+            MigrationService,
+          ](
             PostgresCQRSPersistence.live(),
             MigrationEventStore.live(),
             SnapshotStore.live(),
@@ -147,6 +155,8 @@ object MigrationServiceSpec extends MockSpecDefault {
 
       }
     },
-  ).provideSomeLayerShared(ZConnectionMock.pool())
+  ).provideSomeLayerShared(
+    ZConnectionMock.pool() ++ (zio.telemetry.opentelemetry.OpenTelemetry.contextZIO >>> tracingMockLayer()),
+  )
 
 }

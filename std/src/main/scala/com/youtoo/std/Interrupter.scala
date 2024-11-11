@@ -3,6 +3,8 @@ package std
 
 import zio.*
 
+import zio.telemetry.opentelemetry.tracing.Tracing
+
 trait Interrupter {
   def watch[R](id: Key): ZIO[R & Scope, Throwable, Promise[Throwable, Unit]]
   def interrupt(id: Key): Task[Unit]
@@ -15,16 +17,20 @@ object Interrupter {
   inline def interrupt(id: Key): RIO[Interrupter, Unit] =
     ZIO.serviceWithZIO(_.interrupt(id))
 
-  def live(): ZLayer[Any, Throwable, Interrupter] =
-    ZLayer {
-      Ref.Synchronized.make(Map.empty[Key, Promise[Throwable, Unit]]) map { ref =>
-        Live(ref)
+  def live(): ZLayer[Tracing, Throwable, Interrupter] =
+    ZLayer.fromFunction { (tracing: Tracing) =>
+      ZLayer {
+
+        Ref.Synchronized.make(Map.empty[Key, Promise[Throwable, Unit]]) map { ref =>
+          new InterrupterLive(ref).traced(tracing)
+
+        }
 
       }
 
-    }
+    }.flatten
 
-  class Live(ref: Ref.Synchronized[Map[Key, Promise[Throwable, Unit]]]) extends Interrupter {
+  class InterrupterLive(ref: Ref.Synchronized[Map[Key, Promise[Throwable, Unit]]]) extends Interrupter { self =>
 
     def watch[R](id: Key): ZIO[R & Scope, Throwable, Promise[Throwable, Unit]] =
       ZIO.uninterruptible {
@@ -58,6 +64,14 @@ object Interrupter {
 
           }) as (s - id)
         } as ()
+      }
+
+    inline def traced(tracing: Tracing): Interrupter =
+      new Interrupter {
+        def watch[R](id: Key): ZIO[R & Scope, Throwable, Promise[Throwable, Unit]] =
+          self.watch(id) @@ tracing.aspects.span("Interrupter.watch")
+        def interrupt(id: Key): Task[Unit] = self.interrupt(id) @@ tracing.aspects.span("Interrupter.interrupt")
+
       }
 
   }

@@ -95,11 +95,12 @@ object Dependencies {
     "dev.zio" %% "zio-opentelemetry-zio-logging" % "3.0.1",
     "io.opentelemetry" % "opentelemetry-exporter-otlp" % "1.43.0",
     "io.opentelemetry" % "opentelemetry-exporter-logging-otlp" % "1.43.0",
-    "io.opentelemetry" % "opentelemetry-exporter-zipkin" % "1.44.0",
-    "io.opentelemetry" % "opentelemetry-exporter-prometheus" % "1.44.0-alpha",
+    "io.opentelemetry" % "opentelemetry-exporter-zipkin" % "1.43.0",
+    "io.opentelemetry" % "opentelemetry-exporter-prometheus" % "1.43.0-alpha",
     "io.opentelemetry" % "opentelemetry-sdk" % "1.43.0",
     "io.opentelemetry" % "opentelemetry-sdk-trace" % "1.43.0",
     "io.opentelemetry.semconv" % "opentelemetry-semconv" % "1.22.0-alpha",
+    "io.opentelemetry" % "opentelemetry-sdk-testing" % "1.43.0" % Test,
     "io.grpc" % "grpc-netty-shaded" % "1.47.0",
   )
 }

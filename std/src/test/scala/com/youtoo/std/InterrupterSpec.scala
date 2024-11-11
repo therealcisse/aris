@@ -12,7 +12,7 @@ object InterrupterSpec extends ZIOSpecDefault {
       checkPar(Gen.long, sys.runtime.availableProcessors) { id =>
         for {
           ref <- Ref.Synchronized.make(Map.empty[Key, Promise[Throwable, Unit]])
-          interrupter = new Interrupter.Live(ref)
+          interrupter = new Interrupter.InterrupterLive(ref)
           key = Key(id)
           promises0 <- ZIO.scoped(interrupter.watch(key) *> ref.get)
           promises <- ref.get
@@ -23,7 +23,7 @@ object InterrupterSpec extends ZIOSpecDefault {
       checkPar(Gen.long, sys.runtime.availableProcessors) { id =>
         for {
           ref <- Ref.Synchronized.make(Map.empty[Key, Promise[Throwable, Unit]])
-          interrupter = new Interrupter.Live(ref)
+          interrupter = new Interrupter.InterrupterLive(ref)
           key = Key(id)
           res <- ZIO.scoped((interrupter.watch(key) <&> interrupter.watch(key)))
         } yield assert(res._1)(equalTo(res._2))
@@ -33,7 +33,7 @@ object InterrupterSpec extends ZIOSpecDefault {
       checkPar(Gen.long, sys.runtime.availableProcessors) { id =>
         for {
           ref <- Ref.Synchronized.make(Map.empty[Key, Promise[Throwable, Unit]])
-          interrupter = new Interrupter.Live(ref)
+          interrupter = new Interrupter.InterrupterLive(ref)
           key = Key(id)
           added <- Promise.make[Nothing, Unit]
           fiber <- (interrupter.watch(key).flatMap(promise => added.succeed(()) *> promise.await)).fork

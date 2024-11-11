@@ -11,9 +11,7 @@ import com.youtoo.std.*
 import com.youtoo.migration.service.*
 
 trait DataMigration {
-
   def run(id: Migration.Id): ZIO[DataMigration.Processor & MigrationCQRS & MigrationService, Throwable, Unit]
-
   def stop(id: Migration.Id): Task[Unit]
 
 }
@@ -52,10 +50,10 @@ object DataMigration {
 
   def live(): ZLayer[Interrupter & Healthcheck, Throwable, DataMigration] =
     ZLayer.fromFunction { (interrupter: Interrupter, healthcheck: Healthcheck) =>
-      new Live(interrupter, healthcheck, batchSize = BATCH_SIZE)
+      new DataMigrationLive(interrupter, healthcheck, batchSize = BATCH_SIZE)
     }
 
-  class Live(interrupter: Interrupter, healthcheck: Healthcheck, batchSize: Int) extends DataMigration {
+  class DataMigrationLive(interrupter: Interrupter, healthcheck: Healthcheck, batchSize: Int) extends DataMigration {
     def run(id: Migration.Id): ZIO[DataMigration.Processor & MigrationCQRS & MigrationService, Throwable, Unit] =
       val migrationKey = id.asKey
 
@@ -79,7 +77,7 @@ object DataMigration {
               for {
                 p <- interrupter.watch(migrationKey)
 
-                h <- healthcheck.start(migrationKey, Schedule.spaced(5.seconds))
+                _ <- healthcheck.start(migrationKey, Schedule.spaced(5.seconds))
 
                 executionId <- ((Execution.Id.gen <&> Timestamp.now) flatMap ((executionId, timestamp) =>
                   MigrationCQRS.add(
@@ -142,8 +140,6 @@ object DataMigration {
                 )
 
                 _ <- MigrationCQRS.add(id = migrationKey, cmd = cmd)
-
-                _ <- h.stop
 
               } yield ()
             }

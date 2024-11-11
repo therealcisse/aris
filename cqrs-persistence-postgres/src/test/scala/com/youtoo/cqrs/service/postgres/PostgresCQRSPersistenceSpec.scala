@@ -51,8 +51,6 @@ object PostgresCQRSPersistenceSpec extends PgSpec {
             }
 
             for {
-              // _ <- atomically(SqlFragment.deleteFrom("events").delete)
-
               persistence <- ZIO.service[CQRSPersistence]
 
               event = Change(version = version, DummyEvent("test"))
@@ -400,13 +398,17 @@ object PostgresCQRSPersistenceSpec extends PgSpec {
             timeAssertion = assert(executionTime.toMillis)(isLessThanEqualTo(100L))
 
             executionPlan <- atomically(query.sql.getExecutionPlan)
-            planAssertion = assert(executionPlan)(containsString("Index Scan"))
+            planAssertion = assert(executionPlan)(containsString("Index Scan") || containsString("Index Only Scan"))
 
           } yield planAssertion && timeAssertion
         }
       },
     ).provideSomeLayerShared(
-      PostgresCQRSPersistence.live(),
+      ZLayer.make[CQRSPersistence](
+        tracingMockLayer(),
+        zio.telemetry.opentelemetry.OpenTelemetry.contextZIO,
+        PostgresCQRSPersistence.live(),
+      ),
     ) @@ TestAspect.withLiveClock @@ TestAspect.beforeAll {
       for {
         config <- ZIO.service[DatabaseConfig]

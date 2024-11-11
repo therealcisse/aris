@@ -33,7 +33,11 @@ object ProviderServiceSpec extends MockSpecDefault {
 
         val effect = ProviderService.addProvider(id, name, location)
 
-        assertZIO(effect.provideSomeLayer[ZConnectionPool](eventStoreMock.toLayer >>> ProviderService.live()))(isUnit)
+        assertZIO(
+          effect.provideSomeLayer[ZConnectionPool & zio.telemetry.opentelemetry.tracing.Tracing](
+            eventStoreMock.toLayer >>> ProviderService.live(),
+          ),
+        )(isUnit)
       }
     },
     test("load should return Provider when found") {
@@ -50,7 +54,11 @@ object ProviderServiceSpec extends MockSpecDefault {
 
         val effect = ProviderService.load(id)
 
-        assertZIO(effect.provideSomeLayer[ZConnectionPool](eventStoreMock.toLayer >>> ProviderService.live()))(
+        assertZIO(
+          effect.provideSomeLayer[ZConnectionPool & zio.telemetry.opentelemetry.tracing.Tracing](
+            eventStoreMock.toLayer >>> ProviderService.live(),
+          ),
+        )(
           isSome(equalTo(expectedProvider)),
         )
       }
@@ -69,7 +77,11 @@ object ProviderServiceSpec extends MockSpecDefault {
 
         val effect = ProviderService.loadAll(None, 100L)
 
-        assertZIO(effect.provideSomeLayer[ZConnectionPool](eventStoreMock.toLayer >>> ProviderService.live()))(
+        assertZIO(
+          effect.provideSomeLayer[ZConnectionPool & zio.telemetry.opentelemetry.tracing.Tracing](
+            eventStoreMock.toLayer >>> ProviderService.live(),
+          ),
+        )(
           equalTo(List(expectedProvider)),
         )
       }
@@ -95,10 +107,16 @@ object ProviderServiceSpec extends MockSpecDefault {
 
         val effect = ProviderService.getFiles(providerId, None, 100L)
 
-        assertZIO(effect.provideSomeLayer[ZConnectionPool](eventStoreMock.toLayer >>> ProviderService.live()))(
+        assertZIO(
+          effect.provideSomeLayer[ZConnectionPool & zio.telemetry.opentelemetry.tracing.Tracing](
+            eventStoreMock.toLayer >>> ProviderService.live(),
+          ),
+        )(
           isSome(equalTo(NonEmptyList(expectedFile))),
         )
       }
     },
-  ).provideLayerShared(ZConnectionMock.pool())
+  ).provideLayerShared(
+    ZConnectionMock.pool() ++ (zio.telemetry.opentelemetry.OpenTelemetry.contextZIO >>> tracingMockLayer()),
+  )
 }

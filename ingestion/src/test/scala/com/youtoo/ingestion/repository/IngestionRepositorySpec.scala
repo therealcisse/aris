@@ -94,7 +94,10 @@ object IngestionRepositorySpec extends PgSpec {
         }
       } @@ TestAspect.samples(1),
     ).provideSomeLayerShared(
-      IngestionRepository.live(),
+      ZLayer.make[IngestionRepository](
+        IngestionRepository.live(),
+        (zio.telemetry.opentelemetry.OpenTelemetry.contextZIO >>> tracingMockLayer()),
+      ),
     ) @@ TestAspect.sequential @@ TestAspect.withLiveClock @@ TestAspect.beforeAll {
       for {
         config <- ZIO.service[DatabaseConfig]

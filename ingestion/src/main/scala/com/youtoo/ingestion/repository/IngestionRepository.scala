@@ -14,6 +14,8 @@ import com.youtoo.cqrs.service.*
 
 import com.youtoo.cqrs.Codecs.given
 
+import zio.telemetry.opentelemetry.tracing.Tracing
+
 trait IngestionRepository {
   def load(id: Ingestion.Id): ZIO[ZConnection, Throwable, Option[Ingestion]]
   def loadMany(offset: Option[Key], limit: Long): ZIO[ZConnection, Throwable, Chunk[Key]]
@@ -31,10 +33,10 @@ object IngestionRepository {
   inline def save(o: Ingestion): RIO[IngestionRepository & ZConnection, Long] =
     ZIO.serviceWithZIO[IngestionRepository](_.save(o))
 
-  def live(): ZLayer[Any, Throwable, IngestionRepository] =
-    ZLayer.succeed(new IngestionRepositoryLive)
+  def live(): ZLayer[Tracing, Throwable, IngestionRepository] =
+    ZLayer.fromFunction(new IngestionRepositoryLive().traced(_))
 
-  class IngestionRepositoryLive extends IngestionRepository {
+  class IngestionRepositoryLive() extends IngestionRepository { self =>
     def load(id: Ingestion.Id): ZIO[ZConnection, Throwable, Option[Ingestion]] =
       Queries
         .READ_INGESTION(id)
@@ -49,6 +51,18 @@ object IngestionRepository {
       Queries
         .SAVE_INGESTION(o)
         .insert
+
+    inline def traced(tracing: Tracing): IngestionRepository =
+      new IngestionRepository {
+        def load(id: Ingestion.Id): ZIO[ZConnection, Throwable, Option[Ingestion]] =
+          self.load(id) @@ tracing.aspects.span("IngestionRepository.load")
+        def loadMany(offset: Option[Key], limit: Long): ZIO[ZConnection, Throwable, Chunk[Key]] =
+          self.loadMany(offset, limit) @@ tracing.aspects.span("IngestionRepository.loadMany")
+        def save(o: Ingestion): ZIO[ZConnection, Throwable, Long] =
+          self.save(o) @@ tracing.aspects.span("IngestionRepository.save")
+
+      }
+
   }
 
   object Queries extends JdbcCodecs {

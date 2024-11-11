@@ -18,8 +18,8 @@ class IngestionLoadTest extends Simulation {
 
   val baseUrl = s"http://localhost:$port"
 
-  val numCommandsPerIngestion: Int = Integer.getInteger("numCommandsPerIngestion", 10)
-  val concurrentUsers: Int = Integer.getInteger("concurrentUsers", 1)
+  val numCommandsPerIngestion: Int = Integer.getInteger("numCommandsPerIngestion", 100)
+  val concurrentUsers: Int = Integer.getInteger("concurrentUsers", 2)
   val testDuration: Int = Integer.getInteger("testDuration", 60)
 
   val httpProtocol = http
@@ -27,7 +27,7 @@ class IngestionLoadTest extends Simulation {
     .acceptHeader("application/json")
     .contentTypeHeader("application/json")
 
-  var allIds = Set[String]()
+  var allIds = Set[Long]()
 
   val process: ScenarioBuilder = scenario("Process Ingestion")
     .exec(
@@ -131,7 +131,7 @@ class IngestionLoadTest extends Simulation {
               .saveAs("fetchedIds"),
           ),
       ).exec { session =>
-        val fetchedIds = session("fetchedIds").asOption[Vector[String]].getOrElse(Vector())
+        val fetchedIds = session("fetchedIds").asOption[Vector[Long]].getOrElse(Vector())
         allIds = allIds ++ fetchedIds
 
         if fetchedIds.size < IngestionApp.FetchSize then session.set("offset", "end")
@@ -150,7 +150,7 @@ class IngestionLoadTest extends Simulation {
         val data = session("ids").as[Set[String]]
         session.set(
           "data",
-          String(summon[BinaryCodec[Set[String]]].encode(data).toArray, StandardCharsets.UTF_8.name),
+          String(summon[BinaryCodec[Set[Long]]].encode(data.map(_.toLong)).toArray, StandardCharsets.UTF_8.name),
         )
       }.exec(
         http("POST /dataload/ingestion (fetch objects)")

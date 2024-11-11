@@ -4,6 +4,8 @@ package service
 
 import cats.implicits.*
 
+import zio.telemetry.opentelemetry.tracing.Tracing
+
 import com.youtoo.cqrs.Codecs.given
 
 import com.youtoo.cqrs.service.*
@@ -54,16 +56,18 @@ object ProviderService {
     ZIO.serviceWithZIO(_.getFiles(provider, offset, limit))
 
   def live(): ZLayer[
-    ZConnectionPool & FileEventStore,
+    ZConnectionPool & FileEventStore & Tracing,
     Throwable,
     ProviderService,
   ] =
-    ZLayer.fromFunction(ProviderServiceLive.apply)
+    ZLayer.fromFunction { (pool: ZConnectionPool, eventStore: FileEventStore, tracing: Tracing) =>
+      new ProviderServiceLive(pool, eventStore).traced(tracing)
+    }
 
   class ProviderServiceLive(
     pool: ZConnectionPool,
     eventStore: FileEventStore,
-  ) extends ProviderService {
+  ) extends ProviderService { self =>
 
     def addProvider(
       id: Provider.Id,
@@ -132,6 +136,27 @@ object ProviderService {
           }
         } yield inn
       }.provideEnvironment(ZEnvironment(pool))
+
+    inline def traced(tracing: Tracing): ProviderService =
+      new ProviderService {
+        def addProvider(
+          id: Provider.Id,
+          name: Provider.Name,
+          location: Provider.Location,
+        ): Task[Unit] = self.addProvider(id, name, location) @@ tracing.aspects.span("FileService.addProvider")
+
+        def load(id: Provider.Id): Task[Option[Provider]] = self.load(id) @@ tracing.aspects.span("FileService.load")
+        def loadAll(offset: Option[Key], limit: Long): Task[List[Provider]] =
+          self.loadAll(offset, limit) @@ tracing.aspects.span("FileService.loadAll")
+
+        def getFiles(
+          provider: Provider.Id,
+          offset: Option[Key],
+          limit: Long,
+        ): Task[Option[NonEmptyList[IngestionFile]]] =
+          self.getFiles(provider, offset, limit) @@ tracing.aspects.span("FileService.getFiles")
+      }
+
   }
 
 }

@@ -11,7 +11,7 @@ object HealthcheckSpec extends ZIOSpecDefault {
     test("isRunning returns true after start is called") {
       for {
         ref <- Ref.Synchronized.make(Map.empty[Key, (Timestamp, Fiber[Nothing, Any])])
-        healthcheck = new Healthcheck.Live(ref)
+        healthcheck = new Healthcheck.HealthcheckLive(ref)
         id = Key(1L)
         _ <- healthcheck.start(id, Schedule.spaced(1.second))
         isRunning <- healthcheck.isRunning(id)
@@ -20,24 +20,28 @@ object HealthcheckSpec extends ZIOSpecDefault {
     test("isRunning returns false after stop is called") {
       for {
         ref <- Ref.Synchronized.make(Map.empty[Key, (Timestamp, Fiber[Nothing, Any])])
-        healthcheck = new Healthcheck.Live(ref)
+        healthcheck = new Healthcheck.HealthcheckLive(ref)
         id = Key(1L)
-        handle <- healthcheck.start(id, Schedule.spaced(1.second))
-        _ <- handle.stop
+        _ <- ZIO.scoped(healthcheck.start(id, Schedule.spaced(1.second)))
         isRunning <- healthcheck.isRunning(id)
       } yield assert(isRunning)(isFalse)
     },
     test("getHeartbeat returns updated timestamps") {
       for {
         ref <- Ref.Synchronized.make(Map.empty[Key, (Timestamp, Fiber[Nothing, Any])])
-        healthcheck = new Healthcheck.Live(ref)
+        healthcheck = new Healthcheck.HealthcheckLive(ref)
         id = Key(1L)
-        h <- healthcheck.start(id, Schedule.spaced(1.second))
-        _ <- TestClock.adjust(500.millis)
-        hb1 <- healthcheck.getHeartbeat(id)
-        _ <- TestClock.adjust(1.second)
-        hb2 <- healthcheck.getHeartbeat(id)
-        _ <- h.stop
+        handles <- ZIO.scoped(for {
+
+          h <- healthcheck.start(id, Schedule.spaced(1.second))
+          _ <- TestClock.adjust(500.millis)
+          hb1 <- healthcheck.getHeartbeat(id)
+          _ <- TestClock.adjust(1.second)
+          hb2 <- healthcheck.getHeartbeat(id)
+        } yield (hb1, hb2))
+
+        (hb1, hb2) = handles
+
         _ <- TestClock.adjust(1.second)
         _ <- TestClock.adjust(1.second)
         isRunning <- healthcheck.isRunning(id)
@@ -48,7 +52,7 @@ object HealthcheckSpec extends ZIOSpecDefault {
     test("getHeartbeat returns None if not running") {
       for {
         ref <- Ref.Synchronized.make(Map.empty[Key, (Timestamp, Fiber[Nothing, Any])])
-        healthcheck = new Healthcheck.Live(ref)
+        healthcheck = new Healthcheck.HealthcheckLive(ref)
         id = Key(1L)
         hb <- healthcheck.getHeartbeat(id)
       } yield assert(hb)(isNone)
@@ -56,12 +60,16 @@ object HealthcheckSpec extends ZIOSpecDefault {
     test("heartbeat is no longer updated after stop is called") {
       for {
         ref <- Ref.Synchronized.make(Map.empty[Key, (Timestamp, Fiber[Nothing, Any])])
-        healthcheck = new Healthcheck.Live(ref)
+        healthcheck = new Healthcheck.HealthcheckLive(ref)
         id = Key(1L)
-        handle <- healthcheck.start(id, Schedule.spaced(1.second))
-        _ <- TestClock.adjust(1.second)
-        hb1 <- healthcheck.getHeartbeat(id)
-        _ <- handle.stop
+        hb1 <- ZIO.scoped {
+          for {
+            _ <- healthcheck.start(id, Schedule.spaced(1.second))
+            _ <- TestClock.adjust(1.second)
+            hb1 <- healthcheck.getHeartbeat(id)
+
+          } yield hb1
+        }
         _ <- TestClock.adjust(1.second)
         hb2 <- healthcheck.getHeartbeat(id)
         isRunning <- healthcheck.isRunning(id)

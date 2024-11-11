@@ -4,6 +4,8 @@ package repository
 
 import com.youtoo.migration.model.*
 
+import zio.telemetry.opentelemetry.tracing.Tracing
+
 import com.youtoo.cqrs.service.postgres.*
 
 import zio.*
@@ -34,12 +36,12 @@ object MigrationRepository {
   inline def save(o: Migration): RIO[MigrationRepository & ZConnection, Long] =
     ZIO.serviceWithZIO[MigrationRepository](_.save(o))
 
-  def live(): ZLayer[Any, Throwable, MigrationRepository] =
-    ZLayer.succeed {
-      new MigrationRepositoryLive()
+  def live(): ZLayer[Tracing, Throwable, MigrationRepository] =
+    ZLayer.fromFunction { (tracing: Tracing) =>
+      new MigrationRepositoryLive().traced(tracing)
     }
 
-  class MigrationRepositoryLive() extends MigrationRepository {
+  class MigrationRepositoryLive() extends MigrationRepository { self =>
     def load(id: Migration.Id): ZIO[ZConnection, Throwable, Option[Migration]] =
       Queries
         .READ_MIGRATION(id)
@@ -54,6 +56,17 @@ object MigrationRepository {
       Queries
         .SAVE_MIGRATION(o)
         .insert
+
+    inline def traced(tracing: Tracing): MigrationRepository =
+      new MigrationRepository {
+        def load(id: Migration.Id): ZIO[ZConnection, Throwable, Option[Migration]] =
+          self.load(id) @@ tracing.aspects.span("MigrationRepository.load")
+        def loadMany(offset: Option[Key], limit: Long): ZIO[ZConnection, Throwable, Chunk[Key]] =
+          self.loadMany(offset, limit) @@ tracing.aspects.span("MigrationRepository.loadMany")
+        def save(o: Migration): ZIO[ZConnection, Throwable, Long] =
+          self.save(o) @@ tracing.aspects.span("MigrationRepository.save")
+
+      }
 
   }
 

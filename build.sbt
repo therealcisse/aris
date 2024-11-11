@@ -52,6 +52,7 @@ lazy val aggregatedProjects: Seq[ProjectReference] =
     loadtests,
     benchmarks,
     log,
+    otel,
   )
 
 inThisBuild(replSettings)
@@ -125,12 +126,25 @@ lazy val core = (project in file("cqrs-core"))
   )
   .dependsOn(kernel)
 
+lazy val otel = (project in file("otel"))
+  .dependsOn(kernel)
+  .settings(stdSettings("otel"))
+  // .settings(publishSetting(false))
+  .enablePlugins(BuildInfoPlugin)
+  .settings(buildInfoSettings("com.youtoo"))
+  .settings(
+    testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
+    libraryDependencies ++= openTelemetry,
+  )
+
+
 lazy val std = (project in file("std"))
   .dependsOn(kernel)
   .settings(stdSettings("std"))
   .settings(
     Test / parallelExecution := false,
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
+    libraryDependencies ++= openTelemetry,
     libraryDependencies ++= Seq(
       cats,
       zio,
@@ -149,6 +163,7 @@ lazy val postgres = (project in file("cqrs-persistence-postgres"))
   .settings(
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
     Test / unmanagedResourceDirectories ++= (Compile / unmanagedResourceDirectories).value,
+    libraryDependencies ++= openTelemetry,
     libraryDependencies ++= Seq(
       flyway,
       hicariCP,
@@ -164,7 +179,12 @@ lazy val postgres = (project in file("cqrs-persistence-postgres"))
   )
 
 lazy val ingestion = (project in file("ingestion"))
-  .dependsOn(postgres % "compile->compile;test->test", core % "compile->compile;test->test", log % "compile->compile")
+  .dependsOn(
+    postgres % "compile->compile;test->test",
+    core % "compile->compile;test->test",
+    log % "compile->compile",
+    otel % "compile->compile",
+  )
   .settings(stdSettings("ingestion"))
   .settings(
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
@@ -189,6 +209,7 @@ lazy val dataMigration = (project in file("data-migration"))
     postgres % "compile->compile;test->test",
     core % "compile->compile;test->test",
     log % "compile->compile",
+    otel % "compile->compile",
   )
   .settings(stdSettings("data-migration"))
   .settings(
