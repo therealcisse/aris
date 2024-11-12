@@ -81,7 +81,7 @@ object IngestionApp extends ZIOApp {
           OpenTelemetry.metrics(instrumentationScopeName),
           // OpenTelemetry.logging(instrumentationScopeName),
           OpenTelemetry.baggage(),
-          OpenTelemetry.zioMetrics,
+          // OpenTelemetry.zioMetrics,
           OpenTelemetry.contextZIO,
         )
         .orDie ++ Runtime.setConfigProvider(ConfigProvider.envProvider)
@@ -227,8 +227,10 @@ object IngestionApp extends ZIOApp {
     },
   )
 
-  def run: RIO[Environment, Unit] =
+  def run: RIO[Environment & Scope, Unit] =
     for {
+      _ <- RestEndpoint.Metrics.uptime
+
       config <- ZIO.config[DatabaseConfig]
       _ <- FlywayMigration.run(config)
 

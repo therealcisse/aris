@@ -11,6 +11,8 @@ import zio.telemetry.opentelemetry.baggage.Baggage
 
 import zio.http.*
 
+import java.lang as jl;
+
 import zio.schema.codec.*
 
 object RestEndpoint {
@@ -40,7 +42,7 @@ object RestEndpoint {
       val op = effect.catchAllCause {
         _.failureOrCause.fold(
           { case e =>
-            Log.error(s"[$tag] - Found error", e) `as` Response.internalServerError
+            Log.error(s"[$tag] - Request failed", e) `as` Response.internalServerError
 
           },
           Exit.failCause,
@@ -48,7 +50,7 @@ object RestEndpoint {
 
       }
 
-      val startTime = java.lang.System.nanoTime()
+      val startTime = jl.System.nanoTime()
 
       for {
         activeCounter <- Metrics.activeRequests
@@ -59,11 +61,11 @@ object RestEndpoint {
 
         }
 
-        endTime = java.lang.System.nanoTime()
+        endTime = jl.System.nanoTime()
 
         attributes = Attributes(
           Attribute.string("http_method", request.method.name),
-          Attribute.string("http_path", request.path.encode),
+          Attribute.string("http_path", tag),
           Attribute.long("status_code", response.status.code.toLong),
         )
 
@@ -81,9 +83,9 @@ object RestEndpoint {
     val requestLatency: ZIO[Meter, Nothing, Histogram[Double]] =
       ZIO.serviceWithZIO[Meter] { meter =>
         meter.histogram(
-          name = "http_request_duration_seconds",
+          name = "http_request_duration",
           unit = "ms".some,
-          description = "Request latency in seconds".some,
+          description = "Request latency in milliseconds".some,
           boundaries = Chunk.iterate(1.0, 10)(_ + 1.0).some,
         )
       }
@@ -100,6 +102,19 @@ object RestEndpoint {
       ZIO.serviceWithZIO[Meter] { meter =>
         meter.upDownCounter("http_active_requests", description = "Number of active HTTP requests".some)
       }
+
+    val uptime: ZIO[Meter & Scope, Throwable, Unit] =
+      ZIO.serviceWithZIO[Meter] { meter =>
+        meter.observableGauge(
+          "application_uptime_seconds",
+          description = "The uptime of the application in seconds".some,
+        ) { guage =>
+          val uptimeInSeconds = (jl.System.currentTimeMillis() / 1000.0) - startEpochSeconds
+          guage.record(uptimeInSeconds, Attributes.empty)
+        }
+      }
+
+    val startEpochSeconds: Long = jl.System.currentTimeMillis() / 1000L
 
   }
 

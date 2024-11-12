@@ -131,7 +131,8 @@ class IngestionLoadTest extends Simulation {
               .saveAs("fetchedIds"),
           ),
       ).exec { session =>
-        val fetchedIds = session("fetchedIds").asOption[Vector[Long]].getOrElse(Vector())
+        val fetchedIds =
+          session("fetchedIds").asOption[Vector[String]].getOrElse(Vector()).filterNot(_.isEmpty).map(_.toLong)
         allIds = allIds ++ fetchedIds
 
         if fetchedIds.size < IngestionApp.FetchSize then session.set("offset", "end")
@@ -147,10 +148,10 @@ class IngestionLoadTest extends Simulation {
     }
     .foreach("#{allIds}", "ids") {
       exec { session =>
-        val data = session("ids").as[Set[String]]
+        val data = session("ids").as[Set[Long]]
         session.set(
           "data",
-          String(summon[BinaryCodec[Set[Long]]].encode(data.map(_.toLong)).toArray, StandardCharsets.UTF_8.name),
+          String(summon[BinaryCodec[Set[Long]]].encode(data).toArray, StandardCharsets.UTF_8),
         )
       }.exec(
         http("POST /dataload/ingestion (fetch objects)")

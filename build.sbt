@@ -138,7 +138,6 @@ lazy val observability = (project in file("observability"))
     libraryDependencies += cats,
   )
 
-
 lazy val std = (project in file("std"))
   .dependsOn(kernel)
   .settings(stdSettings("std"))
@@ -193,7 +192,7 @@ lazy val ingestion = (project in file("ingestion"))
     dockerExposedPorts := Seq(8181, 9464),
     dockerUpdateLatest := true,
     dockerEnvVars ++= BuildHelper.getDockerEnvVars(),
-    mainClass := Some("com.youtoo.ingestion.IngestionApp")
+    mainClass := Some("com.youtoo.ingestion.IngestionApp"),
   )
   .settings(stdSettings("ingestion"))
   .settings(
