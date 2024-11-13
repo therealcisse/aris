@@ -19,7 +19,7 @@ class IngestionLoadTest extends Simulation {
   val baseUrl = s"http://localhost:$port"
 
   val numCommandsPerIngestion: Int = Integer.getInteger("numCommandsPerIngestion", 100)
-  val concurrentUsers: Int = Integer.getInteger("concurrentUsers", 2)
+  val concurrentUsers: Int = Integer.getInteger("concurrentUsers", 1)
   val testDuration: Int = Integer.getInteger("testDuration", 60)
 
   val httpProtocol = http

@@ -14,14 +14,14 @@ object OtelSdk {
       for {
         tracerProvider <- TracerProvider.jaeger(resourceName)
         meterProvider <- MeterProvider.prometheus(resourceName)
-        // loggerProvider <- LoggerProvider.seq(resourceName)
+        loggerProvider <- LoggerProvider.seq(resourceName)
         openTelemetry <- ZIO.fromAutoCloseable(
           ZIO.succeed(
             OpenTelemetrySdk
               .builder()
               .setTracerProvider(tracerProvider)
               .setMeterProvider(meterProvider)
-              // .setLoggerProvider(loggerProvider)
+              .setLoggerProvider(loggerProvider)
               .build,
           ),
         )

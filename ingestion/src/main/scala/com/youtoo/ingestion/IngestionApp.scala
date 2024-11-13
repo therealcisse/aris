@@ -79,7 +79,7 @@ object IngestionApp extends ZIOApp {
           OtelSdk.custom(resourceName),
           OpenTelemetry.tracing(instrumentationScopeName),
           OpenTelemetry.metrics(instrumentationScopeName),
-          // OpenTelemetry.logging(instrumentationScopeName),
+          OpenTelemetry.logging(instrumentationScopeName),
           OpenTelemetry.baggage(),
           // OpenTelemetry.zioMetrics,
           OpenTelemetry.contextZIO,

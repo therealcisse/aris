@@ -46,7 +46,7 @@ abstract class PgSpec extends ZIOSpec[ZConnectionPool & DatabaseConfig & FlywayM
         container
       }
 
-      ZIO.acquireRelease(a)(container => ZIO.attemptBlocking(container.stop()).orDie)
+      ZIO.acquireRelease(a)(container => ZIO.attemptBlocking(container.stop()).ignoreLogged)
 
     }
 

@@ -51,22 +51,24 @@ object Healthcheck {
             }
 
           }
-        }).repeat(interval tapOutput (i => ZIO.logDebug(s"Updated heartbeat $i"))).forkDaemon
+        }).repeat(interval tapOutput (i => Log.debug(s"Updated heartbeat $i"))).forkScoped
 
-      val stop = Log.info(s"Stopping health check watch") *> (ref.modifyZIO { s =>
-        s.get(id) match {
-          case None => ZIO.succeed((ZIO.unit, s))
-          case Some((_, fiber)) => ZIO.succeed((fiber.interrupt.unit) -> (s - id))
+      val stop = Log.info(s"Stopping health check watch") *> ZIO.uninterruptibleMask { restore =>
+        (ref.modifyZIO { s =>
+          s.get(id) match {
+            case None => ZIO.succeed((ZIO.unit, s))
+            case Some((_, fiber)) => ZIO.succeed(restore(fiber.interrupt.unit) -> (s - id))
 
-        }
+          }
 
-      }).flatten
+        }).flatten
+      }
 
-      Log.info(s"Start health check watch") *> ZIO.uninterruptibleMask { restore =>
+      Log.info(s"Start health check watch") *>
         (ref.updateZIO { s =>
           s.get(id) match {
             case None =>
-              (Timestamp.now <&> restore(update(id))) map { case (t, fiber) =>
+              (Timestamp.now <&> update(id)) map { case (t, fiber) =>
                 (
                   (s + (id -> (t -> fiber)))
                 )
@@ -77,8 +79,6 @@ object Healthcheck {
           }
 
         }) <* ZIO.addFinalizer(stop)
-
-      }
 
     def getHeartbeat(id: Key): UIO[Option[Timestamp]] =
       ref.get.map { s =>

@@ -1,0 +1,16 @@
+variable "namespace" {
+  description = "The Kubernetes namespace to deploy resources into."
+  type        = string
+  default     = "local-namespace"
+}
+
+variable "jaeger_operator_chart_version" {
+  type        = string
+  description = "Version of the jaeger-operator chart"
+  default     = "2.57.0"
+}
+
+variable "cert_manager_release" {
+  type = string
+  default = "1.16.1"
+}

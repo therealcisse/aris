@@ -33,6 +33,27 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
+  jaeger:
+    image: jaegertracing/all-in-one:1.47
+    container_name: jaeger
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    ports:
+      - "4317:4317"
+      - "16686:16686"
+    restart: unless-stopped
+
+  seq:
+    image: datalust/seq
+    container_name: seq
+    environment:
+      - ACCEPT_EULA=Y
+      - SEQ_FIRSTRUN_ADMINPASSWORDHASH=QGn6SCWIc6ypIJkHOur2JgybRf4Z/i+v6QBQf2Qs2cY5H7P66gszh4c0WQxjHLEe7hsDokvz+mzHbFUOJgeDSh450JhavlH/KArdxi1CtB/E
+    ports:
+      - "80:80"
+      - "5341:5341"
+    restart: unless-stopped
+
   adminer:
     image: adminer
     restart: always

@@ -60,10 +60,8 @@ object MigrationApp extends ZIOApp {
   private val configLayer = ZLayer.succeed(config)
   private val nettyConfigLayer = ZLayer.succeed(nettyConfig)
 
-  private val logging = Runtime.removeDefaultLoggers >>> SLF4J.slf4j >>> logMetrics
-
   val bootstrap: ZLayer[Any, Nothing, Environment] =
-    Runtime.disableFlags(
+    Log.layer >>> Runtime.disableFlags(
       RuntimeFlag.FiberRoots,
     ) ++ Runtime.enableRuntimeMetrics ++ Runtime.enableAutoBlockingExecutor ++ Runtime.enableFlags(
       RuntimeFlag.EagerShiftBack,
@@ -91,10 +89,10 @@ object MigrationApp extends ZIOApp {
           OpenTelemetry.metrics(instrumentationScopeName),
           OpenTelemetry.logging(instrumentationScopeName),
           OpenTelemetry.baggage(),
-          OpenTelemetry.zioMetrics,
+          // OpenTelemetry.zioMetrics,
           OpenTelemetry.contextZIO,
         )
-        .orDie ++ Runtime.setConfigProvider(ConfigProvider.envProvider) ++ logging
+        .orDie ++ Runtime.setConfigProvider(ConfigProvider.envProvider)
 
   val routes: Routes[Environment & Scope, Response] = Routes(
     Method.POST / "dataload" / "migration" -> handler { (req: Request) =>
@@ -109,7 +107,7 @@ object MigrationApp extends ZIOApp {
             ins = migrations.mapFilter(identity)
 
             bytes = ins
-              .map(in => String(summon[BinaryCodec[Migration]].encode(in).toArray, StandardCharsets.UTF_8.name))
+              .map(in => String(summon[BinaryCodec[Migration]].encode(in).toArray, StandardCharsets.UTF_8))
               .mkString("[", ",", "]")
 
             resp = Response(
@@ -131,7 +129,7 @@ object MigrationApp extends ZIOApp {
         atomically {
 
           MigrationService.loadMany(offset = offset.map(Key.apply), limit) map { ids =>
-            val bytes = String(summon[BinaryCodec[Chunk[Key]]].encode(ids).toArray, StandardCharsets.UTF_8.name)
+            val bytes = String(summon[BinaryCodec[Chunk[Key]]].encode(ids).toArray, StandardCharsets.UTF_8)
 
             val nextOffset =
               (if ids.size < limit then None else ids.minOption).map(id => s""","nextOffset":"$id"""").getOrElse("")
@@ -197,7 +195,7 @@ object MigrationApp extends ZIOApp {
           new DataMigration.Processor {
             def count(): Task[Long] = ZIO.succeed(numKeys)
             def load(): ZStream[Any, Throwable, Key] = ZStream((0L until numKeys).map(i => Key(i))*)
-            def process(key: Key): Task[Unit] = ZIO.logInfo(s"Processed $key")
+            def process(key: Key): Task[Unit] = Log.error(s"Processed $key")
 
           }
         }
