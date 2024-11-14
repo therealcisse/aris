@@ -1,8 +1,13 @@
-# output "namespace" {
-#   value = kubernetes_namespace.example.metadata[0].name
-# }
-#
-# output "service_url" {
-#   value = kubernetes_service.example.metadata[0].name
-# }
-#
+output "dashboard_token" {
+  value     = kubernetes_secret.dashboard_admin_token.data.token
+  sensitive = true
+}
+
+output "kubernetes_dashboard_service_metadata" {
+  value = helm_release.kubernetes_dashboard.metadata
+}
+
+output "metrics_server_service_metadata" {
+  value = helm_release.metrics_server.metadata
+}
+

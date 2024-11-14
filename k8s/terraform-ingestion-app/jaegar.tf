@@ -1,4 +1,4 @@
-resource "kubernetes_namespace" "jaeger_namespace" {
+resource "kubernetes_namespace" "observability" {
   lifecycle {
     ignore_changes = [
       metadata
@@ -14,7 +14,7 @@ resource "helm_release" "cert_manager" {
   name              = "cert-manager"
   repository        = "https://charts.jetstack.io"
   chart             = "cert-manager"
-  namespace         = kubernetes_namespace.jaeger_namespace.metadata[0].name
+  namespace         = kubernetes_namespace.observability.metadata[0].name
   create_namespace  = false
   version           = var.cert_manager_release
   dependency_update = true
@@ -37,10 +37,10 @@ resource "helm_release" "jaeger_operator" {
   ]
 
   name       = "jaeger-operator"
-  repository = local.helm_chart_repository
+  repository = "https://jaegertracing.github.io/helm-charts"
   chart      = "jaeger-operator"
   version    = var.jaeger_operator_chart_version
-  namespace  = kubernetes_namespace.jaeger_namespace.metadata[0].name
+  namespace  = kubernetes_namespace.observability.metadata[0].name
 
   create_namespace = false # Namespace is created earlier using kubernetes_namespace resource
 
@@ -69,8 +69,8 @@ resource "kubernetes_manifest" "jaeger" {
     apiVersion = "jaegertracing.io/v1"
     kind       = "Jaeger"
     metadata = {
-      namespace  = kubernetes_namespace.jaeger_namespace.metadata[0].name
-      name = "simple-jaeger"
+      namespace = kubernetes_namespace.observability.metadata[0].name
+      name      = "simple-jaeger"
     }
     spec = {
       strategy = "allInOne"
@@ -85,7 +85,7 @@ resource "kubernetes_manifest" "jaeger" {
         type = "memory"
         options = {
           memory = {
-            "max-traces": "1000"
+            "max-traces" : "1000"
           }
         }
       }
