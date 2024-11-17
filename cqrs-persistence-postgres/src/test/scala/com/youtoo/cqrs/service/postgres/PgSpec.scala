@@ -40,7 +40,7 @@ abstract class PgSpec extends ZIOSpec[ZConnectionPool & DatabaseConfig & FlywayM
   def container(): ZLayer[Any, Throwable, PostgreSQLContainer] =
     ZLayer.scoped {
       val a = ZIO.attemptBlocking {
-        val container = PostgreSQLContainer(dockerImageNameOverride = DockerImageName.parse("postgres:15"))
+        val container = PostgreSQLContainer(dockerImageNameOverride = DockerImageName.parse("postgres:16"))
 
         container.start()
         container
