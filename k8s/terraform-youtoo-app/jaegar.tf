@@ -29,6 +29,8 @@ resource "helm_release" "cert_manager" {
       replicaCount = 2
     })
   ]
+
+  wait = true
 }
 
 resource "helm_release" "jaeger_operator" {
@@ -56,44 +58,43 @@ resource "helm_release" "jaeger_operator" {
     # "rbac.create=true"
     # "clusterRole.create=true"
   ]
+
+  wait = true
 }
 
-resource "kubernetes_manifest" "jaeger" {
+resource "time_sleep" "wait_for_jaegar" {
   depends_on = [
     helm_release.jaeger_operator
   ]
 
-  computed_fields = ["spec.strategy"]
-
-  manifest = {
-    apiVersion = "jaegertracing.io/v1"
-    kind       = "Jaeger"
-    metadata = {
-      namespace = kubernetes_namespace.observability.metadata[0].name
-      name      = "simple-jaeger"
-    }
-    spec = {
-      strategy = "allInOne"
-      allInOne = {
-        options = {
-          query = {
-            base-path = "/jaeger"
-          }
-        }
-      }
-      storage = {
-        type = "memory"
-        options = {
-          memory = {
-            "max-traces" : "1000"
-          }
-        }
-      }
-      ingress = {
-        enabled = true
-      }
-    }
-  }
-
+  create_duration = "30s"
 }
 
+resource "kubectl_manifest" "jaeger" {
+  depends_on = [
+    time_sleep.wait_for_jaegar
+  ]
+
+  yaml_body = <<YAML
+apiVersion: jaegertracing.io/v1
+kind: Jaeger
+metadata:
+  namespace: ${kubernetes_namespace.observability.metadata[0].name}
+  name: simple-jaeger
+spec:
+  strategy: allInOne
+  allInOne:
+    options:
+      query:
+        base-path: "/jaeger"
+  storage:
+    type: memory
+    options:
+      memory:
+        max-traces: "10000"
+  ingress:
+    enabled: true
+
+YAML
+
+}

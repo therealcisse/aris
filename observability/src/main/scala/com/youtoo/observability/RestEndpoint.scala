@@ -83,7 +83,7 @@ object RestEndpoint {
     val requestLatency: ZIO[Meter, Nothing, Histogram[Double]] =
       ZIO.serviceWithZIO[Meter] { meter =>
         meter.histogram(
-          name = "http_request_duration",
+          name = "youtoo_http_request_duration",
           unit = "ms".some,
           description = "Request latency in milliseconds".some,
           boundaries = Chunk.iterate(1.0, 10)(_ + 1.0).some,
@@ -93,20 +93,20 @@ object RestEndpoint {
     val requestCount: ZIO[Meter, Nothing, Counter[Long]] =
       ZIO.serviceWithZIO[Meter] { meter =>
         meter.counter(
-          name = "http_requests_total",
+          name = "youtoo_http_requests_total",
           description = "Total number of HTTP requests".some,
         )
       }
 
     val activeRequests: ZIO[Meter, Nothing, UpDownCounter[Long]] =
       ZIO.serviceWithZIO[Meter] { meter =>
-        meter.upDownCounter("http_active_requests", description = "Number of active HTTP requests".some)
+        meter.upDownCounter("youtoo_http_active_requests", description = "Number of active HTTP requests".some)
       }
 
     val uptime: ZIO[Meter & Scope, Throwable, Unit] =
       ZIO.serviceWithZIO[Meter] { meter =>
         meter.observableGauge(
-          "application_uptime_seconds",
+          "youtoo_application_uptime_seconds",
           description = "The uptime of the application in seconds".some,
         ) { guage =>
           val uptimeInSeconds = (jl.System.currentTimeMillis() / 1000.0) - startEpochSeconds

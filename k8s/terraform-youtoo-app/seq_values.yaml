@@ -1,0 +1,23 @@
+replicaCount: 1
+
+persistence:
+  enabled: true
+  size: 100Mi
+  storageClassName: standard
+
+service:
+  type: ClusterIP
+  port: 5341
+
+resources:
+  requests:
+    memory: 256Mi
+    cpu: 500m
+  limits:
+    memory: 256Mi
+    cpu: 1000m
+
+env:
+  - name: ACCEPT_EULA
+    value: "Y"
+

@@ -21,6 +21,8 @@ resource "helm_release" "prometheus_operator_crds" {
 
   values = [
   ]
+
+  wait = true
 }
 
 resource "helm_release" "prometheus_operator" {
@@ -49,12 +51,6 @@ EOF
   }
 
   set {
-    name  = "server.persistentVolume.enabled"
-    value = false
-  }
-
-  # You can provide a map of value using yamlencode. Don't forget to escape the last element after point in the name
-  set {
     name = "server\\.resources"
     value = yamlencode({
       limits = {
@@ -68,18 +64,19 @@ EOF
     })
   }
 
+  wait = true
 }
 
-resource "kubernetes_service_account" "prometheus_operator" {
+resource "kubernetes_service_account" "prometheus_operator_service_account" {
   metadata {
-    name      = "prometheus-operator"
+    name      = "prometheus-operator-service-account"
     namespace = kubernetes_namespace.monitoring.metadata[0].name
   }
 }
 
-resource "kubernetes_cluster_role" "prometheus_operator" {
+resource "kubernetes_cluster_role" "prometheus_operator_cluster_role" {
   metadata {
-    name = "prometheus-operator"
+    name = "prometheus-operator-cluster-role"
   }
   rule {
     api_groups = [""]
@@ -98,70 +95,68 @@ resource "kubernetes_cluster_role" "prometheus_operator" {
   }
 }
 
-resource "kubernetes_cluster_role_binding" "prometheus_operator" {
+resource "kubernetes_cluster_role_binding" "prometheus_operator_role_binding" {
   metadata {
-    name = "prometheus-operator"
+    name = "prometheus-operator-role-binding"
   }
   role_ref {
     api_group = "rbac.authorization.k8s.io"
     kind      = "ClusterRole"
-    name      = kubernetes_cluster_role.prometheus_operator.metadata[0].name
+    name      = kubernetes_cluster_role.prometheus_operator_cluster_role.metadata[0].name
   }
   subject {
     kind      = "ServiceAccount"
-    name      = kubernetes_service_account.prometheus_operator.metadata[0].name
+    name      = kubernetes_service_account.prometheus_operator_service_account.metadata[0].name
     namespace = kubernetes_namespace.monitoring.metadata[0].name
   }
 }
 
-resource "kubernetes_manifest" "prometheus" {
-  manifest = {
-    "apiVersion" = "monitoring.coreos.com/v1"
-    "kind"       = "Prometheus"
-    "metadata" = {
-      "name"      = "prometheus"
-      "namespace" = kubernetes_namespace.monitoring.metadata[0].name
-      "labels" = {
-        "app" = "prometheus"
-      }
-    }
-    "spec" = {
-      "replicas"          = 2
-      "serviceAccountName" = "prometheus-operator-prometheus"
-      "retention"         = "15d"
-      # "resources" = {
-      #   "requests" = {
-      #     "memory" = "2Gi"
-      #     "cpu"    = "500m"
-      #   }
-      #   "limits" = {
-      #     "memory" = "4Gi"
-      #     "cpu"    = "1000m"
-      #   }
-      # }
-      # "storage" = {
-      #   "volumeClaimTemplate" = {
-      #     "spec" = {
-      #       "accessModes" = ["ReadWriteOnce"]
-      #       "resources" = {
-      #         "requests" = {
-      #           "storage" = "50Gi"
-      #         }
-      #       }
-      #       "storageClassName" = "standard" # Adjust this value to match your cluster's storage class
-      #     }
-      #   }
-      # }
-      "alerting" = {
-        "alertmanagers" = [
-          {
-            "name"      = "alertmanager-main"
-            "namespace" = kubernetes_namespace.monitoring.metadata[0].name
-            "port"      = "web"
-          }
-        ]
-      }
-    }
-  }
+resource "time_sleep" "wait_for_prometheus" {
+  depends_on = [
+    helm_release.prometheus_operator
+  ]
+
+  create_duration = "30s"
 }
 
+resource "kubectl_manifest" "prometheus" {
+  depends_on = [
+    time_sleep.wait_for_prometheus
+  ]
+
+  yaml_body = <<YAML
+apiVersion: monitoring.coreos.com/v1
+kind: Prometheus
+metadata:
+  name: prometheus
+  namespace: ${kubernetes_namespace.monitoring.metadata[0].name}
+  labels:
+    app: prometheus
+spec:
+  replicas: 1
+  serviceAccountName: ${kubernetes_service_account.prometheus_operator_service_account.metadata[0].name}
+  serviceMonitorSelector:
+    matchLabels:
+      group: ${kubernetes_namespace.monitoring.metadata[0].name}
+  podMonitorSelector:
+    matchLabels:
+      group: ${kubernetes_namespace.monitoring.metadata[0].name}
+  retention: 15d
+  storage:
+    volumeClaimTemplate:
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
+        storageClassName: standard
+  alerting:
+    alertmanagers:
+      - name: alertmanager-main
+        namespace: ${kubernetes_namespace.monitoring.metadata[0].name}
+        port: web
+
+YAML
+
+}

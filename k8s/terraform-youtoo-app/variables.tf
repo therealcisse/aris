@@ -9,3 +9,19 @@ variable "cert_manager_release" {
   default = "1.16.1"
 }
 
+variable "postgres_host" {
+  type = string
+}
+
+variable "postgres_db_name" {
+  type = string
+}
+
+variable "postgres_db_username" {
+  type = string
+}
+
+variable "postgres_db_password" {
+  type = string
+}
+

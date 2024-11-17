@@ -39,7 +39,7 @@ object Healthcheck {
   class HealthcheckLive(ref: Ref.Synchronized[Map[Key, (Timestamp, Fiber[Nothing, Any])]]) extends Healthcheck { self =>
     def start(id: Key, interval: Schedule[Any, Any, Any]): RIO[Scope, Unit] =
 
-      def update(id: Key): UIO[Fiber[Nothing, Any]] =
+      def update(id: Key): URIO[Scope, Fiber[Nothing, Any]] =
         (Timestamp.now flatMap { case (t) =>
           ZIO.uninterruptible {
             ref.update { s =>

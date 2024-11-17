@@ -10,19 +10,13 @@ import xerial.sbt.Sonatype.autoImport.*
 object BuildHelper extends ScalaSettings {
   val Scala3 = "3.5.1"
 
-  def getDockerEnvVars(): Map[String, String] =
+  def getEnvVars(): Map[String, String] =
     Map(
-      "YOUTOOENVNAME" -> "docker",
-      "DOCKER_DATABASE_URL" -> sys.env
-        .getOrElse("DOCKER_DATABASE_URL", throw new IllegalStateException("No env found")),
-      "DOCKER_DATABASE_USERNAME" -> sys.env
-        .getOrElse("DOCKER_DATABASE_USERNAME", throw new IllegalStateException("No env found")),
-      "DOCKER_DATABASE_PASSWORD" -> sys.env
-        .getOrElse("DOCKER_DATABASE_PASSWORD", throw new IllegalStateException("No env found")),
-      "INGESTION_SNAPSHOTS_THRESHOLD" -> sys.env
-        .getOrElse("INGESTION_SNAPSHOTS_THRESHOLD", throw new IllegalStateException("No env found")),
-      "MIGRATION_SNAPSHOTS_THRESHOLD" -> sys.env
-        .getOrElse("MIGRATION_SNAPSHOTS_THRESHOLD", throw new IllegalStateException("No env found")),
+      "INGESTION_SNAPSHOTS_THRESHOLD" -> sys.env.getOrElse("INGESTION_SNAPSHOTS_THRESHOLD", ""),
+      "MIGRATION_SNAPSHOTS_THRESHOLD" -> sys.env.getOrElse("MIGRATION_SNAPSHOTS_THRESHOLD", ""),
+      "DATABASE_URL" -> sys.env.getOrElse("DATABASE_URL", ""),
+      "DATABASE_USERNAME" -> sys.env.getOrElse("DATABASE_USERNAME", ""),
+      "DATABASE_PASSWORD" -> sys.env.getOrElse("DATABASE_PASSWORD", ""),
     )
 
   private val stdOptions = Seq(

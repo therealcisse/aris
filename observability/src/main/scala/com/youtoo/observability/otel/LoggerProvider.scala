@@ -37,12 +37,13 @@ object LoggerProvider {
    */
   def seq(resourceName: String): RIO[Scope, SdkLoggerProvider] =
     for {
+      endpoint <- ZIO.config[LoggingConfig.Endpoint]
       logRecordExporter <-
         ZIO.fromAutoCloseable(
           ZIO.succeed(
             OtlpHttpLogRecordExporter
               .builder()
-              .setEndpoint("http://localhost:5341/ingest/otlp/v1/logs")
+              .setEndpoint(s"${endpoint.value}/ingest/otlp/v1/logs")
               .build(),
           ),
         )

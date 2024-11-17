@@ -44,7 +44,7 @@ object DatabaseConfig {
 
         pool = config.jdbcUrl match {
           case JDBCUrlExtractor(host, port, name) => ZConnectionPool.postgres(host, port, name, props)
-          case _ => ZConnectionPool.postgres("localhost", 5432, "cqrs", props)
+          case _ => ZConnectionPool.postgres("localhost", 5432, "youtoo", props)
         }
 
       } yield pool
@@ -56,32 +56,30 @@ object DatabaseConfig {
 
   val pool: ZLayer[Any, Throwable, ZConnectionPool] = createZIOPoolConfig >>> connectionPool
 
-  given Config[DatabaseConfig] = Node { env =>
+  given Config[DatabaseConfig] = (
+    Config.string("driver").optional ++
+      Config.string("url").optional ++ Config.string("username").optional ++ Config
+        .string("password")
+        .optional ++ Config.string("migrations").optional
+  ).nested("database") map { case (driverClassName, jdbcUrl, username, password, migrations) =>
     (
-      Config.string("driver").optional ++
-        Config.string("url").optional ++ Config.string("username").optional ++ Config
-          .string("password")
-          .optional ++ Config.string("migrations").optional
-    ).nested(env.name, "database") map { case (driverClassName, jdbcUrl, username, password, migrations) =>
-      (
-        driverClassName orElse "org.postgresql.Driver".some,
-        jdbcUrl,
-        username,
-        password,
-        migrations orElse "migrations".some,
-      ) mapN {
-        case (
-              driverClassName,
-              jdbcUrl,
-              username,
-              password,
-              migrations,
-            ) =>
-          DatabaseConfig(driverClassName, jdbcUrl, username, password, migrations)
+      driverClassName orElse "org.postgresql.Driver".some,
+      jdbcUrl,
+      username,
+      password,
+      migrations orElse "migrations".some,
+    ) mapN {
+      case (
+            driverClassName,
+            jdbcUrl,
+            username,
+            password,
+            migrations,
+          ) =>
+        DatabaseConfig(driverClassName, jdbcUrl, username, password, migrations)
 
-      } getOrElse (throw IllegalArgumentException("Load database config"))
+    } getOrElse (throw IllegalArgumentException("Load database config"))
 
-    }
   }
 
 }

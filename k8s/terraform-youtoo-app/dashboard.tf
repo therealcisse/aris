@@ -9,10 +9,10 @@ resource "helm_release" "kubernetes_dashboard" {
     kubernetes_namespace.kubernetes_dashboard
   ]
 
-  name = "kubernetes-dashboard"
+  name       = "kubernetes-dashboard"
   repository = "https://kubernetes.github.io/dashboard/"
-  chart = "kubernetes-dashboard"
-  namespace = kubernetes_namespace.kubernetes_dashboard.metadata[0].name
+  chart      = "kubernetes-dashboard"
+  namespace  = kubernetes_namespace.kubernetes_dashboard.metadata[0].name
 
   set {
     name  = "service.type"
@@ -26,11 +26,6 @@ resource "helm_release" "kubernetes_dashboard" {
 
   set {
     name  = "protocolHttp"
-    value = "true"
-  }
-
-  set {
-    name  = "enableInsecureLogin"
     value = "true"
   }
 
@@ -53,10 +48,10 @@ resource "helm_release" "metrics_server" {
     kubernetes_namespace.kubernetes_dashboard
   ]
 
-  name = "metrics-server"
+  name       = "metrics-server"
   repository = "https://kubernetes-sigs.github.io/metrics-server/"
-  chart = "metrics-server"
-  namespace = kubernetes_namespace.kubernetes_dashboard.metadata[0].name
+  chart      = "metrics-server"
+  namespace  = kubernetes_namespace.kubernetes_dashboard.metadata[0].name
 
   set {
     name  = "args"

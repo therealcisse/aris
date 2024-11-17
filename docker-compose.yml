@@ -21,11 +21,11 @@ services:
   #   pid: "host"
 
   db:
-    image: postgres:15
+    image: postgres:16
     environment:
-      POSTGRES_USER: cqrs
+      POSTGRES_USER: youtoo
       POSTGRES_PASSWORD: admin
-      POSTGRES_DB: cqrs
+      POSTGRES_DB: youtoo
     networks:
       - app-network
     ports:
@@ -33,26 +33,26 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
-  jaeger:
-    image: jaegertracing/all-in-one:1.47
-    container_name: jaeger
-    environment:
-      - COLLECTOR_OTLP_ENABLED=true
-    ports:
-      - "4317:4317"
-      - "16686:16686"
-    restart: unless-stopped
+  # jaeger:
+  #   image: jaegertracing/all-in-one:1.47
+  #   container_name: jaeger
+  #   environment:
+  #     - COLLECTOR_OTLP_ENABLED=true
+  #   ports:
+  #     - "4317:4317"
+  #     - "16686:16686"
+  #   restart: unless-stopped
 
-  seq:
-    image: datalust/seq
-    container_name: seq
-    environment:
-      - ACCEPT_EULA=Y
-      - SEQ_FIRSTRUN_ADMINPASSWORDHASH=QGn6SCWIc6ypIJkHOur2JgybRf4Z/i+v6QBQf2Qs2cY5H7P66gszh4c0WQxjHLEe7hsDokvz+mzHbFUOJgeDSh450JhavlH/KArdxi1CtB/E
-    ports:
-      - "80:80"
-      - "5341:5341"
-    restart: unless-stopped
+  # seq:
+  #   image: datalust/seq
+  #   container_name: seq
+  #   environment:
+  #     - ACCEPT_EULA=Y
+  #     - SEQ_FIRSTRUN_ADMINPASSWORDHASH=QGn6SCWIc6ypIJkHOur2JgybRf4Z/i+v6QBQf2Qs2cY5H7P66gszh4c0WQxjHLEe7hsDokvz+mzHbFUOJgeDSh450JhavlH/KArdxi1CtB/E
+  #   ports:
+  #     - "8081:80"
+  #     - "5341:5341"
+  #   restart: unless-stopped
 
   adminer:
     image: adminer
@@ -65,27 +65,27 @@ services:
     ports:
       - 8080:8080
 
-  prometheus:
-    image: prom/prometheus:latest
-    volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml
-    ports:
-      - "9191:9090" # Prometheus server port (mapped to 9091 to avoid conflict)
-    networks:
-      - app-network
+  # prometheus:
+  #   image: prom/prometheus:latest
+  #   volumes:
+  #     - ./prometheus.yml:/etc/prometheus/prometheus.yml
+  #   ports:
+  #     - "9191:9090" # Prometheus server port (mapped to 9091 to avoid conflict)
+  #   networks:
+  #     - app-network
 
-  grafana:
-    image: grafana/grafana:latest
-    ports:
-      - "3000:3000"
-    depends_on:
-      - prometheus
-    networks:
-      - app-network
-    environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
-    volumes:
-      - grafana-storage:/var/lib/grafana
+  # grafana:
+  #   image: grafana/grafana:latest
+  #   ports:
+  #     - "3000:3000"
+  #   depends_on:
+  #     - prometheus
+  #   networks:
+  #     - app-network
+  #   environment:
+  #     - GF_SECURITY_ADMIN_PASSWORD=admin
+  #   volumes:
+  #     - grafana-storage:/var/lib/grafana
 
 volumes:
   postgres_data:

@@ -136,6 +136,8 @@ lazy val observability = (project in file("observability"))
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
     libraryDependencies ++= Dependencies.openTelemetry,
     libraryDependencies += cats,
+    libraryDependencies += `zio-prelude`,
+    libraryDependencies += `zio`,
   )
 
 lazy val std = (project in file("std"))
@@ -191,7 +193,7 @@ lazy val ingestion = (project in file("ingestion"))
     dockerBaseImage := "eclipse-temurin:17-jre",
     dockerExposedPorts := Seq(8181, 9464),
     dockerUpdateLatest := true,
-    dockerEnvVars ++= BuildHelper.getDockerEnvVars(),
+    dockerEnvVars ++= BuildHelper.getEnvVars(),
     mainClass := Some("com.youtoo.ingestion.IngestionApp"),
   )
   .settings(stdSettings("ingestion"))
