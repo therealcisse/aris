@@ -158,48 +158,20 @@ metadata:
     app.kubernetes.io/part-of: prometheus
     app: ${kubernetes_deployment.youtoo_ingestion.metadata[0].name}
     group: ${kubernetes_namespace.monitoring.metadata[0].name}
+    release: prometheus-operator
 spec:
   selector:
     matchLabels:
       app: ${kubernetes_service.youtoo_ingestion_service.metadata[0].name}
-  namespaceSelector:
-    matchNames:
-      - ${kubernetes_namespace.application_namespace.metadata[0].name}
   endpoints:
     - port: "monitoring"
       path: "/metrics"
-      interval: "15s"
-YAML
-
-}
-
-resource "kubectl_manifest" "youtoo_ingestion_pod_monitor" {
-  depends_on = [
-    kubernetes_deployment.youtoo_ingestion
-  ]
-
-  yaml_body = <<YAML
-apiVersion: monitoring.coreos.com/v1
-kind: PodMonitor
-metadata:
-  name: youtoo-ingestion-pod-monitor
-  namespace: ${kubernetes_namespace.monitoring.metadata[0].name}
-  labels:
-    app.kubernetes.io/name: ${kubernetes_deployment.youtoo_ingestion.metadata[0].name}
-    app.kubernetes.io/part-of: prometheus
-    app: ${kubernetes_deployment.youtoo_ingestion.metadata[0].name}
-    group: ${kubernetes_namespace.monitoring.metadata[0].name}
-spec:
-  selector:
-    matchLabels:
-      app: ${kubernetes_deployment.youtoo_ingestion.metadata[0].name}
+      interval: "30s"
   namespaceSelector:
     matchNames:
       - ${kubernetes_namespace.application_namespace.metadata[0].name}
-  podMetricsEndpoints:
-    - port: "monitoring"
-      path: "/metrics"
-      interval: "15s"
+      - ${kubernetes_namespace.monitoring.metadata[0].name}
 YAML
 
 }
+
