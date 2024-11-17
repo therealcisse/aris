@@ -39,10 +39,8 @@ resource "helm_release" "prometheus_operator" {
   create_namespace = false
 
   values = [
-    <<EOF
-prometheusOperator:
-  enabled: true
-EOF
+    file("${path.module}/monitoring-values.yaml")
+
   ]
 
   set {

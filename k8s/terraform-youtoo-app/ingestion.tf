@@ -89,6 +89,11 @@ resource "kubernetes_deployment" "youtoo_ingestion" {
             value = "http://${helm_release.seq.name}.${kubernetes_namespace.logging.metadata[0].name}.svc.cluster.local:5341"
           }
 
+          env {
+            name  = "OBSERVABILITY_TRACING_ENDPOINT"
+            value = "http://simple-jaeger-collector.${kubernetes_namespace.observability.metadata[0].name}.svc.cluster.local:4317"
+          }
+
           resources {
             limits = {
               cpu    = "2"

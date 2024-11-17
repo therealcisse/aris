@@ -38,7 +38,10 @@ object TracerProvider {
    */
   def jaeger(resourceName: String): RIO[Scope, SdkTracerProvider] =
     for {
-      spanExporter <- ZIO.fromAutoCloseable(ZIO.succeed(OtlpGrpcSpanExporter.builder().build()))
+      endpoint <- ZIO.config[TracingConfig.Endpoint]
+      spanExporter <- ZIO.fromAutoCloseable(
+        ZIO.succeed(OtlpGrpcSpanExporter.builder().setEndpoint(endpoint.value).build()),
+      )
       spanProcessor <- ZIO.fromAutoCloseable(ZIO.succeed(SimpleSpanProcessor.create(spanExporter)))
       tracerProvider <-
         ZIO.fromAutoCloseable(
@@ -57,7 +60,10 @@ object TracerProvider {
    */
   def fluentbit(resourceName: String): RIO[Scope, SdkTracerProvider] =
     for {
-      spanExporter <- ZIO.fromAutoCloseable(ZIO.succeed(OtlpHttpSpanExporter.builder().build()))
+      endpoint <- ZIO.config[TracingConfig.Endpoint]
+      spanExporter <- ZIO.fromAutoCloseable(
+        ZIO.succeed(OtlpHttpSpanExporter.builder().setEndpoint(endpoint.value).build()),
+      )
       spanProcessor <- ZIO.fromAutoCloseable(ZIO.succeed(SimpleSpanProcessor.create(spanExporter)))
       tracerProvider <-
         ZIO.fromAutoCloseable(

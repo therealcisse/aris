@@ -92,9 +92,6 @@ spec:
     options:
       memory:
         max-traces: "10000"
-  ingress:
-    enabled: true
-
 YAML
 
 }
