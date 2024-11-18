@@ -5,6 +5,8 @@ resource "kubernetes_deployment" "youtoo_ingestion" {
     labels = {
       app = "youtoo-ingestion"
     }
+    annotations = {
+    }
   }
 
   spec {
@@ -86,7 +88,7 @@ resource "kubernetes_deployment" "youtoo_ingestion" {
 
           env {
             name  = "OBSERVABILITY_LOGGING_ENDPOINT"
-            value = "http://${helm_release.seq.name}.${kubernetes_namespace.logging.metadata[0].name}.svc.cluster.local:5341"
+            value = "http://${helm_release.seq.name}.${kubernetes_namespace.logging.metadata[0].name}.svc.cluster.local:5341/ingest/otlp/v1/logs"
           }
 
           env {

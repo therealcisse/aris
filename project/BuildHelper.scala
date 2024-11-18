@@ -141,7 +141,6 @@ object BuildHelper extends ScalaSettings {
   )
   def stdSettings(prjName: String) = Seq(
     name := prjName,
-    ThisBuild / crossScalaVersions := Seq(Scala3),
     ThisBuild / scalaVersion := Scala3,
     Compile / packageSrc / publishArtifact := false,
     Compile / packageDoc / publishArtifact := false,
@@ -153,7 +152,7 @@ object BuildHelper extends ScalaSettings {
     Test / parallelExecution := true,
     incOptions ~= (_.withLogRecompileOnMacro(false)),
     autoAPIMappings := true,
-    ThisBuild / javaOptions := Seq(
+    ThisBuild / javaOptions ++= Seq(
       s"-DYOUTOO_LOG_LEVEL=${Debug.LogLevel}",
     ),
     Compile / run / javaOptions ++= Seq(
@@ -167,10 +166,6 @@ object BuildHelper extends ScalaSettings {
     ThisBuild / fork := true,
     semanticdbEnabled := scalaVersion.value != Scala3,
     semanticdbOptions += "-P:semanticdb:synthetics:on",
-    semanticdbVersion := {
-      if (scalaVersion.value == Scala3) semanticdbVersion.value
-      else scalafixSemanticdb.revision
-    },
     git.formattedShaVersion := git.gitHeadCommit.value map { sha => s"v$sha" },
   )
 

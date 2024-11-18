@@ -85,13 +85,20 @@ spec:
   strategy: allInOne
   allInOne:
     options:
+      log-level: debug
       query:
         base-path: "/jaeger"
+      prometheus:
+        server-url: "http://prometheus-operated.${kubernetes_namespace.monitoring.metadata[0].name}.svc.cluster.local:9090"
+    metricsStorage:
+      type: prometheus
   storage:
     type: memory
     options:
       memory:
         max-traces: "10000"
+  agent:
+    strategy: DaemonSet
 YAML
 
 }

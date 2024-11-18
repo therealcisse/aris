@@ -43,7 +43,7 @@ object LoggerProvider {
           ZIO.succeed(
             OtlpHttpLogRecordExporter
               .builder()
-              .setEndpoint(s"${endpoint.value}/ingest/otlp/v1/logs")
+              .setEndpoint(endpoint.value)
               .build(),
           ),
         )

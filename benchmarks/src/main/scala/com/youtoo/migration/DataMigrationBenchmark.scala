@@ -86,7 +86,7 @@ object DataMigrationBenchmark {
   import zio.logging.*
   import zio.logging.backend.*
 
-  import com.youtoo.otel.OtelSdk
+  import com.youtoo.observability.otel.OtelSdk
 
   import zio.telemetry.opentelemetry.OpenTelemetry
   import zio.telemetry.opentelemetry.tracing.Tracing
