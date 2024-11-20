@@ -2,7 +2,7 @@ resource "time_sleep" "wait_for_infra" {
 
   depends_on = [
     kubectl_manifest.jaeger,
-    kubectl_manifest.prometheus,
+    # kubectl_manifest.prometheus_k8s,
     helm_release.seq,
   ]
 
@@ -46,7 +46,7 @@ resource "kubernetes_deployment" "youtoo_ingestion" {
         }
 
         annotations = {
-          "sidecar.opentelemetry.io/inject" = "${kubernetes_namespace.monitoring.metadata[0].name}/youtoo-otel-collector"
+          "sidecar.opentelemetry.io/inject" = "${kubernetes_namespace.monitoring.metadata[0].name}/youtoo-otel"
 
           "prometheus.io/scrape" = "true"
           "prometheus.io/port"   = "9464"

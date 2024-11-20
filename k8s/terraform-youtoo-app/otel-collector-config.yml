@@ -29,7 +29,11 @@ extensions:
 exporters:
   debug: {}
   prometheusremotewrite:
-    endpoint: "http://prometheus-operator-kube-p-prometheus.monitoring.svc.cluster.local:9090/api/v1/write"
+    endpoint: "http://prometheus-operated.monitoring.svc.cluster.local:9090/api/v1/write"
+    target_info:
+      enabled: true
+    tls:
+      insecure: true
   otlp/jaeger:
     endpoint: simple-jaeger-collector.observability.svc.cluster.local:4317
     tls:
@@ -45,8 +49,11 @@ service:
       receivers: [otlp]
       # processors: ["batch", "spanmetrics"]
       processors: [batch]
-      exporters: [otlp/jaeger, spanmetrics]
+      exporters: [otlp/jaeger, spanmetrics, debug]
     metrics:
       receivers: [prometheus, otlp, spanmetrics]
       processors: [batch, memory_limiter]
-      exporters: [prometheusremotewrite]
+      exporters: [prometheusremotewrite, debug]
+  telemetry:
+    metrics:
+      address: 0.0.0.0:8888

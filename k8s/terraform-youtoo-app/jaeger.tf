@@ -76,6 +76,8 @@ resource "kubectl_manifest" "jaeger" {
     time_sleep.wait_for_jaeger_crd
   ]
 
+  server_side_apply = true
+
   yaml_body = yamlencode({
     apiVersion = "jaegertracing.io/v1"
     kind       = "Jaeger"
@@ -89,7 +91,10 @@ resource "kubectl_manifest" "jaeger" {
         options = {
           log-level = "debug"
           prometheus = {
-            server-url = "http://prometheus-operator-kube-p-prometheus.${kubernetes_namespace.monitoring.metadata[0].name}.svc.cluster.local:9090"
+            server-url = "http://prometheus-operated.${kubernetes_namespace.monitoring.metadata[0].name}.svc.cluster.local:9090"
+
+            query = {
+            }
           }
         }
         metricsStorage = {
@@ -111,6 +116,8 @@ resource "kubectl_manifest" "jaeger_pod_monitor" {
   depends_on = [
     kubectl_manifest.jaeger
   ]
+
+  server_side_apply = true
 
   yaml_body = yamlencode({
     apiVersion = "monitoring.coreos.com/v1"
