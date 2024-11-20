@@ -11,6 +11,9 @@ import io.opentelemetry.semconv.ResourceAttributes
 import zio.*
 import io.opentelemetry.exporter.otlp.http.trace.OtlpHttpSpanExporter
 import io.opentelemetry.exporter.logging.otlp.OtlpJsonLoggingSpanExporter
+import io.opentelemetry.sdk.trace.`export`.BatchSpanProcessor
+import java.time.Duration
+import java.util.concurrent.TimeUnit
 
 object TracerProvider {
 
@@ -38,11 +41,22 @@ object TracerProvider {
    */
   def jaeger(resourceName: String): RIO[Scope, SdkTracerProvider] =
     for {
-      endpoint <- ZIO.config[TracingConfig.Endpoint]
       spanExporter <- ZIO.fromAutoCloseable(
-        ZIO.succeed(OtlpGrpcSpanExporter.builder().setEndpoint(endpoint.value).build()),
+        ZIO.succeed(
+          OtlpGrpcSpanExporter
+            .builder()
+            .setTimeout(2, TimeUnit.SECONDS)
+            .build(),
+        ),
       )
-      spanProcessor <- ZIO.fromAutoCloseable(ZIO.succeed(SimpleSpanProcessor.create(spanExporter)))
+      spanProcessor <- ZIO.fromAutoCloseable(
+        ZIO.succeed(
+          BatchSpanProcessor
+            .builder(spanExporter)
+            .setScheduleDelay(100, TimeUnit.MILLISECONDS)
+            .build(),
+        ),
+      )
       tracerProvider <-
         ZIO.fromAutoCloseable(
           ZIO.succeed(
@@ -60,11 +74,23 @@ object TracerProvider {
    */
   def fluentbit(resourceName: String): RIO[Scope, SdkTracerProvider] =
     for {
-      endpoint <- ZIO.config[TracingConfig.Endpoint]
       spanExporter <- ZIO.fromAutoCloseable(
-        ZIO.succeed(OtlpHttpSpanExporter.builder().setEndpoint(endpoint.value).build()),
+        ZIO.succeed(
+          OtlpGrpcSpanExporter
+            .builder()
+            .setTimeout(2, TimeUnit.SECONDS)
+            .build(),
+        ),
       )
-      spanProcessor <- ZIO.fromAutoCloseable(ZIO.succeed(SimpleSpanProcessor.create(spanExporter)))
+      spanProcessor <- ZIO.fromAutoCloseable(
+        ZIO.succeed(
+          BatchSpanProcessor
+            .builder(spanExporter)
+            .setScheduleDelay(100, TimeUnit.MILLISECONDS)
+            .build(),
+        ),
+      )
+
       tracerProvider <-
         ZIO.fromAutoCloseable(
           ZIO.succeed(

@@ -122,39 +122,53 @@ resource "kubectl_manifest" "prometheus" {
     time_sleep.wait_for_prometheus
   ]
 
-  yaml_body = <<YAML
-apiVersion: monitoring.coreos.com/v1
-kind: Prometheus
-metadata:
-  name: prometheus
-  namespace: ${kubernetes_namespace.monitoring.metadata[0].name}
-  labels:
-    app: prometheus
-spec:
-  replicas: 1
-  serviceAccountName: ${kubernetes_service_account.prometheus_operator_service_account.metadata[0].name}
-  serviceMonitorSelector:
-    matchLabels:
-      group: ${kubernetes_namespace.monitoring.metadata[0].name}
-  podMonitorSelector:
-    matchLabels:
-      group: ${kubernetes_namespace.monitoring.metadata[0].name}
-  retention: 15d
-  storage:
-    volumeClaimTemplate:
-      spec:
-        accessModes:
-          - ReadWriteOnce
-        resources:
-          requests:
-            storage: 1Gi
-        storageClassName: standard
-  alerting:
-    alertmanagers:
-      - name: alertmanager-main
-        namespace: ${kubernetes_namespace.monitoring.metadata[0].name}
-        port: web
-
-YAML
-
+  yaml_body = yamlencode({
+    apiVersion = "monitoring.coreos.com/v1"
+    kind       = "Prometheus"
+    metadata = {
+      name      = "prometheus"
+      namespace = kubernetes_namespace.monitoring.metadata[0].name
+      labels = {
+        app = "prometheus"
+      }
+    }
+    spec = {
+      replicas                  = 1
+      serviceAccountName        = kubernetes_service_account.prometheus_operator_service_account.metadata[0].name
+      enableRemoteWriteReceiver = true
+      serviceMonitorSelector = {
+        matchLabels = {
+          group = kubernetes_namespace.monitoring.metadata[0].name
+        }
+      }
+      podMonitorSelector = {
+        matchLabels = {
+          group = kubernetes_namespace.monitoring.metadata[0].name
+        }
+      }
+      retention = "15d"
+      storage = {
+        volumeClaimTemplate = {
+          spec = {
+            accessModes = ["ReadWriteOnce"]
+            resources = {
+              requests = {
+                storage = "1Gi"
+              }
+            }
+            storageClassName = "standard"
+          }
+        }
+      }
+      alerting = {
+        alertmanagers = [
+          {
+            name      = "alertmanager-main"
+            namespace = kubernetes_namespace.monitoring.metadata[0].name
+            port      = "web"
+          }
+        ]
+      }
+    }
+  })
 }

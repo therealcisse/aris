@@ -1,4 +1,20 @@
+resource "time_sleep" "wait_for_infra" {
+
+  depends_on = [
+    kubectl_manifest.jaeger,
+    kubectl_manifest.prometheus,
+    helm_release.seq,
+  ]
+
+  create_duration = "90s"
+}
+
+
 resource "kubernetes_deployment" "youtoo_ingestion" {
+  depends_on = [
+    time_sleep.wait_for_infra
+  ]
+
   metadata {
     name      = "youtoo-ingestion"
     namespace = kubernetes_namespace.application_namespace.metadata[0].name
@@ -22,12 +38,19 @@ resource "kubernetes_deployment" "youtoo_ingestion" {
       metadata {
         labels = {
           app = "youtoo-ingestion"
+
+          "app.kubernetes.io/name"     = "youtoo-ingestion"
+          "app.kubernetes.io/version"  = "1.0.0"
+          "app.kubernetes.io/part-of"  = kubernetes_namespace.application_namespace.metadata[0].name
+          "app.kubernetes.io/instance" = "youtoo-ingestion-0"
         }
 
         annotations = {
+          "sidecar.opentelemetry.io/inject" = "${kubernetes_namespace.monitoring.metadata[0].name}/youtoo-otel-collector"
+
           "prometheus.io/scrape" = "true"
-          "prometheus.io/path"   = "/metrics"
           "prometheus.io/port"   = "9464"
+          "prometheus.io/path"   = "/metrics"
         }
 
       }
@@ -44,7 +67,7 @@ resource "kubernetes_deployment" "youtoo_ingestion" {
           }
 
           port {
-            name           = "monitoring"
+            name           = "metrics"
             container_port = 9464
           }
 
@@ -67,6 +90,7 @@ resource "kubernetes_deployment" "youtoo_ingestion" {
           # }
 
           env {
+
             name  = "DATABASE_URL"
             value = "jdbc:postgresql://${var.postgres_host}:5432/${var.postgres_db_name}"
           }
@@ -89,11 +113,6 @@ resource "kubernetes_deployment" "youtoo_ingestion" {
           env {
             name  = "OBSERVABILITY_LOGGING_ENDPOINT"
             value = "http://${helm_release.seq.name}.${kubernetes_namespace.logging.metadata[0].name}.svc.cluster.local:5341/ingest/otlp/v1/logs"
-          }
-
-          env {
-            name  = "OBSERVABILITY_TRACING_ENDPOINT"
-            value = "http://simple-jaeger-collector.${kubernetes_namespace.observability.metadata[0].name}.svc.cluster.local:4317"
           }
 
           resources {
@@ -138,47 +157,7 @@ resource "kubernetes_service" "youtoo_ingestion_service" {
       protocol    = "TCP"
     }
 
-    port {
-      name        = "monitoring"
-      port        = 9464
-      target_port = 9464
-      protocol    = "TCP"
-    }
-
     type = "ClusterIP"
   }
-}
-
-resource "kubectl_manifest" "youtoo_ingestion_service_monitor" {
-  depends_on = [
-    kubernetes_deployment.youtoo_ingestion
-  ]
-
-  yaml_body = <<YAML
-apiVersion: monitoring.coreos.com/v1
-kind: ServiceMonitor
-metadata:
-  name: youtoo-ingestion-service-monitor
-  namespace: ${kubernetes_namespace.monitoring.metadata[0].name}
-  labels:
-    app.kubernetes.io/name: ${kubernetes_deployment.youtoo_ingestion.metadata[0].name}
-    app.kubernetes.io/part-of: prometheus
-    app: ${kubernetes_deployment.youtoo_ingestion.metadata[0].name}
-    group: ${kubernetes_namespace.monitoring.metadata[0].name}
-    release: prometheus-operator
-spec:
-  selector:
-    matchLabels:
-      app: ${kubernetes_service.youtoo_ingestion_service.metadata[0].name}
-  endpoints:
-    - port: "monitoring"
-      path: "/metrics"
-      interval: "30s"
-  namespaceSelector:
-    matchNames:
-      - ${kubernetes_namespace.application_namespace.metadata[0].name}
-      - ${kubernetes_namespace.monitoring.metadata[0].name}
-YAML
-
 }
 
