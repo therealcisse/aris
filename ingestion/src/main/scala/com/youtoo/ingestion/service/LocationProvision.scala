@@ -66,7 +66,7 @@ object LocationProvision {
       ZIO.collectAllPar(files)
     }
 
-    inline def traced(tracing: Tracing): LocationProvision =
+    def traced(tracing: Tracing): LocationProvision =
       new LocationProvision {
         def getFiles(path: String): Task[List[IngestionFile]] =
           self.getFiles(path) @@ tracing.aspects.span("LocationProvision.load")

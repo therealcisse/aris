@@ -52,7 +52,7 @@ object IngestionRepository {
         .SAVE_INGESTION(o)
         .insert
 
-    inline def traced(tracing: Tracing): IngestionRepository =
+    def traced(tracing: Tracing): IngestionRepository =
       new IngestionRepository {
         def load(id: Ingestion.Id): ZIO[ZConnection, Throwable, Option[Ingestion]] =
           self.load(id) @@ tracing.aspects.span("IngestionRepository.load")

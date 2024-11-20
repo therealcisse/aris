@@ -19,8 +19,3 @@ nodes:
     extraMounts:
     - hostPath: ./data/
       containerPath: /data
-  - role: worker
-    image: kindest/node:v1.31.1
-    extraMounts:
-    - hostPath: ./data/
-      containerPath: /data

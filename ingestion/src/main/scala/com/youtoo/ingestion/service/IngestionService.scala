@@ -117,7 +117,7 @@ object IngestionService {
 
     def save(o: Ingestion): Task[Long] = atomically(repository.save(o)).provideEnvironment(ZEnvironment(pool))
 
-    inline def traced(tracing: Tracing): IngestionService =
+    def traced(tracing: Tracing): IngestionService =
       new IngestionService {
         def load(id: Ingestion.Id): Task[Option[Ingestion]] =
           self.load(id) @@ tracing.aspects.span("IngestionService.load")

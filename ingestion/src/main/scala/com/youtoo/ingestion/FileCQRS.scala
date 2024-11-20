@@ -14,8 +14,6 @@ import com.youtoo.ingestion.model.*
 import com.youtoo.cqrs.service.*
 import com.youtoo.ingestion.store.*
 
-import java.time.temporal.ChronoUnit
-
 trait FileCQRS extends CQRS[FileEvent, FileCommand] {}
 
 object FileCQRS {

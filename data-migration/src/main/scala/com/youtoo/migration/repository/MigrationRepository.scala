@@ -57,7 +57,7 @@ object MigrationRepository {
         .SAVE_MIGRATION(o)
         .insert
 
-    inline def traced(tracing: Tracing): MigrationRepository =
+    def traced(tracing: Tracing): MigrationRepository =
       new MigrationRepository {
         def load(id: Migration.Id): ZIO[ZConnection, Throwable, Option[Migration]] =
           self.load(id) @@ tracing.aspects.span("MigrationRepository.load")

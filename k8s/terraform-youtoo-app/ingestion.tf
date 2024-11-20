@@ -2,7 +2,7 @@ resource "time_sleep" "wait_for_infra" {
 
   depends_on = [
     kubectl_manifest.jaeger,
-    # kubectl_manifest.prometheus_k8s,
+    kubectl_manifest.otel_collector,
     helm_release.seq,
   ]
 
@@ -46,7 +46,7 @@ resource "kubernetes_deployment" "youtoo_ingestion" {
         }
 
         annotations = {
-          "sidecar.opentelemetry.io/inject" = "${kubernetes_namespace.monitoring.metadata[0].name}/youtoo-otel"
+          "sidecar.opentelemetry.io/inject" = "${kubernetes_namespace.telemetry.metadata[0].name}/youtoo-otel"
 
           "prometheus.io/scrape" = "true"
           "prometheus.io/port"   = "9464"
@@ -112,7 +112,7 @@ resource "kubernetes_deployment" "youtoo_ingestion" {
 
           env {
             name  = "OBSERVABILITY_LOGGING_ENDPOINT"
-            value = "http://${helm_release.seq.name}.${kubernetes_namespace.logging.metadata[0].name}.svc.cluster.local:5341/ingest/otlp/v1/logs"
+            value = "http://${helm_release.seq.name}.${kubernetes_namespace.telemetry.metadata[0].name}.svc.cluster.local:5341/ingest/otlp/v1/logs"
           }
 
           resources {

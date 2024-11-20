@@ -117,7 +117,7 @@ object MigrationService {
 
     def save(o: Migration): Task[Long] = atomically(repository.save(o)).provideEnvironment(ZEnvironment(pool))
 
-    inline def traced(tracing: Tracing): MigrationService =
+    def traced(tracing: Tracing): MigrationService =
       new MigrationService {
         def load(id: Migration.Id): Task[Option[Migration]] =
           self.load(id) @@ tracing.aspects.span("MigrationService.load")

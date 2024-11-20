@@ -69,7 +69,7 @@ object PostgresCQRSPersistence {
     def saveSnapshot(id: Key, version: Version): RIO[ZConnection, Long] =
       Queries.SAVE_SNAPSHOT(id, version).insert
 
-    inline def traced(tracing: Tracing): CQRSPersistence =
+    def traced(tracing: Tracing): CQRSPersistence =
       new CQRSPersistence {
         def readEvents[Event: BinaryCodec: Tag](
           id: Key,

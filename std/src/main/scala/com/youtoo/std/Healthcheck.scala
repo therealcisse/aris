@@ -92,7 +92,7 @@ object Healthcheck {
     def isRunning(id: Key): UIO[Boolean] =
       ref.get.map(_.contains(id))
 
-    inline def traced(tracing: Tracing): Healthcheck =
+    def traced(tracing: Tracing): Healthcheck =
       new Healthcheck {
         def start(id: Key, interval: Schedule[Any, Any, Any]): RIO[Scope, Unit] =
           self.start(id, interval) @@ tracing.aspects.span("Healthcheck.start")

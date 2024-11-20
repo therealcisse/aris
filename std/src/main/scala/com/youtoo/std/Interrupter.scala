@@ -66,7 +66,7 @@ object Interrupter {
         } as ()
       }
 
-    inline def traced(tracing: Tracing): Interrupter =
+    def traced(tracing: Tracing): Interrupter =
       new Interrupter {
         def watch[R](id: Key): ZIO[R & Scope, Throwable, Promise[Throwable, Unit]] =
           self.watch(id) @@ tracing.aspects.span("Interrupter.watch")

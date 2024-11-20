@@ -137,7 +137,7 @@ object ProviderService {
         } yield inn
       }.provideEnvironment(ZEnvironment(pool))
 
-    inline def traced(tracing: Tracing): ProviderService =
+    def traced(tracing: Tracing): ProviderService =
       new ProviderService {
         def addProvider(
           id: Provider.Id,

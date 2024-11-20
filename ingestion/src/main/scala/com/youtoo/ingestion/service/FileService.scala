@@ -145,7 +145,7 @@ object FileService {
 
       }.provideEnvironment(ZEnvironment(pool))
 
-    inline def traced(tracing: Tracing): FileService =
+    def traced(tracing: Tracing): FileService =
       new FileService {
         def addFile(
           provider: Provider.Id,

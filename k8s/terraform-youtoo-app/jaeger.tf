@@ -1,20 +1,8 @@
-resource "kubernetes_namespace" "observability" {
-  lifecycle {
-    ignore_changes = [
-      metadata
-    ]
-  }
-
-  metadata {
-    name = "observability"
-  }
-}
-
 resource "helm_release" "cert_manager" {
   name              = "cert-manager"
   repository        = "https://charts.jetstack.io"
   chart             = "cert-manager"
-  namespace         = kubernetes_namespace.observability.metadata[0].name
+  namespace         = kubernetes_namespace.telemetry.metadata[0].name
   create_namespace  = false
   version           = var.cert_manager_release
   dependency_update = true
@@ -42,7 +30,7 @@ resource "helm_release" "jaeger_operator" {
   repository = "https://jaegertracing.github.io/helm-charts"
   chart      = "jaeger-operator"
   version    = var.jaeger_operator_chart_version
-  namespace  = kubernetes_namespace.observability.metadata[0].name
+  namespace  = kubernetes_namespace.telemetry.metadata[0].name
 
   create_namespace = false # Namespace is created earlier using kubernetes_namespace resource
 
@@ -82,7 +70,7 @@ resource "kubectl_manifest" "jaeger" {
     apiVersion = "jaegertracing.io/v1"
     kind       = "Jaeger"
     metadata = {
-      namespace = kubernetes_namespace.observability.metadata[0].name
+      namespace = kubernetes_namespace.telemetry.metadata[0].name
       name      = "simple-jaeger"
     }
     spec = {
@@ -91,7 +79,7 @@ resource "kubectl_manifest" "jaeger" {
         options = {
           log-level = "debug"
           prometheus = {
-            server-url = "http://prometheus-operated.${kubernetes_namespace.monitoring.metadata[0].name}.svc.cluster.local:9090"
+            server-url = "http://prometheus-operated.${kubernetes_namespace.telemetry.metadata[0].name}.svc.cluster.local:9090"
 
             query = {
             }
@@ -114,7 +102,8 @@ resource "kubectl_manifest" "jaeger" {
 }
 resource "kubectl_manifest" "jaeger_pod_monitor" {
   depends_on = [
-    kubectl_manifest.jaeger
+    kubectl_manifest.jaeger,
+    kubectl_manifest.otel_collector,
   ]
 
   server_side_apply = true
@@ -124,7 +113,7 @@ resource "kubectl_manifest" "jaeger_pod_monitor" {
     kind       = "PodMonitor"
     metadata = {
       name      = "jaeger-components"
-      namespace = kubernetes_namespace.observability.metadata[0].name
+      namespace = kubernetes_namespace.telemetry.metadata[0].name
       labels = {
         release = "prometheus-operator"
       }
@@ -139,8 +128,7 @@ resource "kubectl_manifest" "jaeger_pod_monitor" {
       ]
       namespaceSelector = {
         matchNames = [
-          kubernetes_namespace.observability.metadata[0].name,
-          kubernetes_namespace.monitoring.metadata[0].name,
+          kubernetes_namespace.telemetry.metadata[0].name,
         ]
       }
       selector = {
