@@ -3,6 +3,8 @@ package observability
 
 import cats.implicits.*
 
+import io.opentelemetry.api.trace.*
+
 import zio.*
 import zio.telemetry.opentelemetry.metrics.*
 import zio.telemetry.opentelemetry.common.*
@@ -37,6 +39,7 @@ object RestEndpoint {
       val effect = body @@ tracing.aspects.root(
         tag,
         attributes = Attributes(Attribute.string("git_commit_hash", YouToo.gitCommitHash)),
+        spanKind = SpanKind.SERVER,
       )
 
       val op = effect.catchAllCause {

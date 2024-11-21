@@ -66,11 +66,6 @@ resource "kubernetes_deployment" "youtoo_ingestion" {
             container_port = 8181
           }
 
-          port {
-            name           = "metrics"
-            container_port = 9464
-          }
-
           # liveness_probe {
           #   http_get {
           #     path = "/health"
@@ -111,7 +106,7 @@ resource "kubernetes_deployment" "youtoo_ingestion" {
           }
 
           env {
-            name  = "OBSERVABILITY_LOGGING_ENDPOINT"
+            name  = "TELEMETRY_LOGGING_ENDPOINT"
             value = "http://${helm_release.seq.name}.${kubernetes_namespace.telemetry.metadata[0].name}.svc.cluster.local:5341/ingest/otlp/v1/logs"
           }
 

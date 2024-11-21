@@ -75,9 +75,9 @@ resource "kubectl_manifest" "otel_collector" {
           hostmetrics = {
             scrapers = {
 
-              cpu = {}
+              cpu    = {}
               memory = {}
-              disk = {}
+              disk   = {}
             }
           }
           otlp = {
@@ -94,21 +94,6 @@ resource "kubectl_manifest" "otel_collector" {
             }
           }
 
-          prometheus = {
-            config = {
-              scrape_configs = [
-                {
-                  job_name = "otelcol"
-                  scrape_interval = "10s"
-                  static_configs = [
-                    {
-                      targets = ["0.0.0.0:8888"]
-                    }
-                  ]
-                }
-              ]
-            }
-          }
         }
         processors = {
           memory_limiter = {
@@ -124,7 +109,6 @@ resource "kubectl_manifest" "otel_collector" {
         }
         connectors = {
           spanmetrics = {
-            namespace = "span.metrics"
           }
 
         }
@@ -145,19 +129,28 @@ resource "kubectl_manifest" "otel_collector" {
               insecure = true
             }
           }
+          prometheus = {
+            endpoint = "0.0.0.0:8889"
+          }
         }
         service = {
           pipelines = {
             traces = {
               receivers  = ["otlp"]
               processors = ["batch"]
-              exporters  = ["otlp/jaeger"]
+              exporters  = ["spanmetrics", "otlp/jaeger"]
             }
 
+            # "metrics/spanmetrics" = {
+            #   receivers = ["spanmetrics"]
+            #   exporters = ["prometheusremotewrite"]
+            #
+            # }
+
             metrics = {
-              receivers  = ["hostmetrics", "otlp", "prometheus"]
+              receivers  = ["hostmetrics", "otlp", "spanmetrics"]
               processors = ["batch", "memory_limiter"]
-              exporters  = ["prometheusremotewrite"]
+              exporters  = ["prometheus"]
             }
 
           }
@@ -167,6 +160,29 @@ resource "kubectl_manifest" "otel_collector" {
               level = "debug"
             }
 
+            # metrics = {
+            #   level = "detailed"
+            #
+            #
+            #   readers = [
+            #     {
+            #
+            #       pull = {
+            #         exporter = {
+            #           prometheus = {
+            #             host = "0.0.0.0"
+            #             port = 8889
+            #
+            #           }
+            #
+            #         }
+            #
+            #       }
+            #     }
+            #   ]
+            #
+            # }
+
           }
 
         }
@@ -175,11 +191,48 @@ resource "kubectl_manifest" "otel_collector" {
       ports = [
         {
           name       = "metrics"
-          port       = 8888
+          port       = 8889
           protocol   = "TCP"
-          targetPort = 8888
+          targetPort = 8889
         }
       ]
+    }
+  })
+}
+resource "kubectl_manifest" "otel_collector_servicemonitor" {
+  depends_on = [
+    kubectl_manifest.otel_collector
+  ]
+
+  server_side_apply = true
+
+  yaml_body = yamlencode({
+    apiVersion = "monitoring.coreos.com/v1"
+    kind       = "ServiceMonitor"
+    metadata = {
+      name      = "otel-collector-metrics"
+      namespace = kubernetes_namespace.telemetry.metadata[0].name
+      labels = {
+        release = "prometheus-operator"
+      }
+    }
+    spec = {
+      selector = {
+        matchLabels = {
+          app = "youtoo-otel-collector"
+        }
+      }
+      endpoints = [
+        {
+          port     = "metrics"
+          interval = "15s"
+        }
+      ]
+      namespaceSelector = {
+        matchNames = [
+          kubernetes_namespace.telemetry.metadata[0].name,
+        ]
+      }
     }
   })
 }

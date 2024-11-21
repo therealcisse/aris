@@ -20,6 +20,57 @@ services:
   #   cgroup: "host"
   #   pid: "host"
 
+  jaeger:
+      networks:
+        - app-network
+      image: jaegertracing/all-in-one:${JAEGER_IMAGE_TAG:-latest}
+      volumes:
+        - "./jaeger-ui.json:/etc/jaeger/jaeger-ui.json"
+      command: --query.ui-config /etc/jaeger/jaeger-ui.json
+      environment:
+        - METRICS_STORAGE_TYPE=prometheus
+        - PROMETHEUS_SERVER_URL=http://prometheus:9090
+        - PROMETHEUS_QUERY_NAMESPACE=${PROMETHEUS_QUERY_NAMESPACE:-}
+        - PROMETHEUS_QUERY_DURATION_UNIT=${PROMETHEUS_QUERY_DURATION_UNIT:-}
+        - PROMETHEUS_QUERY_NORMALIZE_CALLS=true
+        - PROMETHEUS_QUERY_NORMALIZE_DURATION=true
+      ports:
+        - "16686:16686"
+
+  otel_collector:
+    networks:
+      app-network:
+        # This is the host name used in Prometheus scrape configuration.
+        aliases: [spm_metrics_source]
+    image: otel/opentelemetry-collector-contrib:${OTEL_IMAGE_TAG:-0.112.0}
+    volumes:
+      - ${OTEL_CONFIG_SRC:-./otel-collector-config-connector.yml}:/etc/otelcol/otel-collector-config.yml
+    command: --config /etc/otelcol/otel-collector-config.yml
+    depends_on:
+      - jaeger
+    ports:
+      - "4317:4317"
+      - "8889:8889"
+
+  # microsim:
+  #   networks:
+  #     - app-network
+  #   image: yurishkuro/microsim:v0.4.1
+  #   command: "-d 24h -s 500ms"
+  #   environment:
+  #     - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel_collector:4318
+  #     - OTEL_EXPORTER_OTLP_INSECURE=true
+  #   depends_on:
+  #     - otel_collector
+
+  prometheus:
+    networks:
+      - app-network
+    image: prom/prometheus:latest
+    volumes:
+      - "./prometheus.yml:/etc/prometheus/prometheus.yml"
+    ports:
+      - "9090:9090"
   db:
     image: postgres:16
     environment:
@@ -33,39 +84,16 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
-  # otel-collector:
-  #   image: otel/opentelemetry-collector-contrib
-  #   volumes:
-  #     - ./otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml
-  #   ports:
-  #     - 1888:1888 # pprof extension
-  #     - 8888:8888 # Prometheus metrics exposed by the Collector
-  #     - 8889:8889 # Prometheus exporter metrics
-  #     - 13133:13133 # health_check extension
-  #     - 4317:4317 # OTLP gRPC receiver
-  #     - 4318:4318 # OTLP http receiver
-  #     - 55679:55679 # zpages extension
-
-  # jaeger:
-  #   image: jaegertracing/all-in-one:1.47
-  #   container_name: jaeger
-  #   environment:
-  #     - COLLECTOR_OTLP_ENABLED=true
-  #   ports:
-  #     - "4317:4317"
-  #     - "16686:16686"
-  #   restart: unless-stopped
-
-  # seq:
-  #   image: datalust/seq
-  #   container_name: seq
-  #   environment:
-  #     - ACCEPT_EULA=Y
-  #     - SEQ_FIRSTRUN_ADMINPASSWORDHASH=QGn6SCWIc6ypIJkHOur2JgybRf4Z/i+v6QBQf2Qs2cY5H7P66gszh4c0WQxjHLEe7hsDokvz+mzHbFUOJgeDSh450JhavlH/KArdxi1CtB/E
-  #   ports:
-  #     - "8081:80"
-  #     - "5341:5341"
-  #   restart: unless-stopped
+  seq:
+    image: datalust/seq
+    container_name: seq
+    environment:
+      - ACCEPT_EULA=Y
+      - SEQ_FIRSTRUN_ADMINPASSWORDHASH=QGn6SCWIc6ypIJkHOur2JgybRf4Z/i+v6QBQf2Qs2cY5H7P66gszh4c0WQxjHLEe7hsDokvz+mzHbFUOJgeDSh450JhavlH/KArdxi1CtB/E
+    ports:
+      - "8081:80"
+      - "5341:5341"
+    restart: unless-stopped
 
   adminer:
     image: adminer
@@ -78,27 +106,18 @@ services:
     ports:
       - 8080:8080
 
-  # prometheus:
-  #   image: prom/prometheus:latest
-  #   volumes:
-  #     - ./prometheus.yml:/etc/prometheus/prometheus.yml
-  #   ports:
-  #     - "9191:9090" # Prometheus server port (mapped to 9091 to avoid conflict)
-  #   networks:
-  #     - app-network
-
-  # grafana:
-  #   image: grafana/grafana:latest
-  #   ports:
-  #     - "3000:3000"
-  #   depends_on:
-  #     - prometheus
-  #   networks:
-  #     - app-network
-  #   environment:
-  #     - GF_SECURITY_ADMIN_PASSWORD=admin
-  #   volumes:
-  #     - grafana-storage:/var/lib/grafana
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - app-network
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana-storage:/var/lib/grafana
 
 volumes:
   postgres_data:

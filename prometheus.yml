@@ -1,8 +1,8 @@
 global:
   scrape_interval: 5s
+  evaluation_interval: 15s
 
 scrape_configs:
   - job_name: 'youtoo'
-    scrape_interval: 5s
     static_configs:
-      - targets: ['host.docker.internal:9464', 'localhost:9464']
+      - targets: ['spm_metrics_source:8889']

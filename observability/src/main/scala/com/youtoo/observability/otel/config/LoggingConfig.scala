@@ -12,7 +12,7 @@ object LoggingConfig {
   object Endpoint extends Newtype[String] {
     extension (a: Endpoint) inline def value: String = Endpoint.unwrap(a)
 
-    given Config[Endpoint] = Config.string("endpoint").nested("observability", "logging") map { case (url) =>
+    given Config[Endpoint] = Config.string("endpoint").nested("telemetry", "logging") map { case (url) =>
       Endpoint.wrap(url)
 
     }
