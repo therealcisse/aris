@@ -11,6 +11,7 @@ resource "helm_release" "prometheus_operator_crds" {
 
   ]
 
+
   wait = true
 }
 

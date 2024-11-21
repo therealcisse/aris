@@ -6,6 +6,9 @@ prometheus:
     serviceMonitorSelector:
       matchLabels:
         monitoring: "enabled"
+    podMonitorSelector:
+      matchLabels:
+        monitoring: "enabled"
 
 prometheusOperator:
   enabled: true

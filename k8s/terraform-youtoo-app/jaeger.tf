@@ -53,7 +53,8 @@ resource "helm_release" "jaeger_operator" {
 resource "time_sleep" "wait_for_jaeger_crd" {
 
   depends_on = [
-    helm_release.jaeger_operator
+    helm_release.jaeger_operator,
+    helm_release.eck_operator,
   ]
 
   create_duration = "30s"
@@ -61,7 +62,8 @@ resource "time_sleep" "wait_for_jaeger_crd" {
 
 resource "kubectl_manifest" "jaeger" {
   depends_on = [
-    time_sleep.wait_for_jaeger_crd
+    time_sleep.wait_for_jaeger_crd,
+
   ]
 
   server_side_apply = true
@@ -74,30 +76,35 @@ resource "kubectl_manifest" "jaeger" {
       name      = "simple-jaeger"
     }
     spec = {
-      strategy = "allInOne"
-      allInOne = {
-        options = {
-          log-level = "DEBUG"
-          prometheus = {
-            server-url = "http://prometheus-operated.${kubernetes_namespace.telemetry.metadata[0].name}.svc.cluster.local:9090"
+      strategy = "production"
 
+      collector = {
+        maxReplicas = 1
+
+        resources = {
+          limits = {
+            cpu    = "100m"
+            memory = "256Mi"
           }
-          query = {
-            "base-path" : "/jaeger"
+
+          requests = {
+            cpu    = "100m"
+            memory = "128Mi"
           }
         }
-        metricsStorage = {
-          type = "prometheus"
-        }
+
       }
+
       storage = {
-        type = "memory"
+        type = "elasticsearch"
         options = {
-          memory = {
-            max-traces = "100000"
+          es = {
+            server-urls = "https://elasticsearch-es-http.${kubernetes_namespace.elastic_system.metadata[0].name}:9200"
           }
         }
+        # secretName = kubernetes_secret.jaeger_es_credentials.metadata[0].name
       }
+
     }
   })
 }
@@ -116,13 +123,13 @@ resource "kubectl_manifest" "jaeger_pod_monitor" {
       name      = "jaeger-components"
       namespace = kubernetes_namespace.telemetry.metadata[0].name
       labels = {
-        release = "prometheus-operator"
+        release    = "prometheus-operator"
+        monitoring = "enabled"
       }
     }
     spec = {
       podMetricsEndpoints = [
         {
-          path     = "/metrics"
           port     = "admin-http"
           interval = "15s"
         }

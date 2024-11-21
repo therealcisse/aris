@@ -40,25 +40,6 @@ object MeterProvider {
     } yield meterProvider
 
   /**
-   * Send to prometheus
-   */
-  // def prometheus(resourceName: String): RIO[Scope, SdkMeterProvider] =
-  //   for {
-  //     metricReader <-
-  //       ZIO.fromAutoCloseable(ZIO.succeed(PrometheusHttpServer.builder().build()))
-  //     meterProvider <-
-  //       ZIO.fromAutoCloseable(
-  //         ZIO.succeed(
-  //           SdkMeterProvider
-  //             .builder()
-  //             .registerMetricReader(metricReader)
-  //             .setResource(Resource.create(Attributes.of(ResourceAttributes.SERVICE_NAME, resourceName)))
-  //             .build(),
-  //         ),
-  //       )
-  //   } yield meterProvider
-
-  /**
    * Prints to stdout in OTLP Json format
    */
   def stdout(resourceName: String): RIO[Scope, SdkMeterProvider] =
