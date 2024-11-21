@@ -34,10 +34,7 @@ object TracerProvider {
         )
     } yield tracerProvider
 
-  /**
-   * https://www.jaegertracing.io/
-   */
-  def jaeger(resourceName: String): RIO[Scope, SdkTracerProvider] =
+  def otlp(resourceName: String): RIO[Scope, SdkTracerProvider] =
     for {
       spanExporter <- ZIO.fromAutoCloseable(
         ZIO.succeed(
@@ -55,40 +52,6 @@ object TracerProvider {
             .build(),
         ),
       )
-      tracerProvider <-
-        ZIO.fromAutoCloseable(
-          ZIO.succeed(
-            SdkTracerProvider
-              .builder()
-              .setResource(Resource.create(Attributes.of(ResourceAttributes.SERVICE_NAME, resourceName)))
-              .addSpanProcessor(spanProcessor)
-              .build(),
-          ),
-        )
-    } yield tracerProvider
-
-  /**
-   * https://fluentbit.io/
-   */
-  def fluentbit(resourceName: String): RIO[Scope, SdkTracerProvider] =
-    for {
-      spanExporter <- ZIO.fromAutoCloseable(
-        ZIO.succeed(
-          OtlpGrpcSpanExporter
-            .builder()
-            .setTimeout(2, TimeUnit.SECONDS)
-            .build(),
-        ),
-      )
-      spanProcessor <- ZIO.fromAutoCloseable(
-        ZIO.succeed(
-          BatchSpanProcessor
-            .builder(spanExporter)
-            .setScheduleDelay(100, TimeUnit.MILLISECONDS)
-            .build(),
-        ),
-      )
-
       tracerProvider <-
         ZIO.fromAutoCloseable(
           ZIO.succeed(

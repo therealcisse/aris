@@ -25,8 +25,3 @@ variable "postgres_db_password" {
   type = string
 }
 
-variable "prometheus_version" {
-  type    = string
-  default = "2.55.1"
-}
-

@@ -3,6 +3,9 @@ prometheus:
     enableRemoteWriteReceiver: true
     enableFeatures:
     - remote-write-receiver
+    serviceMonitorSelector:
+      matchLabels:
+        monitoring: "enabled"
 
 prometheusOperator:
   enabled: true

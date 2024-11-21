@@ -32,20 +32,26 @@ object RestEndpoint {
 
       } yield a
 
-  inline def boundary[R, E](tag: String, request: Request)(
-    body: ZIO[R, E, Response],
+  inline def boundary[R](tag: String, request: Request)(
+    body: ZIO[R, Throwable, Response],
   ): URIO[R & Baggage & Tracing & Meter, Response] =
     ZIO.serviceWithZIO[Tracing] { (tracing: Tracing) =>
-      val effect = body @@ tracing.aspects.root(
-        tag,
-        attributes = Attributes(Attribute.string("git_commit_hash", YouToo.gitCommitHash)),
-        spanKind = SpanKind.SERVER,
-      )
 
-      val op = effect.catchAllCause {
+      val effect = body.catchAllCause {
         _.failureOrCause.fold(
           { case e =>
-            Log.error(s"[$tag] - Request failed", e) `as` Response.internalServerError
+            for {
+              _ <- Log.error(s"[$tag] - Request failed", e)
+
+              span <- tracing.getCurrentSpanUnsafe
+
+              _ <- ZIO.attempt {
+                span.setStatus(StatusCode.ERROR)
+                span.recordException(e)
+
+              }.ignoreLogged
+
+            } yield Response.internalServerError
 
           },
           Exit.failCause,
@@ -58,6 +64,12 @@ object RestEndpoint {
       for {
         activeCounter <- Metrics.activeRequests
         _ <- activeCounter.inc()
+
+        op = effect @@ tracing.aspects.root(
+          tag,
+          attributes = Attributes(Attribute.string("git_commit_hash", YouToo.gitCommitHash)),
+          spanKind = SpanKind.SERVER,
+        )
 
         response <- op.ensuring {
           activeCounter.dec()

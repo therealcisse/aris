@@ -12,8 +12,8 @@ object OtelSdk {
   def custom(resourceName: String): TaskLayer[api.OpenTelemetry] =
     OpenTelemetry.custom(
       for {
-        tracerProvider <- TracerProvider.jaeger(resourceName)
-        meterProvider <- MeterProvider.prometheus(resourceName)
+        tracerProvider <- TracerProvider.otlp(resourceName)
+        meterProvider <- MeterProvider.otlp(resourceName)
         loggerProvider <- LoggerProvider.seq(resourceName)
         openTelemetry <- ZIO.fromAutoCloseable(
           ZIO.succeed(

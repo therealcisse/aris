@@ -96,7 +96,6 @@ object Dependencies {
     "io.opentelemetry" % "opentelemetry-exporter-otlp" % "1.43.0",
     "io.opentelemetry" % "opentelemetry-exporter-logging-otlp" % "1.43.0",
     "io.opentelemetry" % "opentelemetry-exporter-zipkin" % "1.43.0",
-    "io.opentelemetry" % "opentelemetry-exporter-prometheus" % "1.43.0-alpha",
     "io.opentelemetry" % "opentelemetry-sdk" % "1.43.0",
     "io.opentelemetry" % "opentelemetry-sdk-trace" % "1.43.0",
     "io.opentelemetry.semconv" % "opentelemetry-semconv" % "1.22.0-alpha",

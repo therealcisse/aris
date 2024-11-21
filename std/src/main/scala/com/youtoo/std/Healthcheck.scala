@@ -6,7 +6,6 @@ import cats.implicits.*
 import zio.telemetry.opentelemetry.tracing.Tracing
 
 import zio.*
-import zio.prelude.*
 
 trait Healthcheck {
   def start(id: Key, interval: Schedule[Any, Any, Any]): RIO[Scope, Unit]

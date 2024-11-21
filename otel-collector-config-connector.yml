@@ -3,6 +3,8 @@ receivers:
     protocols:
       grpc:
         endpoint: "0.0.0.0:4317"
+  otlp/metrics:
+    protocols:
       http:
         endpoint: "0.0.0.0:4318"
 
@@ -10,7 +12,7 @@ exporters:
   prometheus:
     endpoint: "0.0.0.0:8889"
 
-  otlp:
+  otlp/jaeger:
     endpoint: jaeger:4317
     tls:
       insecure: true
@@ -26,7 +28,17 @@ service:
     traces:
       receivers: [otlp]
       processors: [batch]
-      exporters: [spanmetrics, otlp]
+      exporters: [otlp/jaeger]
+
+    traces/spanmetrics:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [spanmetrics]
+
+    metrics/prometheus:
+      receivers: [otlp/metrics]
+      processors: [batch]
+      exporters: [prometheus]
 
     # The metrics pipeline receives generated span metrics from 'spanmetrics' connector
     # and pushes to Prometheus exporter, which makes them available for scraping on :8889.

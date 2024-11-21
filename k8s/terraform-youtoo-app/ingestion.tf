@@ -3,6 +3,7 @@ resource "time_sleep" "wait_for_infra" {
   depends_on = [
     kubectl_manifest.jaeger,
     kubectl_manifest.otel_collector,
+    helm_release.prometheus_operator,
     helm_release.seq,
   ]
 
@@ -47,10 +48,6 @@ resource "kubernetes_deployment" "youtoo_ingestion" {
 
         annotations = {
           "sidecar.opentelemetry.io/inject" = "${kubernetes_namespace.telemetry.metadata[0].name}/youtoo-otel"
-
-          "prometheus.io/scrape" = "true"
-          "prometheus.io/port"   = "9464"
-          "prometheus.io/path"   = "/metrics"
         }
 
       }
@@ -149,6 +146,13 @@ resource "kubernetes_service" "youtoo_ingestion_service" {
       name        = "web"
       port        = 8181
       target_port = 8181
+      protocol    = "TCP"
+    }
+
+    port {
+      name        = "metrics"
+      port        = 8889
+      target_port = 8889
       protocol    = "TCP"
     }
 
