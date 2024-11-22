@@ -76,7 +76,7 @@ object BuildHelper extends ScalaSettings {
       buildInfoOptions += BuildInfoOption.ToJson,
       buildInfoOptions += BuildInfoOption.ToMap,
       buildInfoOptions += BuildInfoOption.BuildTime,
-      buildInfoObject := "YouToo",
+      buildInfoObject := "ProjectInfo",
       buildInfoKeys := Seq[BuildInfoKey](
         organization,
         moduleName,
@@ -85,7 +85,7 @@ object BuildHelper extends ScalaSettings {
         scalaVersion,
         sbtVersion,
         isSnapshot,
-        BuildInfoKey.action("gitCommitHash") {
+        BuildInfoKey.action("versionSha") {
           git.formattedShaVersion.value.getOrElse("No commit hash available")
         },
       ),

@@ -83,16 +83,18 @@ object Dependencies {
 
   val netty = "io.netty" % "netty-all" % "4.1.114.Final"
 
-  val `spring-boot` = "org.springframework.boot" % "spring-boot" % "3.3.5"
-
   val jansi = "org.fusesource.jansi" % "jansi" % "2.4.0"
 
-  val openTelemetry = Seq(
+  val `logstash-logback-encoder` = "net.logstash.logback" % "logstash-logback-encoder" % "8.0"
+
+  val `zio-telemetry` = "dev.zio" %% "zio-opentelemetry" % "3.0.1"
+
+  val `open-telemetry` = Seq(
     "dev.zio" %% "zio-http" % "3.0.1",
     "io.zipkin.reporter2" % "zipkin-reporter" % "2.16.3",
     "io.zipkin.reporter2" % "zipkin-sender-okhttp3" % "2.16.3",
     "dev.zio" %% "zio-opentelemetry" % "3.0.1",
-    "dev.zio" %% "zio-opentelemetry-zio-logging" % "3.0.1",
+    // "dev.zio" %% "zio-opentelemetry-zio-logging" % "3.0.1",
     "io.opentelemetry" % "opentelemetry-exporter-otlp" % "1.43.0",
     "io.opentelemetry" % "opentelemetry-exporter-logging-otlp" % "1.43.0",
     "io.opentelemetry" % "opentelemetry-exporter-zipkin" % "1.43.0",

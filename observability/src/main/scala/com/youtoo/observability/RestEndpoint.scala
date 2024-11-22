@@ -20,7 +20,7 @@ import zio.schema.codec.*
 object RestEndpoint {
 
   extension (body: Body)
-    inline def fromBody[A: BinaryCodec: Tag]: Task[A] =
+    inline def fromBody[A: BinaryCodec: Tag]: RIO[Tracing, A] =
       for {
         ch <- body.asChunk
         a <- ZIO.fromEither {
@@ -37,7 +37,7 @@ object RestEndpoint {
   ): URIO[R & Baggage & Tracing & Meter, Response] =
     ZIO.serviceWithZIO[Tracing] { (tracing: Tracing) =>
 
-      val effect = body.catchAllCause {
+      val effect = body catchAllCause {
         _.failureOrCause.fold(
           { case e =>
             for {
@@ -61,17 +61,13 @@ object RestEndpoint {
 
       val startTime = jl.System.nanoTime()
 
-      for {
+      val op = for {
+        _ <- Log.debug(s"started $tag")
+
         activeCounter <- Metrics.activeRequests
         _ <- activeCounter.inc()
 
-        op = effect @@ tracing.aspects.root(
-          tag,
-          attributes = Attributes(Attribute.string("git_commit_hash", YouToo.gitCommitHash)),
-          spanKind = SpanKind.SERVER,
-        )
-
-        response <- op.ensuring {
+        response <- effect.ensuring {
           activeCounter.dec()
 
         }
@@ -90,7 +86,14 @@ object RestEndpoint {
         requestCounter <- Metrics.requestCount
         _ <- requestCounter.inc(attributes)
 
+        _ <- Log.debug(s"completed $tag")
       } yield response
+
+      op @@ tracing.aspects.root(
+        tag,
+        attributes = Attributes(Attribute.string("git_commit_hash", ProjectInfo.versionSha)),
+        spanKind = SpanKind.INTERNAL,
+      )
 
     }
 

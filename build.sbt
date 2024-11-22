@@ -73,10 +73,11 @@ lazy val log = (project in file("log"))
   .settings(
     libraryDependencies ++= Seq(
       jansi,
-      `spring-boot`,
+      `zio-telemetry`,
+      `logstash-logback-encoder`,
       `slf4j-api`,
       `zio-logging`,
-      `zio-logging-slf4j2`,
+      `zio-logging-slf4j`,
       logback,
       `logback-core`,
     ),
@@ -134,7 +135,7 @@ lazy val observability = (project in file("observability"))
   .settings(buildInfoSettings("com.youtoo"))
   .settings(
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
-    libraryDependencies ++= Dependencies.openTelemetry,
+    libraryDependencies ++= Dependencies.`open-telemetry`,
     libraryDependencies += cats,
     libraryDependencies += `zio-prelude`,
     libraryDependencies += `zio`,
@@ -146,7 +147,7 @@ lazy val std = (project in file("std"))
   .settings(
     Test / parallelExecution := false,
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
-    libraryDependencies ++= Dependencies.openTelemetry,
+    libraryDependencies ++= Dependencies.`open-telemetry`,
     libraryDependencies ++= Seq(
       cats,
       zio,
@@ -165,7 +166,7 @@ lazy val postgres = (project in file("cqrs-persistence-postgres"))
   .settings(
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
     Test / unmanagedResourceDirectories ++= (Compile / unmanagedResourceDirectories).value,
-    libraryDependencies ++= Dependencies.openTelemetry,
+    libraryDependencies ++= Dependencies.`open-telemetry`,
     libraryDependencies ++= Seq(
       flyway,
       hicariCP,
@@ -235,7 +236,7 @@ lazy val dataMigration = (project in file("data-migration"))
   )
 
 lazy val loadtests = (project in file("loadtests"))
-  .dependsOn(ingestion)
+  .dependsOn(ingestion % "compile->compile")
   .settings(stdSettings("loadtests"))
   .settings(Gatling / javaOptions := overrideDefaultJavaOptions("-Xms1G", "-Xmx4G"))
   .enablePlugins(GatlingPlugin)

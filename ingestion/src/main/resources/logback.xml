@@ -1,59 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<configuration>
-    <property name="LOG_LEVEL" value="${YOUTOO_LOG_LEVEL:-${env:YOUTOO_LOG_LEVEL:-DEBUG}}" />
+<configuration debug="true">
 
-    <property name="APPLICATION_NAME" value="ingestion"/>
-    <property name="APPLICATION_GROUP" value="youtoo"/>
+    <property name="YOUTOO_APPLICATION_NAME" value="ingestion" />
 
-    <property name="CONSOLE_LOG_PATTERN" value="%clr(%d{${LOG_DATEFORMAT_PATTERN:-yyyy-MM-dd'T'HH:mm:ss.SSSXXX}}){faint} %clr(${LOG_LEVEL_PATTERN:-%5p}) %clr(${PID:- }){magenta} %clr(---){faint} %clr(${APPLICATION_NAME} %-23.23t{23}){faint} %clr([%kvp]){faint} %clr(%-40.40logger{39}){cyan} %clr(:){faint} %m%n${LOG_EXCEPTION_CONVERSION_WORD:-%wEx}"/>
+    <include resource="logback-common.xml" />
 
-    <include resource="org/springframework/boot/logging/logback/defaults.xml" />
-
-    <!-- Define the log file location -->
-    <property name="LOG_FILE" value="logs/application.log"/>
-
-    <!-- Console Appender Configuration -->
-    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
-        <withJansi>true</withJansi>
-        <encoder>
-            <pattern>${CONSOLE_LOG_PATTERN}</pattern>
-        </encoder>
-    </appender>
-
-    <!-- File Appender Configuration -->
-    <appender name="FILE" class="ch.qos.logback.core.FileAppender">
-        <file>${LOG_FILE}</file>
-        <append>true</append>
-        <encoder>
-            <pattern>${FILE_LOG_PATTERN}</pattern>
-        </encoder>
-    </appender>
-
-    <!-- Rolling File Appender Configuration -->
-    <appender name="ROLLING_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <file>${LOG_FILE}</file>
-        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
-            <!-- Daily rollover -->
-            <fileNamePattern>logs/application-%d{yyyy-MM-dd}.log</fileNamePattern>
-            <!-- Keep 30 days' worth of history -->
-            <maxHistory>30</maxHistory>
-        </rollingPolicy>
-        <encoder>
-            <pattern>${FILE_LOG_PATTERN}</pattern>
-        </encoder>
-    </appender>
-
-    <!-- Root Logger Configuration -->
+    <!-- Root Logger -->
     <root level="${LOG_LEVEL}">
-        <appender-ref ref="CONSOLE"/>
-        <!-- <appender-ref ref="ROLLING_FILE"/> -->
+        <appender-ref ref="console" />
     </root>
-
-    <!-- Logger for your application packages -->
-    <logger name="com.youtoo" level="${LOG_LEVEL}" additivity="false">
-        <appender-ref ref="CONSOLE"/>
-        <!-- <appender-ref ref="FILE"/> -->
-    </logger>
-
 </configuration>
-

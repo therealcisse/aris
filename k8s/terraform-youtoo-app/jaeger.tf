@@ -1,24 +1,42 @@
-resource "helm_release" "cert_manager" {
-  name              = "cert-manager"
-  repository        = "https://charts.jetstack.io"
-  chart             = "cert-manager"
-  namespace         = kubernetes_namespace.telemetry.metadata[0].name
-  create_namespace  = false
-  version           = var.cert_manager_release
-  dependency_update = true
+resource "kubernetes_service_account" "jaeger" {
+  metadata {
+    name = "jaeger-service-account"
+    namespace  = kubernetes_namespace.telemetry.metadata[0].name
+  }
+}
 
-  set {
-    name  = "installCRDs"
-    value = true
+resource "kubernetes_role" "jaeger_role" {
+  metadata {
+    name = "jaeger-role"
+    namespace = kubernetes_namespace.telemetry.metadata[0].name
   }
 
-  values = [
-    yamlencode({
-      replicaCount = 2
-    })
-  ]
+  rule {
+    # Allow all operations on Jaeger CRDs in the "telemetry" namespace
+    api_groups = ["jaegertracing.io"]
+    resources  = ["*"]
+    verbs      = ["get", "list", "watch", "create", "update", "patch", "delete"]
+  }
 
-  wait = true
+}
+
+resource "kubernetes_role_binding" "jaeger_role_binding" {
+  metadata {
+    name = "jaeger-role-binding"
+    namespace = kubernetes_namespace.telemetry.metadata[0].name
+  }
+
+  subject {
+    kind = "ServiceAccount"
+    name = kubernetes_service_account.jaeger.metadata[0].name
+    namespace = kubernetes_namespace.telemetry.metadata[0].name
+  }
+
+  role_ref {
+    kind = "Role"
+    name = kubernetes_role.jaeger.metadata[0].name
+    api_group = "rbac.authorization.k8s.io"
+  }
 }
 
 resource "helm_release" "jaeger_operator" {
@@ -32,13 +50,18 @@ resource "helm_release" "jaeger_operator" {
   version    = var.jaeger_operator_chart_version
   namespace  = kubernetes_namespace.telemetry.metadata[0].name
 
-  create_namespace = false # Namespace is created earlier using kubernetes_namespace resource
+  create_namespace = false
 
   timeout = 3600
 
   set {
     name  = "rbac.clusterRole"
     value = true
+  }
+
+  set {
+    name = "serviceAccount.name"
+    value = kubernetes_service_account.jaeger.metadata[0].name
   }
 
   values = [
@@ -55,9 +78,10 @@ resource "time_sleep" "wait_for_jaeger_crd" {
   depends_on = [
     helm_release.jaeger_operator,
     helm_release.eck_operator,
+    time_sleep.wait_for_elasticsearch,
   ]
 
-  create_duration = "30s"
+  create_duration = "120s"
 }
 
 resource "kubectl_manifest" "jaeger" {
@@ -96,14 +120,19 @@ resource "kubectl_manifest" "jaeger" {
       }
 
       storage = {
-        type = "elasticsearch"
+        type    = "elasticsearch"
+
         options = {
           es = {
-            server-urls = "https://elasticsearch-es-http.${kubernetes_namespace.elastic_system.metadata[0].name}:9200"
+            server-urls = "https://${var.es_host}:9200"
+            "index-prefix" = "youtoo"
+            username = "elastic"
+            password = var.es_password
           }
         }
-        # secretName = kubernetes_secret.jaeger_es_credentials.metadata[0].name
+
       }
+
 
     }
   })
@@ -123,7 +152,7 @@ resource "kubectl_manifest" "jaeger_pod_monitor" {
       name      = "jaeger-components"
       namespace = kubernetes_namespace.telemetry.metadata[0].name
       labels = {
-        release    = "prometheus-operator"
+        release = "prometheus-operator"
         monitoring = "enabled"
       }
     }

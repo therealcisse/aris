@@ -119,7 +119,7 @@ object IngestionApp extends ZIOApp {
     } yield id
 
   val routes: Routes[Environment, Response] = Routes(
-    Method.GET / "health" -> handler(Response.json(YouToo.toJson)),
+    Method.GET / "health" -> handler(Response.json(ProjectInfo.toJson)),
     Method.POST / "dataload" / "ingestion" -> handler { (req: Request) =>
       RestEndpoint.boundary("dataload_ingestions", req) {
 

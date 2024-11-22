@@ -5,21 +5,23 @@ package postgres
 
 import com.youtoo.cqrs.config.*
 
+import zio.telemetry.opentelemetry.tracing.Tracing
+
 import zio.*
 
 trait FlywayMigration {
-  def run(config: DatabaseConfig): Task[Unit]
+  def run(config: DatabaseConfig): RIO[Tracing, Unit]
 
 }
 
 object FlywayMigration {
-  inline def run(config: DatabaseConfig): RIO[FlywayMigration, Unit] =
-    ZIO.serviceWithZIO(_.run(config))
+  inline def run(config: DatabaseConfig): RIO[FlywayMigration & Tracing, Unit] =
+    ZIO.serviceWithZIO[FlywayMigration](_.run(config))
 
   def live(): ZLayer[Any, Throwable, FlywayMigration] =
     ZLayer.succeed {
       new FlywayMigration {
-        def run(config: DatabaseConfig): Task[Unit] =
+        def run(config: DatabaseConfig): RIO[Tracing, Unit] =
           runMigration(config).tapError { e =>
             Log.error("Migration failed", e)
           }
@@ -27,7 +29,7 @@ object FlywayMigration {
       }
     }
 
-  def runMigration(config: DatabaseConfig): Task[Unit] =
+  def runMigration(config: DatabaseConfig): RIO[Tracing, Unit] =
     ZIO.scoped {
       import org.flywaydb.core.Flyway
       import com.zaxxer.hikari.{HikariConfig, HikariDataSource}
