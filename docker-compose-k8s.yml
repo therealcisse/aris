@@ -1,27 +1,4 @@
 services:
-  elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.16.1
-    container_name: elasticsearch
-    environment:
-      - discovery.type=single-node
-      - bootstrap.memory_lock=true
-      - "ES_JAVA_OPTS=-Xms1g -Xmx1g"
-      - xpack.security.enabled=true # Enable security
-      - xpack.security.http.ssl.enabled=false # Optional: Disable HTTPS for simplicity
-    ulimits:
-      memlock:
-        soft: -1
-        hard: -1
-    ports:
-      - "9200:9200"
-      - "9300:9300"
-    networks:
-      app-network:
-        # This is the host name used in Kubernetes to access to DB
-        aliases: [es]
-    volumes:
-      - es-data:/usr/share/elasticsearch/data
-      - es-logs:/usr/share/elasticsearch/logs
 
   db:
     image: postgres:16

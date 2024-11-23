@@ -25,7 +25,3 @@ variable "postgres_db_password" {
   type = string
 }
 
-variable "es_password" {
-  type = string
-
-}

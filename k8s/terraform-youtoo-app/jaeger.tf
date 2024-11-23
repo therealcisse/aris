@@ -1,13 +1,13 @@
 resource "kubernetes_service_account" "jaeger" {
   metadata {
-    name = "jaeger-service-account"
-    namespace  = kubernetes_namespace.telemetry.metadata[0].name
+    name      = "jaeger"
+    namespace = kubernetes_namespace.telemetry.metadata[0].name
   }
 }
 
 resource "kubernetes_role" "jaeger_role" {
   metadata {
-    name = "jaeger-role"
+    name      = "jaeger"
     namespace = kubernetes_namespace.telemetry.metadata[0].name
   }
 
@@ -22,22 +22,23 @@ resource "kubernetes_role" "jaeger_role" {
 
 resource "kubernetes_role_binding" "jaeger_role_binding" {
   metadata {
-    name = "jaeger-role-binding"
+    name      = "jaeger"
     namespace = kubernetes_namespace.telemetry.metadata[0].name
   }
 
   subject {
-    kind = "ServiceAccount"
-    name = kubernetes_service_account.jaeger.metadata[0].name
+    kind      = "ServiceAccount"
+    name      = kubernetes_service_account.jaeger.metadata[0].name
     namespace = kubernetes_namespace.telemetry.metadata[0].name
   }
 
   role_ref {
-    kind = "Role"
-    name = kubernetes_role.jaeger.metadata[0].name
+    kind      = "Role"
+    name      = kubernetes_role.jaeger_role.metadata[0].name
     api_group = "rbac.authorization.k8s.io"
   }
 }
+
 
 resource "helm_release" "jaeger_operator" {
   depends_on = [
@@ -60,7 +61,7 @@ resource "helm_release" "jaeger_operator" {
   }
 
   set {
-    name = "serviceAccount.name"
+    name  = "serviceAccount.name"
     value = kubernetes_service_account.jaeger.metadata[0].name
   }
 
@@ -76,18 +77,15 @@ resource "helm_release" "jaeger_operator" {
 resource "time_sleep" "wait_for_jaeger_crd" {
 
   depends_on = [
-    helm_release.jaeger_operator,
-    helm_release.eck_operator,
-    time_sleep.wait_for_elasticsearch,
+    helm_release.jaeger_operator
   ]
 
-  create_duration = "120s"
+  create_duration = "30s"
 }
 
 resource "kubectl_manifest" "jaeger" {
   depends_on = [
-    time_sleep.wait_for_jaeger_crd,
-
+    time_sleep.wait_for_jaeger_crd
   ]
 
   server_side_apply = true
@@ -100,40 +98,43 @@ resource "kubectl_manifest" "jaeger" {
       name      = "simple-jaeger"
     }
     spec = {
-      strategy = "production"
-
-      collector = {
-        maxReplicas = 1
-
-        resources = {
-          limits = {
-            cpu    = "100m"
-            memory = "256Mi"
-          }
-
-          requests = {
-            cpu    = "100m"
-            memory = "128Mi"
-          }
-        }
-
-      }
-
-      storage = {
-        type    = "elasticsearch"
-
+      strategy = "allInOne"
+      allInOne = {
         options = {
-          es = {
-            server-urls = "https://${var.es_host}:9200"
-            "index-prefix" = "youtoo"
-            username = "elastic"
-            password = var.es_password
+          log-level = "DEBUG"
+          prometheus = {
+            server-url = "http://prometheus-operated.${kubernetes_namespace.telemetry.metadata[0].name}.svc.cluster.local:9090"
+
+          }
+          query = {
+            "base-path" : "/jaeger"
           }
         }
-
+        metricsStorage = {
+          type = "prometheus"
+        }
+      }
+      storage = {
+        type = "memory"
+        options = {
+          memory = {
+            max-traces = "100000"
+          }
+        }
       }
 
+      ingress = {
 
+        enabled = false
+      }
+      agent = {
+
+        strategy = "DaemonSet"
+      }
+      annotations = {
+        "scheduler.alpha.kubernetes.io/critical-pod" = ""
+
+      }
     }
   })
 }
