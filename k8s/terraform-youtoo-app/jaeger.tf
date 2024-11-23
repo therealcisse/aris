@@ -5,7 +5,7 @@ resource "kubernetes_service_account" "jaeger" {
   }
 }
 
-resource "kubernetes_role" "jaeger_role" {
+resource "kubernetes_role" "jaeger" {
   metadata {
     name      = "jaeger"
     namespace = kubernetes_namespace.telemetry.metadata[0].name
@@ -20,7 +20,7 @@ resource "kubernetes_role" "jaeger_role" {
 
 }
 
-resource "kubernetes_role_binding" "jaeger_role_binding" {
+resource "kubernetes_role_binding" "jaeger" {
   metadata {
     name      = "jaeger"
     namespace = kubernetes_namespace.telemetry.metadata[0].name
@@ -34,7 +34,7 @@ resource "kubernetes_role_binding" "jaeger_role_binding" {
 
   role_ref {
     kind      = "Role"
-    name      = kubernetes_role.jaeger_role.metadata[0].name
+    name      = kubernetes_role.jaeger.metadata[0].name
     api_group = "rbac.authorization.k8s.io"
   }
 }
@@ -63,6 +63,11 @@ resource "helm_release" "jaeger_operator" {
   set {
     name  = "serviceAccount.name"
     value = kubernetes_service_account.jaeger.metadata[0].name
+  }
+
+  set {
+    name  = "serviceAccount.create"
+    value = false
   }
 
   values = [
@@ -106,9 +111,6 @@ resource "kubectl_manifest" "jaeger" {
             server-url = "http://prometheus-operated.${kubernetes_namespace.telemetry.metadata[0].name}.svc.cluster.local:9090"
 
           }
-          query = {
-            "base-path" : "/jaeger"
-          }
         }
         metricsStorage = {
           type = "prometheus"
@@ -123,18 +125,6 @@ resource "kubectl_manifest" "jaeger" {
         }
       }
 
-      ingress = {
-
-        enabled = false
-      }
-      agent = {
-
-        strategy = "DaemonSet"
-      }
-      annotations = {
-        "scheduler.alpha.kubernetes.io/critical-pod" = ""
-
-      }
     }
   })
 }
@@ -153,7 +143,7 @@ resource "kubectl_manifest" "jaeger_pod_monitor" {
       name      = "jaeger-components"
       namespace = kubernetes_namespace.telemetry.metadata[0].name
       labels = {
-        release = "prometheus-operator"
+        release    = "prometheus-operator"
         monitoring = "enabled"
       }
     }

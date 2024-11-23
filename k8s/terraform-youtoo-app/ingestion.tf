@@ -40,10 +40,9 @@ resource "kubernetes_deployment" "youtoo_ingestion" {
         labels = {
           app = "youtoo-ingestion"
 
-          "app.kubernetes.io/name"     = "youtoo-ingestion"
-          "app.kubernetes.io/version"  = "1.0.0"
-          "app.kubernetes.io/part-of"  = kubernetes_namespace.application_namespace.metadata[0].name
-          "app.kubernetes.io/instance" = "youtoo-ingestion-0"
+          "app.kubernetes.io/name"    = "youtoo-ingestion"
+          "app.kubernetes.io/version" = "1.0.0"
+          "app.kubernetes.io/part-of" = kubernetes_namespace.application_namespace.metadata[0].name
         }
 
         annotations = {

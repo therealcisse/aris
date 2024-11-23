@@ -77,6 +77,11 @@ resource "helm_release" "prometheus_operator" {
     value = kubernetes_service_account.prometheus_operator_service_account.metadata[0].name
   }
 
+  set {
+    name  = "serviceAccount.create"
+    value = false
+  }
+
   values = [
     file("${path.module}/prometheus-values.yaml")
 

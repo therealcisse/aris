@@ -83,7 +83,7 @@ resource "kubectl_manifest" "otel_collector" {
           otlp = {
             protocols = {
               grpc = {
-                endpoint = "localhost:4317"
+                endpoint = "0.0.0.0:4317"
               }
             }
           }
@@ -91,7 +91,7 @@ resource "kubectl_manifest" "otel_collector" {
           "otlp/metrics" = {
             protocols = {
               http = {
-                endpoint = "localhost:4318"
+                endpoint = "0.0.0.0:4318"
                 cors = {
                   allowed_origins = ["http://*", "https://*"]
                 }
@@ -187,29 +187,6 @@ resource "kubectl_manifest" "otel_collector" {
             logs = {
               level = "DEBUG"
             }
-
-            # metrics = {
-            #   level = "detailed"
-            #
-            #
-            #   readers = [
-            #     {
-            #
-            #       pull = {
-            #         exporter = {
-            #           prometheus = {
-            #             host = "0.0.0.0"
-            #             port = 8889
-            #
-            #           }
-            #
-            #         }
-            #
-            #       }
-            #     }
-            #   ]
-            #
-            # }
 
           }
 
