@@ -26,20 +26,20 @@ object PostgresCQRSPersistence {
     ZLayer.fromFunction(new PostgresCQRSPersistenceLive().traced(_))
 
   class PostgresCQRSPersistenceLive() extends CQRSPersistence { self =>
-    def readEvents[Event: BinaryCodec: Tag](
+    def readEvents[Event: BinaryCodec: Tag: MetaInfo](
       id: Key,
       discriminator: Discriminator,
     ): RIO[ZConnection, Chunk[Change[Event]]] =
       Queries.READ_EVENTS(id, discriminator).selectAll
 
-    def readEvents[Event: BinaryCodec: Tag](
+    def readEvents[Event: BinaryCodec: Tag: MetaInfo](
       id: Key,
       discriminator: Discriminator,
       snapshotVersion: Version,
     ): RIO[ZConnection, Chunk[Change[Event]]] =
       Queries.READ_EVENTS(id, discriminator, snapshotVersion).selectAll
 
-    def readEvents[Event: BinaryCodec: Tag](
+    def readEvents[Event: BinaryCodec: Tag: MetaInfo](
       discriminator: Discriminator,
       ns: Option[NonEmptyList[Namespace]],
       hierarchy: Option[Hierarchy],
@@ -47,7 +47,7 @@ object PostgresCQRSPersistence {
     ): RIO[ZConnection, Chunk[Change[Event]]] =
       Queries.READ_EVENTS(discriminator, ns, hierarchy, props).selectAll
 
-    def readEvents[Event: BinaryCodec: Tag](
+    def readEvents[Event: BinaryCodec: Tag: MetaInfo](
       discriminator: Discriminator,
       snapshotVersion: Version,
       ns: Option[NonEmptyList[Namespace]],
@@ -71,32 +71,32 @@ object PostgresCQRSPersistence {
 
     def traced(tracing: Tracing): CQRSPersistence =
       new CQRSPersistence {
-        def readEvents[Event: BinaryCodec: Tag](
+        def readEvents[Event: BinaryCodec: Tag: MetaInfo](
           id: Key,
           discriminator: Discriminator,
         ): RIO[ZConnection, Chunk[Change[Event]]] =
-          self.readEvents(id, discriminator) @@ tracing.aspects.span("CQRSPersistence.readEvents")
+          self.readEvents(id, discriminator) @@ tracing.aspects.span("PostgresCQRSPersistence.readEvents")
 
-        def readEvents[Event: BinaryCodec: Tag](
+        def readEvents[Event: BinaryCodec: Tag: MetaInfo](
           id: Key,
           discriminator: Discriminator,
           snapshotVersion: Version,
         ): RIO[ZConnection, Chunk[Change[Event]]] =
           self.readEvents(id, discriminator, snapshotVersion) @@ tracing.aspects.span(
-            "CQRSPersistence.readEvents.fromSnapshot",
+            "PostgresCQRSPersistence.readEvents.fromSnapshot",
           )
 
-        def readEvents[Event: BinaryCodec: Tag](
+        def readEvents[Event: BinaryCodec: Tag: MetaInfo](
           discriminator: Discriminator,
           ns: Option[NonEmptyList[Namespace]],
           hierarchy: Option[Hierarchy],
           props: Option[NonEmptyList[EventProperty]],
         ): RIO[ZConnection, Chunk[Change[Event]]] =
           self.readEvents(discriminator, ns, hierarchy, props) @@ tracing.aspects.span(
-            "CQRSPersistence.readEvents.query",
+            "PostgresCQRSPersistence.readEvents.query",
           )
 
-        def readEvents[Event: BinaryCodec: Tag](
+        def readEvents[Event: BinaryCodec: Tag: MetaInfo](
           discriminator: Discriminator,
           snapshotVersion: Version,
           ns: Option[NonEmptyList[Namespace]],
@@ -104,7 +104,7 @@ object PostgresCQRSPersistence {
           props: Option[NonEmptyList[EventProperty]],
         ): RIO[ZConnection, Chunk[Change[Event]]] =
           self.readEvents(discriminator, snapshotVersion, ns, hierarchy, props) @@ tracing.aspects.span(
-            "CQRSPersistence.readEvents.query_fromSnapshot",
+            "PostgresCQRSPersistence.readEvents.query_fromSnapshot",
           )
 
         def saveEvent[Event: BinaryCodec: MetaInfo: Tag](
@@ -112,13 +112,13 @@ object PostgresCQRSPersistence {
           discriminator: Discriminator,
           event: Change[Event],
         ): RIO[ZConnection, Long] =
-          self.saveEvent(id, discriminator, event) @@ tracing.aspects.span("CQRSPersistence.saveEvent")
+          self.saveEvent(id, discriminator, event) @@ tracing.aspects.span("PostgresCQRSPersistence.saveEvent")
 
         def readSnapshot(id: Key): RIO[ZConnection, Option[Version]] =
-          self.readSnapshot(id) @@ tracing.aspects.span("CQRSPersistence.readSnapshot")
+          self.readSnapshot(id) @@ tracing.aspects.span("PostgresCQRSPersistence.readSnapshot")
 
         def saveSnapshot(id: Key, version: Version): RIO[ZConnection, Long] =
-          self.saveSnapshot(id, version) @@ tracing.aspects.span("CQRSPersistence.saveSnapshot")
+          self.saveSnapshot(id, version) @@ tracing.aspects.span("PostgresCQRSPersistence.saveSnapshot")
       }
 
   }

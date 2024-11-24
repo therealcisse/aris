@@ -41,11 +41,11 @@ object PostgresCQRSPersistenceSpec extends PgSpec {
   def spec =
     suite("PostgresCQRSPersistenceSpec")(
       test("should save and retrieve events correctly by hierarchy") {
-        check(keyGen, versionGen, keyGen, keyGen, discriminatorGen) {
-          (key, version, grandParentId, parentId, discriminator) =>
+        check(namespaceGen, keyGen, versionGen, keyGen, keyGen, discriminatorGen) {
+          (ns, key, version, grandParentId, parentId, discriminator) =>
 
             given MetaInfo[DummyEvent] with {
-              extension (self: DummyEvent) def namespace: Namespace = Namespace(0)
+              extension (self: DummyEvent) def namespace: Namespace = ns
               extension (self: DummyEvent)
                 def hierarchy: Option[Hierarchy] = Hierarchy.Descendant(grandParentId, parentId).some
               extension (self: DummyEvent) def props: Chunk[EventProperty] = Chunk(EventProperty("type", "DummyEvent"))
@@ -419,6 +419,9 @@ object PostgresCQRSPersistenceSpec extends PgSpec {
       } yield ()
 
     }
+
+  val namespaceGen: Gen[Any, Namespace] =
+    Gen.int.map(Namespace(_))
 
   val discriminatorGen: Gen[Any, Discriminator] =
     Gen.alphaNumericStringBounded(5, 5).map(Discriminator(_))

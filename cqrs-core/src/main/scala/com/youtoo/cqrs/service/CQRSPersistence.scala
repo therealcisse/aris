@@ -10,19 +10,22 @@ import zio.prelude.*
 import zio.schema.codec.*
 
 trait CQRSPersistence {
-  def readEvents[Event: BinaryCodec: Tag](id: Key, discriminator: Discriminator): RIO[ZConnection, Chunk[Change[Event]]]
-  def readEvents[Event: BinaryCodec: Tag](
+  def readEvents[Event: BinaryCodec: Tag: MetaInfo](
+    id: Key,
+    discriminator: Discriminator,
+  ): RIO[ZConnection, Chunk[Change[Event]]]
+  def readEvents[Event: BinaryCodec: Tag: MetaInfo](
     id: Key,
     discriminator: Discriminator,
     snapshotVersion: Version,
   ): RIO[ZConnection, Chunk[Change[Event]]]
-  def readEvents[Event: BinaryCodec: Tag](
+  def readEvents[Event: BinaryCodec: Tag: MetaInfo](
     discriminator: Discriminator,
     ns: Option[NonEmptyList[Namespace]],
     hierarchy: Option[Hierarchy],
     props: Option[NonEmptyList[EventProperty]],
   ): RIO[ZConnection, Chunk[Change[Event]]]
-  def readEvents[Event: BinaryCodec: Tag](
+  def readEvents[Event: BinaryCodec: Tag: MetaInfo](
     discriminator: Discriminator,
     snapshotVersion: Version,
     ns: Option[NonEmptyList[Namespace]],

@@ -124,6 +124,7 @@ lazy val core = (project in file("cqrs-core"))
       `zio-test-sbt`,
       `zio-test-magnolia`,
       `zio-mock`,
+      mockito,
     ),
   )
   .dependsOn(kernel)
@@ -161,7 +162,7 @@ lazy val std = (project in file("std"))
   )
 
 lazy val postgres = (project in file("cqrs-persistence-postgres"))
-  .dependsOn(core)
+  .dependsOn(core % "compile->test")
   .settings(stdSettings("cqrs-persistence-postgres"))
   // .settings(publishSetting(false))
   .settings(
@@ -178,21 +179,22 @@ lazy val postgres = (project in file("cqrs-persistence-postgres"))
       `zio-test-sbt`,
       `zio-test-magnolia`,
       `zio-mock`,
-      mockito,
     ),
   )
 
 lazy val memory = (project in file("cqrs-persistence-memory"))
-  .dependsOn(core)
+  .dependsOn(core % "compile->test")
   .settings(stdSettings("cqrs-persistence-memory"))
   // .settings(publishSetting(false))
   .settings(
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
     Test / unmanagedResourceDirectories ++= (Compile / unmanagedResourceDirectories).value,
     libraryDependencies ++= Dependencies.`open-telemetry`,
+    libraryDependencies += `scala-collection-contrib`,
     libraryDependencies ++= Seq(
       flyway,
       hicariCP,
+      `zio-jdbc`,
       `zio-test`,
       `zio-test-sbt`,
       `zio-test-magnolia`,

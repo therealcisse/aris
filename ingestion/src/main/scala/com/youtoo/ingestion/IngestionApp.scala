@@ -16,6 +16,7 @@ import com.youtoo.ingestion.model.*
 import com.youtoo.ingestion.service.*
 import com.youtoo.ingestion.repository.*
 import com.youtoo.cqrs.service.postgres.*
+import com.youtoo.cqrs.service.memory.*
 import com.youtoo.ingestion.store.*
 import com.youtoo.cqrs.config.*
 
@@ -65,7 +66,8 @@ object IngestionApp extends ZIOApp {
         .make[Environment](
           zio.metrics.jvm.DefaultJvmMetrics.live.unit,
           DatabaseConfig.pool,
-          PostgresCQRSPersistence.live(),
+          // PostgresCQRSPersistence.live(),
+          MemoryCQRSPersistence.live(),
           FlywayMigration.live(),
           SnapshotStore.live(),
           IngestionEventStore.live(),

@@ -44,20 +44,20 @@ object MockCQRSPersistence extends Mock[CQRSPersistence] {
       for {
         proxy <- ZIO.service[Proxy]
       } yield new CQRSPersistence {
-        def readEvents[Event: BinaryCodec: Tag](
+        def readEvents[Event: BinaryCodec: Tag: MetaInfo](
           id: Key,
           discriminator: Discriminator,
           snapshotVersion: Version,
         ): ZIO[ZConnection, Throwable, Chunk[Change[Event]]] =
           proxy(ReadEvents.Snapshot.of[Chunk[Change[Event]]], (id, discriminator, snapshotVersion))
 
-        def readEvents[Event: BinaryCodec: Tag](
+        def readEvents[Event: BinaryCodec: Tag: MetaInfo](
           id: Key,
           discriminator: Discriminator,
         ): ZIO[ZConnection, Throwable, Chunk[Change[Event]]] =
           proxy(ReadEvents.Full.of[Chunk[Change[Event]]], (id, discriminator))
 
-        def readEvents[Event: BinaryCodec: Tag](
+        def readEvents[Event: BinaryCodec: Tag: MetaInfo](
           discriminator: Discriminator,
           snapshotVersion: Version,
           ns: Option[NonEmptyList[Namespace]],
@@ -69,7 +69,7 @@ object MockCQRSPersistence extends Mock[CQRSPersistence] {
             (discriminator, snapshotVersion, ns, hierarchy, props),
           )
 
-        def readEvents[Event: BinaryCodec: Tag](
+        def readEvents[Event: BinaryCodec: Tag: MetaInfo](
           discriminator: Discriminator,
           ns: Option[NonEmptyList[Namespace]],
           hierarchy: Option[Hierarchy],
