@@ -73,11 +73,15 @@ resource "kubectl_manifest" "otel_collector" {
       config = {
         receivers = {
           hostmetrics = {
+            collection_interval = "10s"
             scrapers = {
 
-              cpu    = {}
-              memory = {}
-              disk   = {}
+              cpu        = {}
+              load       = {}
+              memory     = {}
+              disk       = {}
+              filesystem = {}
+              network    = {}
             }
           }
           otlp = {

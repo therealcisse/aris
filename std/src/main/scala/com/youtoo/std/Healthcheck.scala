@@ -8,13 +8,13 @@ import zio.telemetry.opentelemetry.tracing.Tracing
 import zio.*
 
 trait Healthcheck {
-  def start(id: Key, interval: Schedule[Any, Any, Any]): RIO[Scope, Unit]
+  def start(id: Key, interval: Schedule[Any, Any, Any]): RIO[Tracing & Scope, Unit]
   def getHeartbeat(id: Key): UIO[Option[Timestamp]]
   def isRunning(id: Key): UIO[Boolean]
 }
 
 object Healthcheck {
-  inline def start(id: Key, interval: Schedule[Any, Any, Any]): RIO[Healthcheck & Scope, Unit] =
+  inline def start(id: Key, interval: Schedule[Any, Any, Any]): RIO[Tracing & Healthcheck & Scope, Unit] =
     ZIO.serviceWithZIO[Healthcheck](_.start(id, interval))
 
   inline def getHeartbeat(id: Key): URIO[Healthcheck, Option[Timestamp]] =
@@ -36,9 +36,9 @@ object Healthcheck {
     }.flatten
 
   class HealthcheckLive(ref: Ref.Synchronized[Map[Key, (Timestamp, Fiber[Nothing, Any])]]) extends Healthcheck { self =>
-    def start(id: Key, interval: Schedule[Any, Any, Any]): RIO[Scope, Unit] =
+    def start(id: Key, interval: Schedule[Any, Any, Any]): RIO[Tracing & Scope, Unit] =
 
-      def update(id: Key): URIO[Scope, Fiber[Nothing, Any]] =
+      def update(id: Key): URIO[Tracing & Scope, Fiber[Nothing, Any]] =
         (Timestamp.now flatMap { case (t) =>
           ZIO.uninterruptible {
             ref.update { s =>
@@ -93,7 +93,7 @@ object Healthcheck {
 
     def traced(tracing: Tracing): Healthcheck =
       new Healthcheck {
-        def start(id: Key, interval: Schedule[Any, Any, Any]): RIO[Scope, Unit] =
+        def start(id: Key, interval: Schedule[Any, Any, Any]): RIO[Tracing & Scope, Unit] =
           self.start(id, interval) @@ tracing.aspects.span("Healthcheck.start")
         def getHeartbeat(id: Key): UIO[Option[Timestamp]] =
           self.getHeartbeat(id) @@ tracing.aspects.span("Healthcheck.getHeartbeat")

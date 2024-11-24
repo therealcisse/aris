@@ -13,7 +13,9 @@ import com.youtoo.std.*
 
 import com.youtoo.migration.model.*
 import com.youtoo.migration.service.*
-import com.youtoo.cqrs.CQRS
+import com.youtoo.cqrs.*
+
+import zio.telemetry.opentelemetry.tracing.Tracing
 
 object DataMigrationSpec extends MockSpecDefault {
 
@@ -23,7 +25,7 @@ object DataMigrationSpec extends MockSpecDefault {
     testIncompleteMigrationResumption,
     testStopMigration,
   ).provideSomeLayerShared(
-    ZLayer.make[Healthcheck & Interrupter & DataMigration](
+    ZLayer.make[Tracing & Healthcheck & Interrupter & DataMigration](
       (Healthcheck.live() ++ Interrupter.live()) >+> DataMigration.live(),
       (zio.telemetry.opentelemetry.OpenTelemetry.contextZIO >>> tracingMockLayer()),
     ),
@@ -77,7 +79,7 @@ object DataMigrationSpec extends MockSpecDefault {
       layer = (processor ++ ZLayer.succeed(
         new DataMigration.DataMigrationLive(interrupter, healthcheck, 1),
       ) ++ migrationCQRS ++ migrationService)
-      fiber <- DataMigration.run(migrationId).fork.provideLayer(layer)
+      fiber <- DataMigration.run(migrationId).fork.provideSomeLayer(layer)
       _ <- processingStarted.await
       _ <- DataMigration.stop(migrationId).provideLayer(layer)
       _ <- proceed.succeed(())
@@ -108,8 +110,7 @@ object DataMigrationSpec extends MockSpecDefault {
         ) ++ ZLayer.succeed(cqrs)
 
       for {
-        service <- ZIO.service[DataMigration]
-        _ <- service.run(migrationId).provide(layer)
+        _ <- DataMigration.run(migrationId).provideSomeLayer(layer)
         calls <- cqrs.getCalls
         seenKeys <- processor.getKeys
       } yield assert(calls.size)(equalTo(n + 2)) && assert(seenKeys)(equalTo(n))
@@ -149,8 +150,7 @@ object DataMigrationSpec extends MockSpecDefault {
         ) ++ ZLayer.succeed(cqrs)
 
       for {
-        service <- ZIO.service[DataMigration]
-        _ <- service.run(migrationId).provide(layer)
+        _ <- DataMigration.run(migrationId).provideSomeLayer(layer)
         calls <- cqrs.getCalls
         seenKeys <- processor.getKeys
       } yield assert(calls.size)(equalTo(remainingKeys.size + 2)) && assert(seenKeys)(equalTo(Set(remainingKeys*)))
@@ -171,8 +171,7 @@ object DataMigrationSpec extends MockSpecDefault {
       ) ++ ZLayer.succeed(cqrs)
 
       for {
-        service <- ZIO.service[DataMigration]
-        _ <- service.run(id).provide(layer)
+        _ <- DataMigration.run(id).provideSomeLayer(layer)
         calls <- cqrs.getCalls
         seenKeys <- processor.getKeys
       } yield assert(calls.size)(equalTo(keys.size + 2)) && assert(seenKeys)(equalTo(keys))

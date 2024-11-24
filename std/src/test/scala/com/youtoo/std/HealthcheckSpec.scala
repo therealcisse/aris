@@ -75,5 +75,8 @@ object HealthcheckSpec extends ZIOSpecDefault {
         isRunning <- healthcheck.isRunning(id)
       } yield assert(hb1)(isSome(anything)) && assert(hb2)(isNone) && assert(isRunning)(isFalse)
     },
+  ).provideSomeLayerShared(
+    zio.telemetry.opentelemetry.OpenTelemetry.contextZIO >>> tracingMockLayer(),
   ) @@ TestAspect.sequential
+
 }

@@ -102,8 +102,8 @@ resource "kubernetes_deployment" "youtoo_ingestion" {
           }
 
           env {
-            name  = "TELEMETRY_LOGGING_ENDPOINT"
-            value = "http://${helm_release.seq.name}.${kubernetes_namespace.telemetry.metadata[0].name}.svc.cluster.local:5341/ingest/otlp/v1/logs"
+            name  = "YOUTOO_LOG_LEVEL"
+            value = var.log_level
           }
 
           resources {
@@ -118,6 +118,117 @@ resource "kubernetes_deployment" "youtoo_ingestion" {
               memory = "1Gi"
             }
 
+          }
+        }
+
+        container {
+          name  = "fluent-bit"
+          image = "cr.fluentbit.io/fluent/fluent-bit:3.2.1"
+
+          args = [
+            "-c",
+            "/fluent-bit/etc/fluent-bit.conf"
+          ]
+
+          volume_mount {
+            name       = "fluent-bit-config"
+            mount_path = "/fluent-bit/etc/fluent-bit.conf"
+            sub_path   = "fluent-bit.conf"
+            read_only  = true
+          }
+
+
+          volume_mount {
+            name       = "varlog"
+            mount_path = "/var/log"
+            read_only  = true
+          }
+
+          volume_mount {
+            name       = "varlibdockercontainers"
+            mount_path = "/var/lib/docker/containers"
+            read_only  = true
+          }
+
+          volume_mount {
+            name       = "etcmachineid"
+            mount_path = "/etc/machine-id"
+            read_only  = true
+          }
+
+          env {
+            name = "POD_NAME"
+            value_from {
+              field_ref {
+                field_path = "metadata.name"
+              }
+            }
+          }
+
+          env {
+            name = "POD_UID"
+            value_from {
+              field_ref {
+                field_path = "metadata.uid"
+              }
+            }
+          }
+
+          # liveness_probe {
+          #   http_get {
+          #     path   = "/"
+          #     port   = 8181
+          #     scheme = "HTTP"
+          #   }
+          #   failure_threshold = 3
+          #   period_seconds    = 10
+          #   success_threshold = 1
+          #   timeout_seconds   = 1
+          # }
+          #
+          # readiness_probe {
+          #   http_get {
+          #     path   = "/api/v1/health"
+          #     port   = 8181
+          #     scheme = "HTTP"
+          #   }
+          #   failure_threshold = 3
+          #   period_seconds    = 10
+          #   success_threshold = 1
+          #   timeout_seconds   = 1
+          # }
+        }
+
+        volume {
+          name = "fluent-bit-config"
+
+          config_map {
+            name = kubernetes_config_map.fluent_bit_ingestion_config.metadata[0].name
+          }
+        }
+
+        volume {
+          name = "varlog"
+
+          host_path {
+            path = "/var/log"
+          }
+        }
+
+        volume {
+          name = "varlibdockercontainers"
+
+          host_path {
+            path = "/var/lib/docker/containers"
+          }
+        }
+
+        volume {
+          name = "etcmachineid"
+
+          host_path {
+            path = "/etc/machine-id"
+            type = "File"
           }
         }
 

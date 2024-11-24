@@ -190,12 +190,11 @@ object MigrationApp extends ZIOApp {
       RestEndpoint.boundary("run_migration", req) {
         val numKeys = req.queryParamToOrElse[Long]("numKeys", 10L)
 
-        val processor: ZLayer[Any, Nothing, DataMigration.Processor] = ZLayer.succeed {
-
+        val processor: ZLayer[Tracing, Nothing, DataMigration.Processor] = ZLayer.fromFunction { (tracing: Tracing) =>
           new DataMigration.Processor {
             def count(): Task[Long] = ZIO.succeed(numKeys)
             def load(): ZStream[Any, Throwable, Key] = ZStream((0L until numKeys).map(i => Key(i))*)
-            def process(key: Key): Task[Unit] = Log.error(s"Processed $key")
+            def process(key: Key): Task[Unit] = Log.info(s"Processed $key").provide(ZLayer.succeed(tracing))
 
           }
         }
@@ -203,7 +202,7 @@ object MigrationApp extends ZIOApp {
         val op =
           DataMigration
             .run(id = Migration.Id(Key(id)))
-            .provideSomeLayer[MigrationCQRS & DataMigration & MigrationService & Scope](processor)
+            .provideSomeLayer[Tracing & MigrationCQRS & DataMigration & MigrationService & Scope](processor)
 
         op `as` Response.ok
       }

@@ -2,7 +2,7 @@
 
 set -e
 
-kind create cluster -v -q --config ./kind-config.yaml --name youtoo
+kind create cluster --config ./kind-config.yaml --name youtoo
 
 kubectl cluster-info --context kind-youtoo
 

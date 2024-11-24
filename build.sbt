@@ -47,6 +47,7 @@ lazy val aggregatedProjects: Seq[ProjectReference] =
     core,
     std,
     postgres,
+    memory,
     ingestion,
     dataMigration,
     loadtests,
@@ -181,8 +182,26 @@ lazy val postgres = (project in file("cqrs-persistence-postgres"))
     ),
   )
 
+lazy val memory = (project in file("cqrs-persistence-memory"))
+  .dependsOn(core)
+  .settings(stdSettings("cqrs-persistence-memory"))
+  // .settings(publishSetting(false))
+  .settings(
+    testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
+    Test / unmanagedResourceDirectories ++= (Compile / unmanagedResourceDirectories).value,
+    libraryDependencies ++= Dependencies.`open-telemetry`,
+    libraryDependencies ++= Seq(
+      flyway,
+      hicariCP,
+      `zio-test`,
+      `zio-test-sbt`,
+      `zio-test-magnolia`,
+    ),
+  )
+
 lazy val ingestion = (project in file("ingestion"))
   .dependsOn(
+    memory % "compile->compile;test->test",
     postgres % "compile->compile;test->test",
     core % "compile->compile;test->test",
     log % "compile->compile",
@@ -216,6 +235,7 @@ lazy val ingestion = (project in file("ingestion"))
 lazy val dataMigration = (project in file("data-migration"))
   .dependsOn(
     std % "compile->compile;test->test",
+    memory % "compile->compile;test->test",
     postgres % "compile->compile;test->test",
     core % "compile->compile;test->test",
     log % "compile->compile",

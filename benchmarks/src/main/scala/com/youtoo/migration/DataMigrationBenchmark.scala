@@ -99,7 +99,7 @@ object DataMigrationBenchmark {
   ) ++ Runtime.enableRuntimeMetrics ++ Runtime.enableAutoBlockingExecutor ++ Runtime.enableFlags(
     RuntimeFlag.EagerShiftBack,
   ) ++ Runtime.removeDefaultLoggers >>> SLF4J.slf4j ++ ZLayer
-    .make[MigrationCQRS & FlywayMigration & MigrationService & ZConnectionPool](
+    .make[Tracing & MigrationCQRS & FlywayMigration & MigrationService & ZConnectionPool](
       SnapshotStrategy.live(),
       DatabaseConfig.pool,
       SnapshotStore.live(),

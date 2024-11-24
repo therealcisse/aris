@@ -14,18 +14,16 @@ object OtelSdk {
       for {
         tracerProvider <- TracerProvider.otlp(resourceName)
         meterProvider <- MeterProvider.otlp(resourceName)
-        loggerProvider <- LoggerProvider.seq(resourceName)
-        openTelemetry <- ZIO.fromAutoCloseable(
+        openTelemetrySdk <- ZIO.fromAutoCloseable(
           ZIO.succeed(
             OpenTelemetrySdk
               .builder()
               .setTracerProvider(tracerProvider)
               .setMeterProvider(meterProvider)
-              .setLoggerProvider(loggerProvider)
               .build,
           ),
         )
-      } yield openTelemetry,
+      } yield openTelemetrySdk,
     )
 
 }

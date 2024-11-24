@@ -31,25 +31,21 @@
             </jsonGeneratorDecorator>
             <providers>
                 <timestamp>
-                    <fieldName>Timestamp/UTC</fieldName>
+                    <fieldName>time</fieldName>
                     <timeZone>UTC</timeZone>
                 </timestamp>
                 <logLevel>
-                    <fieldName>Level</fieldName>
+                    <fieldName>level</fieldName>
                 </logLevel>
                 <threadName>
-                    <fieldName>Thread</fieldName>
+                    <fieldName>thread</fieldName>
                 </threadName>
-                <contextName>
-                    <fieldName>ServiceName</fieldName>
-                </contextName>
                 <pattern>
                     <!-- The pattern that defines what to include -->
                     <pattern>
                         {
-                          "ServiceVersion": "${APPLICATION_NAME}",
-                          "ServiceHostName": "${hostname}",
-                          "PID": "${PID:-}"
+                          "service_name": "${APPLICATION_NAME}",
+                          "service_host_name": "${hostname}"
                         }
                     </pattern>
                 </pattern>
@@ -58,22 +54,22 @@
                 <!--     <includeNonStructuredArguments>true</includeNonStructuredArguments> -->
                 <!-- </arguments> -->
                 <loggerName>
-                    <fieldName>Logger</fieldName>
+                    <fieldName>logger</fieldName>
                 </loggerName>
-                <callerData>
-                    <!-- <classFieldName>Class</classFieldName> -->
-                    <!-- <methodFieldName>Method</methodFieldName> -->
-                    <fileFieldName>File</fileFieldName>
-                    <lineFieldName>Line</lineFieldName>
-                </callerData>
+                <!-- <callerData> -->
+                <!--     <classFieldName>class</classFieldName> -->
+                <!--     <methodFieldName>method</methodFieldName> -->
+                <!--     <fileFieldName>file</fileFieldName> -->
+                <!--     <lineFieldName>line</lineFieldName> -->
+                <!-- </callerData> -->
                 <message>
-                    <fieldName>Message</fieldName>
+                    <fieldName>message</fieldName>
                 </message>
                 <throwableClassName>
-                    <fieldName>ExceptionClass</fieldName>
+                    <fieldName>exceptionClass</fieldName>
                 </throwableClassName>
                 <stackTrace>
-                    <fieldName>StackTrace</fieldName>
+                    <fieldName>stackTrace</fieldName>
                     <!-- maxLength - limit the length of the stack trace -->
                     <throwableConverter class="net.logstash.logback.stacktrace.ShortenedThrowableConverter">
                         <maxDepthPerThrowable>200</maxDepthPerThrowable>

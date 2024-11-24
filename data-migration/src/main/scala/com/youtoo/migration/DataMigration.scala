@@ -10,8 +10,10 @@ import com.youtoo.migration.model.*
 import com.youtoo.std.*
 import com.youtoo.migration.service.*
 
+import zio.telemetry.opentelemetry.tracing.Tracing
+
 trait DataMigration {
-  def run(id: Migration.Id): ZIO[DataMigration.Processor & MigrationCQRS & MigrationService, Throwable, Unit]
+  def run(id: Migration.Id): ZIO[Tracing & DataMigration.Processor & MigrationCQRS & MigrationService, Throwable, Unit]
   def stop(id: Migration.Id): Task[Unit]
 
 }
@@ -25,7 +27,7 @@ object DataMigration {
 
   inline def run(
     id: Migration.Id,
-  ): RIO[DataMigration & MigrationCQRS & DataMigration.Processor & MigrationService, Unit] =
+  ): RIO[Tracing & DataMigration & MigrationCQRS & DataMigration.Processor & MigrationService, Unit] =
     ZIO.serviceWithZIO[DataMigration](_.run(id) @@ ZIOAspect.annotated("migration_id", id.asKey.value.toString))
 
   inline def stop(id: Migration.Id): RIO[DataMigration, Unit] =
@@ -54,12 +56,14 @@ object DataMigration {
     }
 
   class DataMigrationLive(interrupter: Interrupter, healthcheck: Healthcheck, batchSize: Int) extends DataMigration {
-    def run(id: Migration.Id): ZIO[DataMigration.Processor & MigrationCQRS & MigrationService, Throwable, Unit] =
+    def run(
+      id: Migration.Id,
+    ): ZIO[Tracing & DataMigration.Processor & MigrationCQRS & MigrationService, Throwable, Unit] =
       val migrationKey = id.asKey
 
-      inline def logInfo(msg: => String): Task[Unit] =
+      inline def logInfo(msg: => String): RIO[Tracing, Unit] =
         Log.info(msg)
-      inline def logError(msg: => String, e: => Throwable): Task[Unit] =
+      inline def logError(msg: => String, e: => Throwable): RIO[Tracing, Unit] =
         Log.error(msg, Cause.fail(e))
 
       (DataMigration.count() <&> MigrationService.load(id = id)) flatMap {

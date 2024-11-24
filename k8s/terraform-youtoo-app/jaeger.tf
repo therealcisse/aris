@@ -1,45 +1,3 @@
-resource "kubernetes_service_account" "jaeger" {
-  metadata {
-    name      = "jaeger"
-    namespace = kubernetes_namespace.telemetry.metadata[0].name
-  }
-}
-
-resource "kubernetes_role" "jaeger" {
-  metadata {
-    name      = "jaeger"
-    namespace = kubernetes_namespace.telemetry.metadata[0].name
-  }
-
-  rule {
-    # Allow all operations on Jaeger CRDs in the "telemetry" namespace
-    api_groups = ["jaegertracing.io"]
-    resources  = ["*"]
-    verbs      = ["get", "list", "watch", "create", "update", "patch", "delete"]
-  }
-
-}
-
-resource "kubernetes_role_binding" "jaeger" {
-  metadata {
-    name      = "jaeger"
-    namespace = kubernetes_namespace.telemetry.metadata[0].name
-  }
-
-  subject {
-    kind      = "ServiceAccount"
-    name      = kubernetes_service_account.jaeger.metadata[0].name
-    namespace = kubernetes_namespace.telemetry.metadata[0].name
-  }
-
-  role_ref {
-    kind      = "Role"
-    name      = kubernetes_role.jaeger.metadata[0].name
-    api_group = "rbac.authorization.k8s.io"
-  }
-}
-
-
 resource "helm_release" "jaeger_operator" {
   depends_on = [
     helm_release.cert_manager
@@ -58,16 +16,6 @@ resource "helm_release" "jaeger_operator" {
   set {
     name  = "rbac.clusterRole"
     value = true
-  }
-
-  set {
-    name  = "serviceAccount.name"
-    value = kubernetes_service_account.jaeger.metadata[0].name
-  }
-
-  set {
-    name  = "serviceAccount.create"
-    value = false
   }
 
   values = [

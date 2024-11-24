@@ -11,19 +11,19 @@ object Log {
   inline def layer = Runtime.removeDefaultLoggers >>> SLF4J.slf4j >>> logMetrics
 
   val GitCommitHashAnnotation: ZIOAspect[Nothing, Any, Nothing, Any, Nothing, Any] = LogAnnotation[String](
-    name = "Version",
+    name = "version",
     combine = (_, r) => r,
     render = identity,
   ).apply(ProjectInfo.versionSha)
 
   val TraceId: LogAnnotation[String] = LogAnnotation[String](
-    name = "TraceId",
+    name = "trace_id",
     combine = (_, r) => r,
     render = identity,
   )
 
   val SpanId: LogAnnotation[String] = LogAnnotation[String](
-    name = "SpanId",
+    name = "span_id",
     combine = (_, r) => r,
     render = identity,
   )
@@ -39,7 +39,7 @@ object Log {
     for {
       tracing <- ZIO.service[Tracing]
       context <- tracing.getCurrentSpanContextUnsafe
-      _ <- ZIO.logInfo(message) @@ GitCommitHashAnnotation @@ TraceId(context.getTraceId) @@ SpanId(context.getSpanId)
+      _ <- ZIO.logDebug(message) @@ GitCommitHashAnnotation @@ TraceId(context.getTraceId) @@ SpanId(context.getSpanId)
     } yield ()
 
   inline def debug[E](message: => String, cause: => E): URIO[Tracing, Unit] =

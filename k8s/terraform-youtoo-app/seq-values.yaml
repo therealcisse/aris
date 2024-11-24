@@ -5,6 +5,9 @@ persistence:
   size: 100Mi
   storageClassName: standard
 
+gelf:
+  enabled: true
+
 service:
   type: ClusterIP
   port: 5341

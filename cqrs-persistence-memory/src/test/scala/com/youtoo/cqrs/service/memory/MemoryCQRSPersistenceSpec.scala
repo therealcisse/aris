@@ -1,7 +1,7 @@
 package com.youtoo
 package cqrs
 package service
-package postgres
+package memory
 
 import com.youtoo.cqrs.config.*
 import com.youtoo.cqrs.service.*
@@ -15,12 +15,11 @@ import zio.*
 import zio.prelude.*
 import zio.test.*
 import zio.test.Assertion.*
-import zio.jdbc.*
 import zio.schema.*
 
 import zio.telemetry.opentelemetry.tracing.*
 
-object PostgresCQRSPersistenceSpec extends PgSpec {
+object MemoryCQRSPersistenceSpec extends ZIOSpecDefault {
   case class DummyEvent(id: String)
 
   inline val grandParentIdXXX = 11L
@@ -39,7 +38,7 @@ object PostgresCQRSPersistenceSpec extends PgSpec {
   }
 
   def spec =
-    suite("PostgresCQRSPersistenceSpec")(
+    suite("MemoryCQRSPersistenceSpec")(
       test("should save and retrieve events correctly by hierarchy") {
         check(keyGen, versionGen, keyGen, keyGen, discriminatorGen) {
           (key, version, grandParentId, parentId, discriminator) =>
@@ -322,103 +321,13 @@ object PostgresCQRSPersistenceSpec extends PgSpec {
           } yield a && b
         }
       },
-      test("read snapshot is optimized") {
-        check(keyGen) { key =>
-
-          val query = PostgresCQRSPersistence.Queries.READ_SNAPSHOT(key)
-          for {
-
-            executionTime <- atomically(query.selectOne).timed.map(_._1)
-            timeAssertion = assert(executionTime.toMillis)(isLessThanEqualTo(100L))
-
-            executionPlan <- atomically(query.sql.getExecutionPlan)
-            planAssertion = assert(executionPlan)(containsString("Index Scan") || containsString("Index Only Scan"))
-
-          } yield planAssertion && timeAssertion
-        }
-      },
-      test("read all events is optimized") {
-        check(keyGen, discriminatorGen) { (key, discriminator) =>
-
-          val query = PostgresCQRSPersistence.Queries.READ_EVENTS[DummyEvent](key, discriminator)
-          for {
-
-            executionTime <- atomically(query.selectAll).timed.map(_._1)
-            timeAssertion = assert(executionTime.toMillis)(isLessThanEqualTo(100L))
-
-            executionPlan <- atomically(query.sql.getExecutionPlan)
-            planAssertion = assert(executionPlan)(containsString("Index Scan") || containsString("Index Only Scan"))
-
-          } yield planAssertion && timeAssertion
-        }
-      },
-      test("read snapshot events is optimized") {
-        check(keyGen, versionGen, discriminatorGen) { case (key, version, discriminator) =>
-          val query = PostgresCQRSPersistence.Queries.READ_EVENTS[DummyEvent](key, discriminator, version)
-          for {
-
-            executionTime <- atomically(query.selectAll).timed.map(_._1)
-            timeAssertion = assert(executionTime.toMillis)(isLessThanEqualTo(100L))
-
-            executionPlan <- atomically(query.sql.getExecutionPlan)
-            planAssertion = assert(executionPlan)(containsString("Index Scan"))
-
-          } yield planAssertion && timeAssertion
-        }
-      },
-      test("read all events by args is optimized") {
-        check(Gen.option(namespacesGen), Gen.option(hierarchyGen), Gen.option(eventPropertiesGen), discriminatorGen) {
-          case (ns, hierarchy, props, discriminator) =>
-            val query =
-              PostgresCQRSPersistence.Queries
-                .READ_EVENTS[DummyEvent](discriminator, ns, hierarchy, props)
-            for {
-
-              executionTime <- atomically(query.selectAll).timed.map(_._1)
-              timeAssertion = assert(executionTime.toMillis)(isLessThanEqualTo(100L))
-
-              executionPlan <- atomically(query.sql.getExecutionPlan)
-              planAssertion = assert(executionPlan)(containsString("Index Scan") || containsString("Index Only Scan"))
-
-            } yield planAssertion && timeAssertion
-        }
-      },
-      test("read snapshot events by args is optimized") {
-        check(
-          versionGen,
-          Gen.option(namespacesGen),
-          Gen.option(hierarchyGen),
-          Gen.option(eventPropertiesGen),
-          discriminatorGen,
-        ) { case (version, ns, hierarchy, props, discriminator) =>
-          val query =
-            PostgresCQRSPersistence.Queries
-              .READ_EVENTS[DummyEvent](discriminator, version, ns, hierarchy, props)
-          for {
-
-            executionTime <- atomically(query.selectAll).timed.map(_._1)
-            timeAssertion = assert(executionTime.toMillis)(isLessThanEqualTo(100L))
-
-            executionPlan <- atomically(query.sql.getExecutionPlan)
-            planAssertion = assert(executionPlan)(containsString("Index Scan") || containsString("Index Only Scan"))
-
-          } yield planAssertion && timeAssertion
-        }
-      },
     ).provideSomeLayerShared(
       ZLayer.make[Tracing & CQRSPersistence](
         tracingMockLayer(),
         zio.telemetry.opentelemetry.OpenTelemetry.contextZIO,
-        PostgresCQRSPersistence.live(),
+        MemoryCQRSPersistence.live(),
       ),
-    ) @@ TestAspect.withLiveClock @@ TestAspect.beforeAll {
-      for {
-        config <- ZIO.service[DatabaseConfig]
-        _ <- FlywayMigration.run(config)
-
-      } yield ()
-
-    }
+    ) @@ TestAspect.withLiveClock
 
   val discriminatorGen: Gen[Any, Discriminator] =
     Gen.alphaNumericStringBounded(5, 5).map(Discriminator(_))

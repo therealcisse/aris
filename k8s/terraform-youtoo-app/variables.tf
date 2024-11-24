@@ -25,3 +25,8 @@ variable "postgres_db_password" {
   type = string
 }
 
+variable "log_level" {
+  type    = string
+  default = "INFO"
+}
+
