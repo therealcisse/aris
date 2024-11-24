@@ -132,8 +132,7 @@ resource "kubernetes_deployment" "youtoo_ingestion" {
 
           volume_mount {
             name       = "fluent-bit-config"
-            mount_path = "/fluent-bit/etc/fluent-bit.conf"
-            sub_path   = "fluent-bit.conf"
+            mount_path = "/fluent-bit/etc/"
             read_only  = true
           }
 
@@ -141,18 +140,6 @@ resource "kubernetes_deployment" "youtoo_ingestion" {
           volume_mount {
             name       = "varlog"
             mount_path = "/var/log"
-            read_only  = true
-          }
-
-          volume_mount {
-            name       = "varlibdockercontainers"
-            mount_path = "/var/lib/docker/containers"
-            read_only  = true
-          }
-
-          volume_mount {
-            name       = "etcmachineid"
-            mount_path = "/etc/machine-id"
             read_only  = true
           }
 
@@ -212,23 +199,6 @@ resource "kubernetes_deployment" "youtoo_ingestion" {
 
           host_path {
             path = "/var/log"
-          }
-        }
-
-        volume {
-          name = "varlibdockercontainers"
-
-          host_path {
-            path = "/var/lib/docker/containers"
-          }
-        }
-
-        volume {
-          name = "etcmachineid"
-
-          host_path {
-            path = "/etc/machine-id"
-            type = "File"
           }
         }
 

@@ -5,6 +5,18 @@ resource "kubernetes_config_map" "fluent_bit_ingestion_config" {
   }
 
   data = {
+    "parsers.conf" = <<EOT
+
+[PARSER]
+    Name        log_parser
+    Format      regex
+    Regex       ^(?<timestamp>[^\s]+)\s(?<stream>[^\s]+)\s(?<k8s_log_level>[^\s]+)\s(?<log_content>.*)$
+    Time_Key    timestamp
+    Time_Format %Y-%m-%dT%H:%M:%S.%L%z
+    Decode_Field_As json log_content
+
+EOT
+
     "fluent-bit.conf" = <<EOT
 
 [SERVICE]
@@ -17,36 +29,40 @@ resource "kubernetes_config_map" "fluent_bit_ingestion_config" {
 
 [INPUT]
     Name              tail
-    Path              /var/log/pods/${kubernetes_namespace.application_namespace.metadata[0].name}_$${POD_NAME}_$${POD_UID}/youtoo-ingestion/*.log
-    PARSER            docker
+    Path              /var/log/containers/$${POD_NAME}_${kubernetes_namespace.application_namespace.metadata[0].name}_youtoo-ingestion-*.log
+    PARSER            log_parser
     Refresh_Interval  5
-    Tag               youtoo.ingestion.*
-    Mem_Buf_Limit     50MB
+    Tag               kube.youtoo.ingestion.*
+    Mem_Buf_Limit     64MB
     Skip_Long_Lines   On
 
 [FILTER]
-    Name                kubernetes
-    Match               kube.*
-    Merge_Log           On
-    Keep_Log            Off
-    K8S-Logging.Parser  On
-    K8S-Logging.Exclude On
-    Annotations         On
-    Labels              On
-    tls.verify          Off
+    Name                  record_modifier
+    Match                 kube.youtoo.ingestion.*
+    Remove_key            k8s_log_level
+    Remove_key            stream
+    Record  k8s.pod.name  $${POD_NAME}
+
+[FILTER]
+    Name              nest
+    Match             kube.youtoo.ingestion.*
+    Operation         lift
+    Nested_under      log_content
 
 [OUTPUT]
     Name                    gelf
-    Match                   youtoo.ingestion.*
+    Match                   kube.youtoo.ingestion.*
     Host                    ${helm_release.seq.name}.${kubernetes_namespace.telemetry.metadata[0].name}.svc.cluster.local
     Port                    12201
     Mode                    tcp
-    Gelf_Short_Message_Key  data
+    Gelf_Short_Message_Key  message
     Compress                On
     Retry_Limit             False
-    tls                     on
+    tls                     Off
+    tls.verify              Off
 
 EOT
   }
 }
+
 

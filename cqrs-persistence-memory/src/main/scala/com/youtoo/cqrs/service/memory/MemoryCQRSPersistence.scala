@@ -18,14 +18,29 @@ object MemoryCQRSPersistence {
   import zio.jdbc.*
   import zio.schema.*
 
-  def live(): ZLayer[Tracing, Throwable, CQRSPersistence] =
-    ZLayer.fromFunction(new MemoryCQRSPersistenceLive().traced(_))
+  case class State()
 
-  class MemoryCQRSPersistenceLive() extends CQRSPersistence { self =>
+  object State {
+    def empty: State = State()
+
+  }
+
+  def live(): ZLayer[Tracing, Throwable, CQRSPersistence] =
+    ZLayer {
+      for {
+        tracing <- ZIO.service[Tracing]
+        ref <- Ref.Synchronized.make(State.empty)
+
+      } yield new MemoryCQRSPersistenceLive(ref).traced(tracing)
+
+    }
+
+  class MemoryCQRSPersistenceLive(ref: Ref.Synchronized[State]) extends CQRSPersistence { self =>
     def readEvents[Event: BinaryCodec: Tag](
       id: Key,
       discriminator: Discriminator,
     ): RIO[ZConnection, Chunk[Change[Event]]] =
+      println(ref)
       ???
 
     def readEvents[Event: BinaryCodec: Tag](
