@@ -16,7 +16,7 @@ resource "helm_release" "opentelemetry_operator" {
   namespace  = kubernetes_namespace.telemetry.metadata[0].name
   repository = "https://open-telemetry.github.io/opentelemetry-helm-charts"
   chart      = "opentelemetry-operator"
-  version    = "0.74.2"
+  version    = "0.74.3"
 
   values = [
     yamlencode({
@@ -154,6 +154,12 @@ resource "kubectl_manifest" "otel_collector" {
               insecure = true
             }
           }
+          "otlphttp/seq" = {
+            endpoint = "http://seq.${kubernetes_namespace.telemetry.metadata[0].name}.svc.cluster.local:5341/ingest/otlp/v1/traces"
+            tls = {
+              insecure = true
+            }
+          }
           prometheus = {
             endpoint = "0.0.0.0:8889"
           }
@@ -170,6 +176,12 @@ resource "kubectl_manifest" "otel_collector" {
               receivers  = ["otlp"]
               processors = ["batch"]
               exporters  = ["spanmetrics"]
+            }
+
+            "traces/seq" = {
+              receivers  = ["otlp"]
+              processors = ["batch"]
+              exporters  = ["otlphttp/seq"]
             }
 
             "metrics/prometheus" = {

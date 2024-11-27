@@ -17,6 +17,11 @@ exporters:
     tls:
       insecure: true
 
+  otlp/seq:
+    endpoint: seq/ingest/otlp
+    tls:
+      insecure: true
+
 connectors:
   spanmetrics:
 
@@ -34,6 +39,11 @@ service:
       receivers: [otlp]
       processors: [batch]
       exporters: [spanmetrics]
+
+    traces/seq:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlp/seq]
 
     metrics/prometheus:
       receivers: [otlp/metrics]
