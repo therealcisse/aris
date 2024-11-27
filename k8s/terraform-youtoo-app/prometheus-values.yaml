@@ -3,16 +3,9 @@ prometheus:
     enableRemoteWriteReceiver: true
     enableFeatures:
     - remote-write-receiver
-    serviceMonitorSelector:
-      matchLabels:
-        monitoring: "enabled"
-    podMonitorSelector:
-      matchLabels:
-        monitoring: "enabled"
 
 prometheusOperator:
   enabled: true
-
 
 grafana:
   dashboardProviders:

@@ -139,10 +139,6 @@ object MemoryCQRSPersistenceSpec extends ZIOSpecDefault {
                       props = None,
                     ),
                   )
-                  _ = println()
-                  _ = println(events0)
-                  _ = println(events1)
-                  _ = println()
                   events2 <- atomically(
                     persistence.readEvents[DummyEvent](
                       discriminator,
@@ -159,9 +155,9 @@ object MemoryCQRSPersistenceSpec extends ZIOSpecDefault {
                 )(equalTo(events1))
               )
 
-            } yield a && b && c // && d && e
+            } yield a && b && c && d && e
         }
-      } @@ TestAspect.samples(1),
+      },
       test("should save and retrieve events correctly by props") {
         check(keyGen, versionGen, discriminatorGen) { (key, version, discriminator) =>
           for {

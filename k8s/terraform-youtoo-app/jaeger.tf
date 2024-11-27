@@ -76,6 +76,7 @@ resource "kubectl_manifest" "jaeger" {
     }
   })
 }
+
 resource "kubectl_manifest" "jaeger_pod_monitor" {
   depends_on = [
     kubectl_manifest.jaeger,
@@ -91,8 +92,7 @@ resource "kubectl_manifest" "jaeger_pod_monitor" {
       name      = "jaeger-components"
       namespace = kubernetes_namespace.telemetry.metadata[0].name
       labels = {
-        release    = "prometheus-operator"
-        monitoring = "enabled"
+        release = "prometheus-operator"
       }
     }
     spec = {
