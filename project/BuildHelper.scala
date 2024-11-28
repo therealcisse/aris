@@ -161,7 +161,6 @@ object BuildHelper extends ScalaSettings {
     ThisBuild / fork := true,
     semanticdbEnabled := scalaVersion.value != Scala3,
     semanticdbOptions += "-P:semanticdb:synthetics:on",
-    git.formattedShaVersion := git.gitHeadCommit.value map { sha => s"v$sha" },
   )
 
   def runSettings(className: String = "example.HelloWorld") = Seq(

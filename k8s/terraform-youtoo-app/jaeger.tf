@@ -19,9 +19,11 @@ resource "helm_release" "jaeger_operator" {
   }
 
   values = [
-    # You can add custom values if needed for the operator, for example:
-    # "rbac.create=true"
-    # "clusterRole.create=true"
+    yamlencode({
+      extraEnv = [
+      ]
+
+    })
   ]
 
   wait = true
@@ -52,25 +54,30 @@ resource "kubectl_manifest" "jaeger" {
     }
     spec = {
       strategy = "allInOne"
-      extraEnv = [
-        {
-          name = "PROMETHEUS_QUERY_NORMALIZE_CALLS"
-          value = true
-        },
-
-        {
-          name = "PROMETHEUS_QUERY_NORMALIZE_DURATION"
-          value = true
-        }
-
-      ]
       allInOne = {
+        image = "jaegertracing/all-in-one:latest"
         options = {
           log-level = "DEBUG"
+
+          query = {
+            base-path = "/jaeger"
+          }
+
+          prometheus = {
+            server-url = "http://prometheus-operated.${kubernetes_namespace.telemetry.metadata[0].name}.svc.cluster.local:9090"
+
+            query = {
+              normalize-calls    = true
+              normalize-duration = true
+            }
+
+          }
+
+          "metrics-backend" = "prometheus"
+
         }
         metricsStorage = {
           type = "prometheus"
-          server-url = "http://prometheus-operated.${kubernetes_namespace.telemetry.metadata[0].name}.svc.cluster.local:9090"
         }
       }
       storage = {

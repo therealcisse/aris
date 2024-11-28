@@ -15,6 +15,17 @@ ThisBuild / resolvers ++= Resolver.sonatypeOssRepos("snapshots")
 
 ThisBuild / version := "0.1.0-SNAPSHOT"
 
+enablePlugins(GitVersioning)
+
+ThisBuild / git.formattedShaVersion := git.gitHeadCommit.value map { sha => "v"+sha.take(7) }
+
+ThisBuild / git.useGitDescribe := true
+
+ThisBuild / git.gitTagToVersionNumber := { tag: String =>
+  if(tag matches "[0-9]+\\..*") Some(tag)
+  else None
+}
+
 // Define onLoad task to copy the hook into .git/hooks/pre-push
 def installGitHook: Unit = {
   import java.nio.file.{Files, Paths, StandardCopyOption}

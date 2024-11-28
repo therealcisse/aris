@@ -1,14 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration debug="true">
 
-    <property name="YOUTOO_APPLICATION_NAME" value="ingestion" />
+    <property name="YOUTOO_APPLICATION_NAME" value="loadtests" />
 
     <include resource="logback-common.xml" />
 
     <!-- Root Logger -->
-    <root level="${LOG_LEVEL}">
+    <root level="INFO">
         <appender-ref ref="console" />
-        <appender-ref ref="socket" />
     </root>
 </configuration>
 

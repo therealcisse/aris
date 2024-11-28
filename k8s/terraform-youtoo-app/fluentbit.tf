@@ -155,7 +155,7 @@ resource "kubectl_manifest" "fluentbit_filter" {
     apiVersion = "fluentbit.fluent.io/v1alpha2"
     kind       = "ClusterFilter"
     metadata = {
-      name      = "youtoo-filter"
+      name      = "youtoo-log-filter"
       namespace = kubernetes_namespace.telemetry.metadata[0].name
       labels = {
         "fluentbit.fluent.io/enabled" = "true"
@@ -199,8 +199,7 @@ resource "kubectl_manifest" "fluentbit_input_youtoo" {
         tag                    = "kube.*"
         path                   = "/var/log/containers/youtoo-ingestion-*_${kubernetes_namespace.application_namespace.metadata[0].name}_youtoo-ingestion-*.log"
         readFromHead           = true
-        pathKey                = "log_file"
-        parser                 = "ingestion-log-parser"
+        parser                 = "youtoo-log"
         refreshIntervalSeconds = 10
         memBufLimit            = "64MB"
         skipLongLines          = true
@@ -367,7 +366,7 @@ resource "kubectl_manifest" "cluster_parser_log_parser" {
     apiVersion = "fluentbit.fluent.io/v1alpha2"
     kind       = "ClusterParser"
     metadata = {
-      name      = "ingestion-log-parser"
+      name      = "youtoo-log"
       namespace = kubernetes_namespace.telemetry.metadata[0].name
       labels = {
         "fluentbit.fluent.io/enabled" = "true"
@@ -420,53 +419,8 @@ resource "kubectl_manifest" "cluster_output_youtoo_seq" {
         port            = 12201
         shortMessageKey = "message"
         fullMessageKey  = "message"
-        timestampKey    = "epoch"
-        mode            = "udp"
-        networking = {
-          DNSMode        = "UDP"
-          connectTimeout = 90
-          DNSResolver    = "LEGACY"
-
-        }
-
-      }
-
-    }
-
-  })
-
-}
-
-resource "kubectl_manifest" "cluster_output_youtoo_opensearch" {
-  depends_on = [
-    time_sleep.wait_for_fluentbit_operator,
-  ]
-
-  server_side_apply = true
-
-  yaml_body = yamlencode({
-    apiVersion = "fluentbit.fluent.io/v1alpha2"
-    kind       = "ClusterOutput"
-    metadata = {
-      name      = "output-ingestion-opensearch"
-      namespace = kubernetes_namespace.telemetry.metadata[0].name
-      labels = {
-        "fluentbit.fluent.io/enabled" = "true"
-        "fluentbit.fluent.io/mode"    = "k8s"
-      }
-    }
-    spec = {
-      match = "kube.*"
-
-      # stdout = {
-      #   format = "json_lines"
-      # }
-
-      opensearch = {
-        host            = var.opensearch_host
-        port            = 9200
-        index           = "logs"
-        type            = "_doc"
+        timestampKey    = "date"
+        mode            = "tcp"
         networking = {
           DNSMode        = "TCP"
           connectTimeout = 90
@@ -481,6 +435,51 @@ resource "kubectl_manifest" "cluster_output_youtoo_opensearch" {
   })
 
 }
+
+# resource "kubectl_manifest" "cluster_output_youtoo_opensearch" {
+#   depends_on = [
+#     time_sleep.wait_for_fluentbit_operator,
+#   ]
+#
+#   server_side_apply = true
+#
+#   yaml_body = yamlencode({
+#     apiVersion = "fluentbit.fluent.io/v1alpha2"
+#     kind       = "ClusterOutput"
+#     metadata = {
+#       name      = "output-ingestion-opensearch"
+#       namespace = kubernetes_namespace.telemetry.metadata[0].name
+#       labels = {
+#         "fluentbit.fluent.io/enabled" = "true"
+#         "fluentbit.fluent.io/mode"    = "k8s"
+#       }
+#     }
+#     spec = {
+#       match = "kube.*"
+#
+#       # stdout = {
+#       #   format = "json_lines"
+#       # }
+#
+#       opensearch = {
+#         host            = var.opensearch_host
+#         port            = 9200
+#         index           = "logs"
+#         type            = "_doc"
+#         networking = {
+#           DNSMode        = "TCP"
+#           connectTimeout = 90
+#           DNSResolver    = "LEGACY"
+#
+#         }
+#
+#       }
+#
+#     }
+#
+#   })
+#
+# }
 
 # resource "kubectl_manifest" "cluster_output_kube_seq" {
 #   depends_on = [
