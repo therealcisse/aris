@@ -3,14 +3,14 @@ services:
     image: cr.fluentbit.io/fluent/fluent-bit:3.2.1
     container_name: fluentbit
     volumes:
-      - ./fluentbit-config:/fluentbit/config:ro
+      - ./fluentbit-config:/fluent-bit/config:ro
       - ./logs:/var/log/youtoo:ro
     ports:
       - "2020:2020"
       - "24224:24224"
     command: >
       /fluent-bit/bin/fluent-bit
-      -c /fluentbit/config/fluent-bit.conf
+      -c /fluent-bit/config/fluent-bit.conf
     networks:
       app-network:
         # This is the host name used in FluentBit scrape configuration.
@@ -128,6 +128,7 @@ services:
 
   db:
     image: postgres:16
+    container_name: db
     environment:
       POSTGRES_USER: youtoo
       POSTGRES_PASSWORD: admin
@@ -154,14 +155,18 @@ services:
 
   seq-input-gelf:
     image: datalust/seq-input-gelf:latest
+    container_name: seq-input-gelf
     depends_on:
       - seq
     ports:
-      - "12201:12201/tcp"
+      - "12201:12201/udp"
     environment:
       SEQ_ADDRESS: "http://seq:5341"
+      GELF_ENABLE_DIAGNOSTICS: "True"
+      RUST_BACKTRACE: "full"
     networks:
-      - app-network
+      app-network:
+        aliases: [seq-input-gelf]
     restart: unless-stopped
 
   adminer:

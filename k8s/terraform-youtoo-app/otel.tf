@@ -154,12 +154,12 @@ resource "kubectl_manifest" "otel_collector" {
               insecure = true
             }
           }
-          "otlphttp/seq" = {
-            endpoint = "http://seq.${kubernetes_namespace.telemetry.metadata[0].name}.svc.cluster.local:5341/ingest/otlp/v1/traces"
-            tls = {
-              insecure = true
-            }
-          }
+          # "otlphttp/seq" = {
+          #   endpoint = "http://seq.${kubernetes_namespace.telemetry.metadata[0].name}.svc.cluster.local:5341/ingest/otlp/v1/traces"
+          #   tls = {
+          #     insecure = true
+          #   }
+          # }
           prometheus = {
             endpoint = "0.0.0.0:8889"
           }
@@ -178,11 +178,11 @@ resource "kubectl_manifest" "otel_collector" {
               exporters  = ["spanmetrics"]
             }
 
-            "traces/seq" = {
-              receivers  = ["otlp"]
-              processors = ["batch"]
-              exporters  = ["otlphttp/seq"]
-            }
+            # "traces/seq" = {
+            #   receivers  = ["otlp"]
+            #   processors = ["batch"]
+            #   exporters  = ["otlphttp/seq"]
+            # }
 
             "metrics/prometheus" = {
               receivers  = ["hostmetrics", "otlp/metrics"]

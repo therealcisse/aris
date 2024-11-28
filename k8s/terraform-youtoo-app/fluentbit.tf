@@ -420,10 +420,10 @@ resource "kubectl_manifest" "cluster_output_youtoo_seq" {
         port            = 12201
         shortMessageKey = "message"
         fullMessageKey  = "message"
-        timestampKey    = "timestamp"
-        mode            = "tcp"
+        timestampKey    = "epoch"
+        mode            = "udp"
         networking = {
-          DNSMode        = "TCP"
+          DNSMode        = "UDP"
           connectTimeout = 90
           DNSResolver    = "LEGACY"
 

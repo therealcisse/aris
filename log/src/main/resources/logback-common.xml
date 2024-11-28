@@ -10,75 +10,80 @@
     <appender name="console" class="ch.qos.logback.core.ConsoleAppender">
         <withJansi>true</withJansi>
         <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
-            <jsonGeneratorDecorator class="com.youtoo.logging.SensitiveMaskingPatternLayout" />
-            <jsonGeneratorDecorator class="net.logstash.logback.mask.MaskingJsonGeneratorDecorator">
-                <value>\"(\w*(?i)card\w*)\"\s*:\s*\"([^\"]*)\"</value><!-- Any property with the word card -->
-                <value>\"(\w*(?i)address\w*)\"\s*:\s*\"([^\"]*)\"</value>
-                <value>\"(\w*(?i)email\w*)\"\s*:\s*\"([^\"]*)\"</value>
-                <value>\"(\w*(?i)password\w*)\"\s*:\s*\"([^\"]*)\"</value>
-                <value>\"(\w*(?i)token\w*)\"\s*:\s*\"([^\"]*)\"</value>
-                <value>\"(\w*(?i)phone\w*)\"\s*:\s*\"([^\"]*)\"</value>
-                <value>\"(\w*(?i)passport\w*)\"\s*:\s*\"([^\"]*)\"</value>
-                <value>\"(\w*(?i)expiryDate\w*)\"\s*:\s*\"([^\"]*)\"</value>
-                <value>\"(\w*(?i)cvv\w*)\"\s*:\s*\"([^\"]*)\"</value>
-                <value>\"(\w*(?i)security\w*)\"\s*:\s*\"([^\"]*)\"</value>
-                <value>\"(\w*(?i)txnFlow\w*)\"\s*:\s*\"([^\"]*)\"</value>
-                <value>\"(\w*(?i)cvc\w*)\"\s*:\s*\"([^\"]*)\"</value>
-                <value>\"(\w*(?i)cvv\w*)\"\s*:\s*\"([^\"]*)\"</value>
-                <value>\"(\w*(?i)firstName\w*)\"\s*:\s*\"([^\"]*)\"</value>
-                <value>\"(\w*(?i)lastName\w*)\"\s*:\s*\"([^\"]*)\"</value>
-                <value>(\d+\.\d+\.\d+\.\d+)</value> <!-- Ip address IPv4-->
-                <value>(\w+@\w+\.\w+)</value> <!-- Email pattern -->
-            </jsonGeneratorDecorator>
-            <providers>
-                <timestamp>
-                    <fieldName>time</fieldName>
-                    <timeZone>UTC</timeZone>
-                </timestamp>
-                <logLevel>
-                    <fieldName>level</fieldName>
-                </logLevel>
-                <threadName>
-                    <fieldName>thread</fieldName>
-                </threadName>
-                <pattern>
-                    <!-- The pattern that defines what to include -->
-                    <pattern>
-                        {
-                          "service_name": "${APPLICATION_NAME}",
-                          "service_host_name": "${hostname}"
-                        }
-                    </pattern>
-                </pattern>
-                <mdc />
-                <!-- <arguments> -->
-                <!--     <includeNonStructuredArguments>true</includeNonStructuredArguments> -->
-                <!-- </arguments> -->
-                <loggerName>
-                    <fieldName>logger</fieldName>
-                </loggerName>
-                <!-- <callerData> -->
-                <!--     <classFieldName>class</classFieldName> -->
-                <!--     <methodFieldName>method</methodFieldName> -->
-                <!--     <fileFieldName>file</fileFieldName> -->
-                <!--     <lineFieldName>line</lineFieldName> -->
-                <!-- </callerData> -->
-                <message>
-                    <fieldName>message</fieldName>
-                </message>
-                <throwableClassName>
-                    <fieldName>exceptionClass</fieldName>
-                </throwableClassName>
-                <stackTrace>
-                    <fieldName>stackTrace</fieldName>
-                    <!-- maxLength - limit the length of the stack trace -->
-                    <throwableConverter class="net.logstash.logback.stacktrace.ShortenedThrowableConverter">
-                        <maxDepthPerThrowable>200</maxDepthPerThrowable>
-                        <maxLength>5000</maxLength>
-                        <rootCauseFirst>true</rootCauseFirst>
-                    </throwableConverter>
-                </stackTrace>
-            </providers>
+
+          <jsonGeneratorDecorator class="com.youtoo.logging.SensitiveMaskingPatternLayout" />
+          <jsonGeneratorDecorator class="net.logstash.logback.mask.MaskingJsonGeneratorDecorator">
+            <value>\"(\w*(?i)card\w*)\"\s*:\s*\"([^\"]*)\"</value><!-- Any property with the word card -->
+            <value>\"(\w*(?i)address\w*)\"\s*:\s*\"([^\"]*)\"</value>
+            <value>\"(\w*(?i)email\w*)\"\s*:\s*\"([^\"]*)\"</value>
+            <value>\"(\w*(?i)password\w*)\"\s*:\s*\"([^\"]*)\"</value>
+            <value>\"(\w*(?i)token\w*)\"\s*:\s*\"([^\"]*)\"</value>
+            <value>\"(\w*(?i)phone\w*)\"\s*:\s*\"([^\"]*)\"</value>
+            <value>\"(\w*(?i)passport\w*)\"\s*:\s*\"([^\"]*)\"</value>
+            <value>\"(\w*(?i)expiryDate\w*)\"\s*:\s*\"([^\"]*)\"</value>
+            <value>\"(\w*(?i)cvv\w*)\"\s*:\s*\"([^\"]*)\"</value>
+            <value>\"(\w*(?i)security\w*)\"\s*:\s*\"([^\"]*)\"</value>
+            <value>\"(\w*(?i)txnFlow\w*)\"\s*:\s*\"([^\"]*)\"</value>
+            <value>\"(\w*(?i)cvc\w*)\"\s*:\s*\"([^\"]*)\"</value>
+            <value>\"(\w*(?i)cvv\w*)\"\s*:\s*\"([^\"]*)\"</value>
+            <value>\"(\w*(?i)firstName\w*)\"\s*:\s*\"([^\"]*)\"</value>
+            <value>\"(\w*(?i)lastName\w*)\"\s*:\s*\"([^\"]*)\"</value>
+            <value>(\d+\.\d+\.\d+\.\d+)</value> <!-- Ip address IPv4-->
+            <value>(\w+@\w+\.\w+)</value> <!-- Email pattern -->
+          </jsonGeneratorDecorator>
+          <providers>
+            <timestamp>
+              <fieldName>time</fieldName>
+              <timeZone>UTC</timeZone>
+            </timestamp>
+            <timestamp>
+              <fieldName>epoch</fieldName>
+              <pattern>[UNIX_TIMESTAMP_AS_NUMBER]</pattern>
+            </timestamp>
+            <logLevel>
+              <fieldName>level</fieldName>
+            </logLevel>
+            <threadName>
+              <fieldName>thread</fieldName>
+            </threadName>
+            <pattern>
+              <!-- The pattern that defines what to include -->
+              <pattern>
+                {
+                "service_name": "${APPLICATION_NAME}",
+                "service_host_name": "${hostname}"
+                }
+              </pattern>
+            </pattern>
+            <mdc />
+            <!-- <arguments> -->
+              <!--     <includeNonStructuredArguments>true</includeNonStructuredArguments> -->
+              <!-- </arguments> -->
+            <loggerName>
+              <fieldName>logger</fieldName>
+            </loggerName>
+            <!-- <callerData> -->
+              <!--     <classFieldName>class</classFieldName> -->
+              <!--     <methodFieldName>method</methodFieldName> -->
+              <!--     <fileFieldName>file</fileFieldName> -->
+              <!--     <lineFieldName>line</lineFieldName> -->
+              <!-- </callerData> -->
+            <message>
+              <fieldName>message</fieldName>
+            </message>
+            <throwableClassName>
+              <fieldName>exceptionClass</fieldName>
+            </throwableClassName>
+            <stackTrace>
+              <fieldName>stackTrace</fieldName>
+              <!-- maxLength - limit the length of the stack trace -->
+              <throwableConverter class="net.logstash.logback.stacktrace.ShortenedThrowableConverter">
+                <maxDepthPerThrowable>200</maxDepthPerThrowable>
+                <maxLength>5000</maxLength>
+                <rootCauseFirst>true</rootCauseFirst>
+              </throwableConverter>
+            </stackTrace>
+          </providers>
         </encoder>
     </appender>
 
@@ -119,6 +124,10 @@
           <timestamp>
             <fieldName>time</fieldName>
             <timeZone>UTC</timeZone>
+          </timestamp>
+          <timestamp>
+            <fieldName>epoch</fieldName>
+            <pattern>[UNIX_TIMESTAMP_AS_NUMBER]</pattern>
           </timestamp>
           <logLevel>
             <fieldName>level</fieldName>
