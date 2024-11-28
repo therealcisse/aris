@@ -38,9 +38,6 @@ onLoad in Global := {
     previousOnLoad(state)
   }
 }
-// Setting default log level to INFO
-val _ = sys.props += ("YOUTOO_LOG_LEVEL" -> sys.env.getOrElse("YOUTOO_LOG_LEVEL", Debug.LogLevel))
-
 lazy val aggregatedProjects: Seq[ProjectReference] =
   Seq(
     kernel,
@@ -216,10 +213,16 @@ lazy val ingestion = (project in file("ingestion"))
     dockerExposedPorts := Seq(8181, 9464),
     dockerUpdateLatest := true,
     dockerEnvVars ++= BuildHelper.getEnvVars(),
+    bashScriptExtraDefines += """addJava "-Dlogback.configurationFile=logback-production.xml"""",
     mainClass := Some("com.youtoo.ingestion.IngestionApp"),
   )
   .settings(stdSettings("ingestion"))
   .settings(
+    ThisBuild / javaOptions ++= Seq(
+      "-Dlogback.configurationFile=logback-local.xml"
+
+    ),
+
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
     libraryDependencies ++= Seq(
       netty,

@@ -1,4 +1,56 @@
 services:
+  fluentbit:
+    image: cr.fluentbit.io/fluent/fluent-bit:3.2.1
+    container_name: fluentbit
+    volumes:
+      - ./fluentbit-config:/fluentbit/config:ro
+      - ./logs:/var/log/youtoo:ro
+    ports:
+      - "2020:2020"
+      - "24224:24224"
+    command: >
+      /fluent-bit/bin/fluent-bit
+      -c /fluentbit/config/fluent-bit.conf
+    networks:
+      app-network:
+        # This is the host name used in FluentBit scrape configuration.
+        aliases: [fluentbit]
+
+  opensearch:
+    image: opensearchproject/opensearch:2.18.0
+    container_name: opensearch
+    environment:
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
+      - OPENSEARCH_INITIAL_ADMIN_PASSWORD=${OPENSEARCH_INITIAL_ADMIN_PASSWORD}
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - opensearch-data:/usr/share/opensearch/data
+    ports:
+      - "9200:9200" # OpenSearch REST API
+      - "9600:9600" # OpenSearch performance monitoring
+    networks:
+      app-network:
+        # This is the host name used in OpenSearch scrape configuration.
+        aliases: [opensearch]
+
+  opensearch-dashboards:
+    image: opensearchproject/opensearch-dashboards:2.18.0
+    container_name: opensearch-dashboards
+    environment:
+      - 'OPENSEARCH_HOSTS=["https://opensearch:9200"]'
+      - opensearch.username=admin
+      - opensearch.password=${OPENSEARCH_INITIAL_ADMIN_PASSWORD}
+    ports:
+      - "5601:5601" # OpenSearch Dashboards UI
+    networks:
+      app-network:
+        aliases: [opensearch-dashboards]
+
   # datadog-agent:
   #   image: datadog/agent:latest
   #   env_file:
@@ -67,11 +119,13 @@ services:
   prometheus:
     networks:
       - app-network
+    container_name: prometheus
     image: prom/prometheus:latest
     volumes:
       - "./prometheus.yml:/etc/prometheus/prometheus.yml"
     ports:
       - "9090:9090"
+
   db:
     image: postgres:16
     environment:
@@ -86,7 +140,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
 
   seq:
-    image: datalust/seq
+    image: datalust/seq:latest
     container_name: seq
     environment:
       - ACCEPT_EULA=Y
@@ -94,6 +148,20 @@ services:
     ports:
       - "8081:80"
       - "5341:5341"
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  seq-input-gelf:
+    image: datalust/seq-input-gelf:latest
+    depends_on:
+      - seq
+    ports:
+      - "12201:12201/tcp"
+    environment:
+      SEQ_ADDRESS: "http://seq:5341"
+    networks:
+      - app-network
     restart: unless-stopped
 
   adminer:
@@ -107,22 +175,23 @@ services:
     ports:
       - 8080:8080
 
-  grafana:
-    image: grafana/grafana:latest
-    ports:
-      - "3000:3000"
-    depends_on:
-      - prometheus
-    networks:
-      - app-network
-    environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
-    volumes:
-      - grafana-storage:/var/lib/grafana
+  # grafana:
+  #   image: grafana/grafana:latest
+  #   ports:
+  #     - "3000:3000"
+  #   depends_on:
+  #     - prometheus
+  #   networks:
+  #     - app-network
+  #   environment:
+  #     - GF_SECURITY_ADMIN_PASSWORD=admin
+  #   volumes:
+  #     - grafana-storage:/var/lib/grafana
 
 volumes:
   postgres_data:
   grafana-storage:
+  opensearch-data:
 networks:
   app-network:
     driver: bridge

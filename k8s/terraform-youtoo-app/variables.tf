@@ -9,6 +9,10 @@ variable "cert_manager_release" {
   default = "1.16.1"
 }
 
+variable "opensearch_host" {
+  type = string
+}
+
 variable "postgres_host" {
   type = string
 }

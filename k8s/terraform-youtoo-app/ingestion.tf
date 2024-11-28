@@ -155,7 +155,7 @@ resource "kubernetes_service" "youtoo_ingestion_service" {
       protocol    = "TCP"
     }
 
-    type = "ClusterIP"
+    type = "LoadBalancer"
   }
 }
 

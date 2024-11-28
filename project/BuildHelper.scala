@@ -148,7 +148,7 @@ object BuildHelper extends ScalaSettings {
     incOptions ~= (_.withLogRecompileOnMacro(false)),
     autoAPIMappings := true,
     ThisBuild / javaOptions ++= Seq(
-      s"-DYOUTOO_LOG_LEVEL=${Debug.LogLevel}",
+      s"-DYOUTOO_LOG_LEVEL=${sys.env.getOrElse("YOUTOO_LOG_LEVEL", Debug.LogLevel)}",
     ),
     Compile / run / javaOptions ++= Seq(
       "--add-exports=java.base/jdk.internal.misc=ALL-UNNAMED",

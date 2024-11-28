@@ -52,16 +52,25 @@ resource "kubectl_manifest" "jaeger" {
     }
     spec = {
       strategy = "allInOne"
+      extraEnv = [
+        {
+          name = "PROMETHEUS_QUERY_NORMALIZE_CALLS"
+          value = true
+        },
+
+        {
+          name = "PROMETHEUS_QUERY_NORMALIZE_DURATION"
+          value = true
+        }
+
+      ]
       allInOne = {
         options = {
           log-level = "DEBUG"
-          prometheus = {
-            server-url = "http://prometheus-operated.${kubernetes_namespace.telemetry.metadata[0].name}.svc.cluster.local:9090"
-
-          }
         }
         metricsStorage = {
           type = "prometheus"
+          server-url = "http://prometheus-operated.${kubernetes_namespace.telemetry.metadata[0].name}.svc.cluster.local:9090"
         }
       }
       storage = {
