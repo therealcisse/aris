@@ -18,6 +18,8 @@ import com.youtoo.cqrs.*
 import zio.telemetry.opentelemetry.tracing.Tracing
 
 object DataMigrationSpec extends MockSpecDefault {
+  override val bootstrap: ZLayer[Any, Any, TestEnvironment] =
+    Log.layer >>> testEnvironment
 
   def spec = suite("DataMigrationSpec")(
     testExecutionRecordsCreation,
@@ -113,11 +115,11 @@ object DataMigrationSpec extends MockSpecDefault {
         _ <- DataMigration.run(migrationId).provideSomeLayer(layer)
         calls <- cqrs.getCalls
         seenKeys <- processor.getKeys
-      } yield assert(calls.size)(equalTo(n + 2)) && assert(seenKeys)(equalTo(n))
+      } yield assert(calls.size)(equalTo(n + 2)) && assert(seenKeys)(hasSameElements(keys))
 
     }
 
-  } @@ TestAspect.ignore
+  }
 
   val testIncompleteMigrationResumption = test("Incomplete Migration Resumption") {
     check(migrationIdGen, timestampGen, Gen.int(100, 1000)) { case (migrationId, now, n) =>

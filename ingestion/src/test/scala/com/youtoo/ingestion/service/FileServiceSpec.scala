@@ -20,6 +20,8 @@ import com.youtoo.ingestion.store.*
 import com.youtoo.cqrs.domain.*
 
 object FileServiceSpec extends MockSpecDefault {
+  override val bootstrap: ZLayer[Any, Any, TestEnvironment] =
+    Log.layer >>> testEnvironment
 
   def spec = suite("FileServiceSpec")(
     test("addFile should save events to EventStore") {

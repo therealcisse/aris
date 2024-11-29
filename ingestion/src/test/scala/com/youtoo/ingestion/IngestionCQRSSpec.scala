@@ -15,12 +15,13 @@ import com.youtoo.ingestion.store.*
 import com.youtoo.cqrs.service.*
 import com.youtoo.cqrs.store.*
 
-import com.youtoo.cqrs.service.postgres.*
 import com.youtoo.cqrs.domain.*
 
 object IngestionCQRSSpec extends MockSpecDefault {
   override val bootstrap: ZLayer[Any, Any, TestEnvironment] =
-    testEnvironment ++ Runtime.setConfigProvider(ConfigProvider.fromMap(Map("Ingestion.snapshots.threshold" -> "10")))
+    Log.layer >>> testEnvironment ++ Runtime.setConfigProvider(
+      ConfigProvider.fromMap(Map("Ingestion.snapshots.threshold" -> "10")),
+    )
 
   def spec = suite("IngestionCQRSSpec")(
     test("should add command") {

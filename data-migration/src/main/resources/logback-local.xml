@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration debug="true">
+
+    <property name="YOUTOO_APPLICATION_NAME" value="migration" />
+
+    <include resource="logback-common.xml" />
+
+    <!-- Root Logger -->
+    <root level="${LOG_LEVEL}">
+        <appender-ref ref="console" />
+        <appender-ref ref="socket" />
+    </root>
+</configuration>
+
+

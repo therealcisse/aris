@@ -96,26 +96,20 @@ object BuildHelper extends ScalaSettings {
   val replSettings = makeReplSettings {
     """|import zio.*
        |import zio.jdbc.*
+       |import zio.schema.*
        |
-       |import com.youtoo.cqrs.store.*
-       |import com.youtoo.cqrs.service.*
+       |extension[A](io: ZIO[Any, Any, A])
+       |  def r: A =
+       |    Unsafe.unsafe { implicit unsafe =>
+       |      Runtime.default.unsafe.run(io).getOrThrowFiberFailure()
+       |    }
        |
-       |import com.youtoo.ingestion.model.*
-       |import com.youtoo.ingestion.service.*
-       |import com.youtoo.ingestion.repository.*
-       |import com.youtoo.cqrs.service.postgres.*
-       |import com.youtoo.cqrs.config.*
+       |import com.youtoo.*
        |
        |import zio.http.{Version as _, *}
        |import zio.http.netty.NettyConfig
        |import zio.http.netty.NettyConfig.LeakDetectionLevel
        |import zio.schema.codec.*
-       |implicit class RunSyntax[A](io: ZIO[Any, Any, A]) {
-       |  def r: A =
-       |    Unsafe.unsafe { implicit unsafe =>
-       |      Runtime.default.unsafe.run(io).getOrThrowFiberFailure()
-       |    }
-       |}
     """.stripMargin
   }
 
@@ -147,6 +141,11 @@ object BuildHelper extends ScalaSettings {
     Test / parallelExecution := true,
     incOptions ~= (_.withLogRecompileOnMacro(false)),
     autoAPIMappings := true,
+    ThisBuild / Test / javaOptions ++= Seq(
+      "-Dlogback.configurationFile=logback-test.xml"
+
+    ),
+
     ThisBuild / javaOptions ++= Seq(
       s"-DYOUTOO_LOG_LEVEL=${sys.env.getOrElse("YOUTOO_LOG_LEVEL", Debug.LogLevel)}",
     ),

@@ -6,6 +6,8 @@ import zio.test.*
 import zio.test.Assertion.*
 
 object HealthcheckSpec extends ZIOSpecDefault {
+  override val bootstrap: ZLayer[Any, Any, TestEnvironment] =
+    Log.layer >>> testEnvironment
 
   def spec = suite("HealthcheckSpec")(
     test("isRunning returns true after start is called") {

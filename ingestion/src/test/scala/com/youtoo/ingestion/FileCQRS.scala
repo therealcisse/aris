@@ -15,10 +15,11 @@ import com.youtoo.ingestion.store.*
 import com.youtoo.cqrs.service.*
 import com.youtoo.cqrs.store.*
 
-import com.youtoo.cqrs.service.postgres.*
 import com.youtoo.cqrs.domain.*
 
 object FileCQRSSpec extends MockSpecDefault {
+  override val bootstrap: ZLayer[Any, Any, TestEnvironment] =
+    Log.layer >>> testEnvironment
 
   def spec = suite("FileCQRSSpec")(
     test("should add command") {

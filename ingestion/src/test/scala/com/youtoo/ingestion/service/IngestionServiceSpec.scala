@@ -26,7 +26,7 @@ object IngestionServiceSpec extends MockSpecDefault {
   inline val Threshold = 10
 
   override val bootstrap: ZLayer[Any, Any, TestEnvironment] =
-    testEnvironment ++ Runtime.setConfigProvider(
+    Log.layer >>> testEnvironment ++ Runtime.setConfigProvider(
       ConfigProvider.fromMap(Map("Ingestion.snapshots.threshold" -> s"$Threshold")),
     )
 

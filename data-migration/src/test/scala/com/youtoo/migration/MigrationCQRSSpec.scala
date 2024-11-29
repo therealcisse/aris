@@ -15,12 +15,13 @@ import com.youtoo.cqrs.*
 import com.youtoo.cqrs.service.*
 import com.youtoo.cqrs.store.*
 
-import com.youtoo.cqrs.service.postgres.*
 import com.youtoo.cqrs.domain.*
 
 object MigrationCQRSSpec extends MockSpecDefault {
   override val bootstrap: ZLayer[Any, Any, TestEnvironment] =
-    testEnvironment ++ Runtime.setConfigProvider(ConfigProvider.fromMap(Map("Migration.snapshots.threshold" -> "10")))
+    Log.layer >>> testEnvironment ++ Runtime.setConfigProvider(
+      ConfigProvider.fromMap(Map("Migration.snapshots.threshold" -> "10")),
+    )
 
   def spec = suite("MigrationCQRSSpec")(
     test("should add command") {

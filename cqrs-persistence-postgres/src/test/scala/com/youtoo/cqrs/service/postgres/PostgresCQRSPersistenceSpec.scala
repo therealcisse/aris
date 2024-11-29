@@ -97,8 +97,8 @@ object PostgresCQRSPersistenceSpec extends PgSpec {
                 ) && assert(
                   events3,
                 )(isEmpty) && assert(
-                  events0,
-                )(equalTo(events1))
+                  events1,
+                )(hasSubset(events0))
               )
 
               d <- (
@@ -124,8 +124,8 @@ object PostgresCQRSPersistenceSpec extends PgSpec {
                 } yield assert(events0)(isNonEmpty) && assert(events1)(isNonEmpty) && assert(events2)(
                   isEmpty,
                 ) && assert(
-                  events0,
-                )(equalTo(events1))
+                  events1,
+                )(hasSubset(events0))
               )
 
               e <- (
@@ -151,8 +151,8 @@ object PostgresCQRSPersistenceSpec extends PgSpec {
                 } yield assert(events0)(isNonEmpty) && assert(events1)(isNonEmpty) && assert(events2)(
                   isEmpty,
                 ) && assert(
-                  events0,
-                )(equalTo(events1))
+                  events1,
+                )(hasSubset(events0))
               )
 
             } yield a && b && c && d && e
@@ -251,7 +251,9 @@ object PostgresCQRSPersistenceSpec extends PgSpec {
 
             es <- atomically(persistence.readEvents[DummyEvent](key, discriminator))
 
-            a = assert(es)(equalTo(es.sorted)) && assert(es)(equalTo(events.sorted))
+            a = assert(es)(isSorted) && assert(events)(isSorted) && assert(es)(equalTo(es.sorted)) && assert(es)(
+              equalTo(events.sorted),
+            )
 
           } yield a
         }

@@ -12,9 +12,10 @@ services:
     command: >
       /fluent-bit/bin/fluent-bit
       -c /fluent-bit/config/fluent-bit.conf
+      # -Z --trace="input=tail.0 output=stdout output.format=json_lines"
     depends_on:
       - seq-input-gelf
-      - opensearch
+      # - opensearch
     networks:
       app-network:
         # This is the host name used in FluentBit scrape configuration.
@@ -77,21 +78,21 @@ services:
   #   pid: "host"
 
   jaeger:
-      networks:
-        - app-network
-      image: jaegertracing/all-in-one:${JAEGER_IMAGE_TAG:-latest}
-      volumes:
-        - "./jaeger-ui.json:/etc/jaeger/jaeger-ui.json"
-      command: --query.ui-config /etc/jaeger/jaeger-ui.json
-      environment:
-        - METRICS_STORAGE_TYPE=prometheus
-        - PROMETHEUS_SERVER_URL=http://prometheus:9090
-        - PROMETHEUS_QUERY_NAMESPACE=${PROMETHEUS_QUERY_NAMESPACE:-}
-        - PROMETHEUS_QUERY_DURATION_UNIT=${PROMETHEUS_QUERY_DURATION_UNIT:-}
-        - PROMETHEUS_QUERY_NORMALIZE_CALLS=true
-        - PROMETHEUS_QUERY_NORMALIZE_DURATION=true
-      ports:
-        - "16686:16686"
+    networks:
+      - app-network
+    image: jaegertracing/all-in-one:${JAEGER_IMAGE_TAG:-latest}
+    volumes:
+      - "./jaeger-ui.json:/etc/jaeger/jaeger-ui.json"
+    command: --query.ui-config /etc/jaeger/jaeger-ui.json
+    environment:
+      - METRICS_STORAGE_TYPE=prometheus
+      - PROMETHEUS_SERVER_URL=http://prometheus:9090
+      - PROMETHEUS_QUERY_NAMESPACE=${PROMETHEUS_QUERY_NAMESPACE:-}
+      - PROMETHEUS_QUERY_DURATION_UNIT=${PROMETHEUS_QUERY_DURATION_UNIT:-}
+      - PROMETHEUS_QUERY_NORMALIZE_CALLS=true
+      - PROMETHEUS_QUERY_NORMALIZE_DURATION=true
+    ports:
+      - "16686:16686"
 
   otel_collector:
     networks:

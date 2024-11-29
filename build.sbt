@@ -97,7 +97,7 @@ lazy val kernel = (project in file("kernel"))
   // .settings(publishSetting(false))
   .enablePlugins(BuildInfoPlugin)
   .settings(buildInfoSettings("com.youtoo"))
-  .dependsOn(log % "compile->compile")
+  .dependsOn(log % "compile->compile;test->compile")
   .settings(
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
     libraryDependencies ++= Seq(
@@ -214,14 +214,14 @@ lazy val ingestion = (project in file("ingestion"))
     memory % "compile->compile;test->test",
     postgres % "compile->compile;test->test",
     core % "compile->compile;test->test",
-    log % "compile->compile",
+    log % "compile->compile;test->compile",
     observability % "compile->compile",
   )
   .enablePlugins(DockerPlugin, JavaAppPackaging)
   .settings(
     Docker / packageName := "youtoo-ingestion",
     dockerBaseImage := "eclipse-temurin:17-jre",
-    dockerExposedPorts := Seq(8181, 9464),
+    dockerExposedPorts := Seq(8181),
     dockerUpdateLatest := true,
     dockerEnvVars ++= BuildHelper.getEnvVars(),
     bashScriptExtraDefines += """addJava "-Dlogback.configurationFile=logback-production.xml"""",
@@ -254,11 +254,26 @@ lazy val dataMigration = (project in file("data-migration"))
     memory % "compile->compile;test->test",
     postgres % "compile->compile;test->test",
     core % "compile->compile;test->test",
-    log % "compile->compile",
+    log % "compile->compile;test->compile",
     observability % "compile->compile",
   )
   .settings(stdSettings("data-migration"))
+  .enablePlugins(DockerPlugin, JavaAppPackaging)
   .settings(
+    Docker / packageName := "youtoo-migration",
+    dockerBaseImage := "eclipse-temurin:17-jre",
+    dockerExposedPorts := Seq(8181),
+    dockerUpdateLatest := true,
+    dockerEnvVars ++= BuildHelper.getEnvVars(),
+    bashScriptExtraDefines += """addJava "-Dlogback.configurationFile=logback-production.xml"""",
+    mainClass := Some("com.youtoo.migration.MigrationApp"),
+  )
+  .settings(
+    ThisBuild / javaOptions ++= Seq(
+      "-Dlogback.configurationFile=logback-local.xml"
+
+    ),
+
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
     libraryDependencies ++= Seq(
       // `zio-config-typesafe`,

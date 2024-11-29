@@ -61,6 +61,8 @@ object DataMigration {
     ): ZIO[Tracing & DataMigration.Processor & MigrationCQRS & MigrationService, Throwable, Unit] =
       val migrationKey = id.asKey
 
+      inline def logDebug(msg: => String): RIO[Tracing, Unit] =
+        Log.debug(msg)
       inline def logInfo(msg: => String): RIO[Tracing, Unit] =
         Log.info(msg)
       inline def logError(msg: => String, e: => Throwable): RIO[Tracing, Unit] =
@@ -73,8 +75,9 @@ object DataMigration {
           val remaining = l - migration.totalProcessed
 
           if remaining < 0 then
-            logInfo(s"Invalid remaining keys for migration: $remaining / $l") *> ZIO.fail(
-              IllegalStateException("Migration already processed"),
+            val e = IllegalStateException("Migration already processed")
+            logError(s"Invalid remaining keys for migration: $remaining / $l", e) *> ZIO.fail(
+              e,
             )
           else
             ZIO.scoped {
@@ -111,7 +114,7 @@ object DataMigration {
                         ZIO.uninterruptibleMask { restore =>
                           restore(process).onInterrupt(onCancelled) `foldZIO` (
                             success =
-                              _ => logInfo(s"Processed key: $key") *> restore(onSuccess) `as` s.addProcessed(key),
+                              _ => logDebug(s"Processed key: $key") *> restore(onSuccess) `as` s.addProcessed(key),
                             failure =
                               e => logError(s"Processing failed: $key", e) *> restore(onError) `as` s.addFailed(key)
                           )

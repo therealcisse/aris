@@ -20,6 +20,8 @@ import com.youtoo.ingestion.store.*
 import com.youtoo.cqrs.domain.*
 
 object ProviderServiceSpec extends MockSpecDefault {
+  override val bootstrap: ZLayer[Any, Any, TestEnvironment] =
+    Log.layer >>> testEnvironment
 
   def spec = suite("ProviderServiceSpec")(
     test("addProvider should save events to EventStore") {

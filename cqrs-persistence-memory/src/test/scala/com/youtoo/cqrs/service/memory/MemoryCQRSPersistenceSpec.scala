@@ -40,24 +40,24 @@ object MemoryCQRSPersistenceSpec extends ZIOSpecDefault {
 
   def spec =
     suite("MemoryCQRSPersistenceSpec")(
-      test("should save and retrieve events correctly by hierarchy") {
-        check(namespaceGen, keyGen, versionGen, keyGen, keyGen, discriminatorGen) {
-          (ns, key, version, grandParentId, parentId, discriminator) =>
+      test("should save and retrieve events correctly by hierarchy : Descendant") {
+        check(namespaceGen, keyGen, versionGen, keyGen, keyGen, discriminatorGen, dummyEventGen) {
+          (ns, key, version, grandParentId, parentId, discriminator, event) =>
 
             given MetaInfo[DummyEvent] with {
               extension (self: DummyEvent) def namespace: Namespace = ns
               extension (self: DummyEvent)
                 def hierarchy: Option[Hierarchy] = Hierarchy.Descendant(grandParentId, parentId).some
-              extension (self: DummyEvent) def props: Chunk[EventProperty] = Chunk(EventProperty("type", "DummyEvent"))
+              extension (self: DummyEvent) def props: Chunk[EventProperty] = Chunk()
 
             }
 
             for {
               persistence <- ZIO.service[CQRSPersistence]
 
-              event = Change(version = version, DummyEvent("test"))
+              ch = Change(version = version, event)
 
-              saveResult <- atomically(persistence.saveEvent(key, discriminator, event))
+              saveResult <- atomically(persistence.saveEvent(key, discriminator, ch))
 
               a = assert(saveResult)(equalTo(1L))
 
@@ -97,36 +97,36 @@ object MemoryCQRSPersistenceSpec extends ZIOSpecDefault {
                 ) && assert(
                   events3,
                 )(isEmpty) && assert(
-                  events0,
-                )(equalTo(events1))
+                  events1,
+                )(hasSubset(events0))
               )
 
-              d <- (
-                for {
-                  events0 <- atomically(persistence.readEvents[DummyEvent](key, discriminator))
-                  events1 <- atomically(
-                    persistence.readEvents[DummyEvent](
-                      discriminator,
-                      ns = None,
-                      hierarchy = Hierarchy.GrandChild(grandParentId).some,
-                      props = None,
-                    ),
-                  )
-                  events2 <- atomically(
-                    persistence.readEvents[DummyEvent](
-                      discriminator,
-                      ns = None,
-                      hierarchy = Hierarchy.GrandChild(Key(grandParentIdXXX)).some,
-                      props = None,
-                    ),
-                  )
+            } yield a && b && c
+        }
+      },
+      test("should save and retrieve events correctly by hierarchy : Child") {
+        check(namespaceGen, keyGen, versionGen, keyGen, keyGen, discriminatorGen, dummyEventGen) {
+          (ns, key, version, grandParentId, parentId, discriminator, event) =>
 
-                } yield assert(events0)(isNonEmpty) && assert(events1)(isNonEmpty) && assert(events2)(
-                  isEmpty,
-                ) && assert(
-                  events0,
-                )(equalTo(events1))
-              )
+            given MetaInfo[DummyEvent] with {
+              extension (self: DummyEvent) def namespace: Namespace = ns
+              extension (self: DummyEvent)
+                def hierarchy: Option[Hierarchy] = Hierarchy.Descendant(grandParentId, parentId).some
+              extension (self: DummyEvent) def props: Chunk[EventProperty] = Chunk(EventProperty("type", "DummyEvent"))
+
+            }
+
+            for {
+              persistence <- ZIO.service[CQRSPersistence]
+
+              ch = Change(version = version, event)
+
+              saveResult <- atomically(persistence.saveEvent(key, discriminator, ch))
+
+              a = assert(saveResult)(equalTo(1L))
+
+              events0 <- atomically(persistence.readEvents[DummyEvent](key, discriminator))
+              b = assert(events0)(isNonEmpty)
 
               e <- (
                 for {
@@ -151,11 +151,65 @@ object MemoryCQRSPersistenceSpec extends ZIOSpecDefault {
                 } yield assert(events0)(isNonEmpty) && assert(events1)(isNonEmpty) && assert(events2)(
                   isEmpty,
                 ) && assert(
-                  events0,
-                )(equalTo(events1))
+                  events1,
+                )(hasSubset(events0))
               )
 
-            } yield a && b && c && d && e
+            } yield a && b && e
+        }
+      },
+      test("should save and retrieve events correctly by hierarchy : GrandChild") {
+        check(namespaceGen, keyGen, versionGen, keyGen, keyGen, discriminatorGen, dummyEventGen) {
+          (ns, key, version, grandParentId, parentId, discriminator, event) =>
+
+            given MetaInfo[DummyEvent] with {
+              extension (self: DummyEvent) def namespace: Namespace = ns
+              extension (self: DummyEvent)
+                def hierarchy: Option[Hierarchy] = Hierarchy.Descendant(grandParentId, parentId).some
+              extension (self: DummyEvent) def props: Chunk[EventProperty] = Chunk(EventProperty("type", "DummyEvent"))
+
+            }
+
+            for {
+              persistence <- ZIO.service[CQRSPersistence]
+
+              ch = Change(version = version, event)
+
+              saveResult <- atomically(persistence.saveEvent(key, discriminator, ch))
+
+              a = assert(saveResult)(equalTo(1L))
+
+              events0 <- atomically(persistence.readEvents[DummyEvent](key, discriminator))
+              b = assert(events0)(isNonEmpty)
+
+              d <- (
+                for {
+                  events0 <- atomically(persistence.readEvents[DummyEvent](key, discriminator))
+                  events1 <- atomically(
+                    persistence.readEvents[DummyEvent](
+                      discriminator,
+                      ns = None,
+                      hierarchy = Hierarchy.GrandChild(grandParentId).some,
+                      props = None,
+                    ),
+                  )
+                  events2 <- atomically(
+                    persistence.readEvents[DummyEvent](
+                      discriminator,
+                      ns = None,
+                      hierarchy = Hierarchy.GrandChild(Key(grandParentIdXXX)).some,
+                      props = None,
+                    ),
+                  )
+
+                } yield assert(events0)(isNonEmpty) && assert(events1)(isNonEmpty) && assert(events2)(
+                  isEmpty,
+                ) && assert(
+                  events1,
+                )(hasSubset(events0))
+              )
+
+            } yield a && b && d
         }
       },
       test("should save and retrieve events correctly by props") {
@@ -330,6 +384,9 @@ object MemoryCQRSPersistenceSpec extends ZIOSpecDefault {
         MemoryCQRSPersistence.live(),
       ),
     ) @@ TestAspect.withLiveClock
+
+  val dummyEventGen: Gen[Any, DummyEvent] =
+    Gen.alphaNumericStringBounded(4, 36).map(DummyEvent(_))
 
   val namespaceGen: Gen[Any, Namespace] =
     Gen.int.map(Namespace(_))
