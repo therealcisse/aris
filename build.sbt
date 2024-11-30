@@ -27,7 +27,7 @@ ThisBuild / git.gitTagToVersionNumber := { tag: String =>
 }
 
 // Define onLoad task to copy the hook into .git/hooks/pre-push
-def installGitHook: Unit = {
+def installGitHook: Unit = if (!sys.env.contains("CI")) {
   import java.nio.file.{Files, Paths, StandardCopyOption}
 
   val hookSource = Paths.get("hooks/prepush")
