@@ -14,12 +14,7 @@ object Key extends Newtype[Long] {
 
   extension (a: Key) inline def value: Long = Key.unwrap(a)
 
-  given Schema[Key] = Schema
-    .primitive[Long]
-    .transform(
-      wrap,
-      unwrap,
-    )
+  given Schema[Key] = derive
 
   given Order[Key] = Order.by(_.value)
 }

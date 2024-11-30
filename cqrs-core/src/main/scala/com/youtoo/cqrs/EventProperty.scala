@@ -17,12 +17,7 @@ object EventProperty {
 
     extension (a: Key) inline def value: String = Key.unwrap(a)
 
-    given Schema[Key] = Schema
-      .primitive[String]
-      .transform(
-        wrap,
-        unwrap,
-      )
+    given Schema[Key] = derive
   }
 
   inline def apply(inline key: String, value: String): EventProperty = EventProperty(Key(key), value)

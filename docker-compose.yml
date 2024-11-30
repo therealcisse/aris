@@ -150,7 +150,7 @@ services:
     container_name: seq
     environment:
       - ACCEPT_EULA=Y
-      - SEQ_FIRSTRUN_ADMINPASSWORDHASH=QGn6SCWIc6ypIJkHOur2JgybRf4Z/i+v6QBQf2Qs2cY5H7P66gszh4c0WQxjHLEe7hsDokvz+mzHbFUOJgeDSh450JhavlH/KArdxi1CtB/E
+      - SEQ_FIRSTRUN_ADMINPASSWORDHASH=${SEQ_FIRSTRUN_ADMINPASSWORDHASH}
     ports:
       - "8081:80"
       - "5341:5341"

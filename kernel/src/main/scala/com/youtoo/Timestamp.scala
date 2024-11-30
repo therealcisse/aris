@@ -13,10 +13,5 @@ object Timestamp extends Newtype[Long] {
 
   def now: UIO[Timestamp] = Clock.currentTime(ChronoUnit.MILLIS).map(Timestamp.wrap)
 
-  given Schema[Timestamp] = Schema
-    .primitive[Long]
-    .transform(
-      wrap,
-      unwrap,
-    )
+  given Schema[Timestamp] = derive
 }

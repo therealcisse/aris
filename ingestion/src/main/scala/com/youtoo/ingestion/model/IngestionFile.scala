@@ -30,12 +30,7 @@ object IngestionFile {
 
     extension (a: Id) inline def asKey: Key = Id.unwrap(a)
 
-    given Schema[Id] = Schema
-      .primitive[Long]
-      .transform(
-        Key.wrap `andThen` wrap,
-        unwrap `andThen` Key.unwrap,
-      )
+    given Schema[Id] = derive
 
   }
 
@@ -45,12 +40,7 @@ object IngestionFile {
 
     extension (a: Name) inline def value: String = Name.unwrap(a)
 
-    given Schema[Name] = Schema
-      .primitive[String]
-      .transform(
-        wrap,
-        unwrap,
-      )
+    given Schema[Name] = derive
 
   }
 
@@ -60,12 +50,7 @@ object IngestionFile {
 
     extension (a: Sig) inline def value: String = Sig.unwrap(a)
 
-    given Schema[Sig] = Schema
-      .primitive[String]
-      .transform(
-        wrap,
-        unwrap,
-      )
+    given Schema[Sig] = derive
 
   }
 

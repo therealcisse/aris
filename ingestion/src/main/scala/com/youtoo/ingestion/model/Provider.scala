@@ -25,12 +25,7 @@ object Provider {
 
     extension (a: Id) inline def asKey: Key = Id.unwrap(a)
 
-    given Schema[Id] = Schema
-      .primitive[Long]
-      .transform(
-        Key.wrap `andThen` wrap,
-        unwrap `andThen` Key.unwrap,
-      )
+    given Schema[Id] = derive
 
   }
 
@@ -40,12 +35,7 @@ object Provider {
 
     extension (a: Name) inline def value: String = Name.unwrap(a)
 
-    given Schema[Name] = Schema
-      .primitive[String]
-      .transform(
-        wrap,
-        unwrap,
-      )
+    given Schema[Name] = derive
 
   }
 

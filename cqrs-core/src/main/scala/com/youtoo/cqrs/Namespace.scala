@@ -11,10 +11,5 @@ object Namespace extends Newtype[Int] {
 
   extension (a: Namespace) inline def value: Int = Namespace.unwrap(a)
 
-  given Schema[Namespace] = Schema
-    .primitive[Int]
-    .transform(
-      wrap,
-      unwrap,
-    )
+  given Schema[Namespace] = derive
 }

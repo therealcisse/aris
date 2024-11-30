@@ -16,12 +16,7 @@ object Version extends Newtype[Long] {
   extension (a: Version) inline def value: Long = Version.unwrap(a)
   extension (a: Version) inline def timestamp: Timestamp = Timestamp(SnowflakeIdGenerator.extractTimestamp(a.value))
 
-  given Schema[Version] = Schema
-    .primitive[Long]
-    .transform(
-      wrap,
-      unwrap,
-    )
+  given Schema[Version] = derive
 
   given Order[Version] = Order.by(_.value)
 }

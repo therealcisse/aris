@@ -11,10 +11,5 @@ object Discriminator extends Newtype[String] {
 
   extension (a: Discriminator) inline def value: String = Discriminator.unwrap(a)
 
-  given Schema[Discriminator] = Schema
-    .primitive[String]
-    .transform(
-      wrap,
-      unwrap,
-    )
+  given Schema[Discriminator] = derive
 }

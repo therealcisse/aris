@@ -67,12 +67,7 @@ object Execution {
 
     extension (a: Id) inline def asKey: Key = Id.unwrap(a)
 
-    given Schema[Id] = Schema
-      .primitive[Long]
-      .transform(
-        Key.wrap `andThen` wrap,
-        unwrap `andThen` Key.unwrap,
-      )
+    given Schema[Id] = derive
 
     given Order[Id] = Order.by(_.asKey)
 
