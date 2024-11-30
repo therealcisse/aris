@@ -142,10 +142,8 @@ object BuildHelper extends ScalaSettings {
     incOptions ~= (_.withLogRecompileOnMacro(false)),
     autoAPIMappings := true,
     ThisBuild / Test / javaOptions ++= Seq(
-      "-Dlogback.configurationFile=logback-test.xml"
-
+      "-Dlogback.configurationFile=logback-test.xml",
     ),
-
     ThisBuild / javaOptions ++= Seq(
       s"-DYOUTOO_LOG_LEVEL=${sys.env.getOrElse("YOUTOO_LOG_LEVEL", Debug.LogLevel)}",
     ),
