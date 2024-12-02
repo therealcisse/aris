@@ -127,7 +127,6 @@ object BuildHelper extends ScalaSettings {
   )
   def stdSettings(prjName: String) = Seq(
     name := prjName,
-
     ThisBuild / scalaVersion := Scala3,
     Compile / packageSrc / publishArtifact := false,
     Compile / packageDoc / publishArtifact := false,
