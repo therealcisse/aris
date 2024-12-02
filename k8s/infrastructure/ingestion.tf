@@ -41,7 +41,7 @@ resource "kubernetes_deployment" "youtoo_ingestion" {
           app = "youtoo-ingestion"
 
           "app.kubernetes.io/name"    = "youtoo-ingestion"
-          "app.kubernetes.io/version" = "1.0.0"
+          "app.kubernetes.io/version" = "0.1.0-809f03e"
           "app.kubernetes.io/part-of" = kubernetes_namespace.application_namespace.metadata[0].name
         }
 
@@ -54,7 +54,7 @@ resource "kubernetes_deployment" "youtoo_ingestion" {
       spec {
         container {
           name              = "youtoo-ingestion"
-          image             = "youtoo-ingestion:latest"
+          image             = "youtoo-ingestion:0.1.0-809f03e"
           image_pull_policy = "IfNotPresent"
 
           port {

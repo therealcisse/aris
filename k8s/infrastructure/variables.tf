@@ -6,12 +6,12 @@ variable "jaeger_operator_chart_version" {
 
 variable "cert_manager_release" {
   type    = string
-  default = "1.16.1"
+  default = "1.16.2"
 }
 
-variable "opensearch_host" {
-  type = string
-}
+# variable "opensearch_host" {
+#   type = string
+# }
 
 variable "postgres_host" {
   type = string
@@ -34,3 +34,7 @@ variable "log_level" {
   default = "INFO"
 }
 
+variable "host" {
+  type        = string
+  description = "The hostname"
+}

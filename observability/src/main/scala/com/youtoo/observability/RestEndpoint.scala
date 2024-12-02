@@ -91,7 +91,7 @@ object RestEndpoint {
 
       op @@ tracing.aspects.root(
         tag,
-        attributes = Attributes(Attribute.string("git_commit_hash", ProjectInfo.versionSha)),
+        attributes = Attributes(Attribute.string("version", ProjectInfo.version)),
         spanKind = SpanKind.INTERNAL,
       )
 

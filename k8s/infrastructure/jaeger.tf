@@ -53,6 +53,10 @@ resource "kubectl_manifest" "jaeger" {
       name      = "simple-jaeger"
     }
     spec = {
+      ingress = {
+        enabled = false
+
+      }
       strategy = "allInOne"
       allInOne = {
         image = "jaegertracing/all-in-one:latest"
@@ -60,7 +64,6 @@ resource "kubectl_manifest" "jaeger" {
           log-level = "DEBUG"
 
           query = {
-            base-path = "/jaeger"
           }
 
           prometheus = {

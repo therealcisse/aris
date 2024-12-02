@@ -13,12 +13,7 @@ import sbt.Keys.*
 
 ThisBuild / resolvers ++= Resolver.sonatypeOssRepos("snapshots")
 
-ThisBuild / version := "0.1.0-SNAPSHOT"
-
-enablePlugins(GitVersioning)
-
-ThisBuild / git.formattedShaVersion := git.gitHeadCommit.value map { sha => "v"+sha.take(7) }
-
+ThisBuild / version := git.gitHeadCommit.value.map(commit => s"0.1.0-${commit.take(7)}").getOrElse("0.1.0-SNAPSHOT")
 ThisBuild / git.useGitDescribe := true
 
 ThisBuild / git.gitTagToVersionNumber := { tag: String =>
@@ -69,7 +64,7 @@ inThisBuild(replSettings)
 lazy val root = (project in file("."))
   .settings(git.useGitDescribe := true)
   .enablePlugins(BuildInfoPlugin)
-  .settings(stdSettings("youtoo-root"))
+  .settings(stdSettings("youtoo"))
   // .settings(publishSetting(false))
   .settings(meta)
   .aggregate(aggregatedProjects *)
@@ -313,3 +308,5 @@ lazy val benchmarks = (project in file("benchmarks"))
     libraryDependencies += compilerPlugin("dev.zio" %% "zio-profiling-tagging-plugin" % "0.3.2"),
     libraryDependencies += `scala-collection-contrib`,
   )
+
+

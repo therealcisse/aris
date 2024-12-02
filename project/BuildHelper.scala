@@ -85,9 +85,6 @@ object BuildHelper extends ScalaSettings {
         scalaVersion,
         sbtVersion,
         isSnapshot,
-        BuildInfoKey.action("versionSha") {
-          git.formattedShaVersion.value.getOrElse("No commit hash available")
-        },
       ),
       buildInfoPackage := packageName,
     )
@@ -130,6 +127,7 @@ object BuildHelper extends ScalaSettings {
   )
   def stdSettings(prjName: String) = Seq(
     name := prjName,
+
     ThisBuild / scalaVersion := Scala3,
     Compile / packageSrc / publishArtifact := false,
     Compile / packageDoc / publishArtifact := false,

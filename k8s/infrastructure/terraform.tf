@@ -1,5 +1,6 @@
 terraform {
   required_version = ">= 1.9.5"
+
   required_providers {
     kubernetes = {
       source  = "hashicorp/kubernetes"
@@ -28,9 +29,10 @@ terraform {
 
 provider "helm" {
   kubernetes {
-    config_path = "~/.kube/config"
+    config_path = "~/.kube/config" # Points to your local kubeconfig file
   }
 }
 
 provider "kubectl" {
 }
+
