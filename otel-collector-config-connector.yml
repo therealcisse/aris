@@ -17,10 +17,24 @@ exporters:
     tls:
       insecure: true
 
-  # otlp/seq:
-  #   endpoint: seq:5341
-  #   tls:
-  #     insecure: true
+  # https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/exporter/opensearchexporter
+  # opensearch/trace:
+  #   http:
+  #     endpoint: https://opensearch:9200
+  #     auth:
+  #       authenticator: basicauth/client
+  #     tls:
+  #       # insecure: true
+  #       insecure_skip_verify: true
+  #   dataset: "logs"
+  #   namespace: "youtoo"
+  #   logs_index: "otel-traces"
+
+extensions:
+  # basicauth/client: # https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/extension/basicauthextension
+  #   client_auth:
+  #     username: "admin"
+  #     password: "yourStrongPassword123!"
 
 connectors:
   spanmetrics:
@@ -29,6 +43,9 @@ processors:
   batch:
 
 service:
+  extensions: [
+    # basicauth/client
+  ]
   pipelines:
     traces:
       receivers: [otlp]
@@ -40,10 +57,10 @@ service:
       processors: [batch]
       exporters: [spanmetrics]
 
-    # traces/seq:
+    # traces/opensearch:
     #   receivers: [otlp]
     #   processors: [batch]
-    #   exporters: [otlp/seq]
+    #   exporters: [opensearch/trace]
 
     metrics/prometheus:
       receivers: [otlp/metrics]
