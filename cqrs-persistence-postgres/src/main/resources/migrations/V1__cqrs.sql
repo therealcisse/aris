@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS events (
   aggregate_id BIGINT NOT NULL,
   discriminator TEXT NOT NULL,
   namespace INT NOT NULL,
+  reference BIGINT,
   parent_id BIGINT,
   grand_parent_id BIGINT,
   props JSONB NOT NULL DEFAULT '{}'::jsonb,
@@ -22,6 +23,7 @@ CREATE TABLE IF NOT EXISTS events (
 CREATE INDEX idx_events_discriminator ON events (discriminator);
 CREATE INDEX idx_events_aggregate_id ON events (aggregate_id);
 CREATE INDEX idx_events_namespace ON events (namespace);
+CREATE INDEX idx_events_reference ON events (reference);
 CREATE INDEX idx_events_parent_id ON events (parent_id);
 CREATE INDEX idx_events_grand_parent_id ON events (grand_parent_id);
 

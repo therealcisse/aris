@@ -3,15 +3,11 @@ package cqrs
 package service
 package postgres
 
-import cats.implicits.*
-
 import zio.telemetry.opentelemetry.tracing.Tracing
 
 import com.youtoo.cqrs.domain.*
 
 import zio.schema.codec.*
-
-import zio.prelude.*
 
 import java.nio.charset.StandardCharsets
 
@@ -26,37 +22,35 @@ object PostgresCQRSPersistence {
     ZLayer.fromFunction(new PostgresCQRSPersistenceLive().traced(_))
 
   class PostgresCQRSPersistenceLive() extends CQRSPersistence { self =>
-    def readEvents[Event: BinaryCodec: Tag: MetaInfo](
+    def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
       id: Key,
       discriminator: Discriminator,
     ): RIO[ZConnection, Chunk[Change[Event]]] =
       Queries.READ_EVENTS(id, discriminator).selectAll
 
-    def readEvents[Event: BinaryCodec: Tag: MetaInfo](
+    def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
       id: Key,
       discriminator: Discriminator,
       snapshotVersion: Version,
     ): RIO[ZConnection, Chunk[Change[Event]]] =
       Queries.READ_EVENTS(id, discriminator, snapshotVersion).selectAll
 
-    def readEvents[Event: BinaryCodec: Tag: MetaInfo](
+    def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
       discriminator: Discriminator,
-      ns: Option[NonEmptyList[Namespace]],
-      hierarchy: Option[Hierarchy],
-      props: Option[NonEmptyList[EventProperty]],
+      query: PersistenceQuery,
+      options: FetchOptions,
     ): RIO[ZConnection, Chunk[Change[Event]]] =
-      Queries.READ_EVENTS(discriminator, ns, hierarchy, props).selectAll
+      Queries.READ_EVENTS(discriminator, query, options).selectAll
 
-    def readEvents[Event: BinaryCodec: Tag: MetaInfo](
+    def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
       discriminator: Discriminator,
       snapshotVersion: Version,
-      ns: Option[NonEmptyList[Namespace]],
-      hierarchy: Option[Hierarchy],
-      props: Option[NonEmptyList[EventProperty]],
+      query: PersistenceQuery,
+      options: FetchOptions,
     ): RIO[ZConnection, Chunk[Change[Event]]] =
-      Queries.READ_EVENTS(discriminator, snapshotVersion, ns, hierarchy, props).selectAll
+      Queries.READ_EVENTS(discriminator, snapshotVersion, query, options).selectAll
 
-    def saveEvent[Event: BinaryCodec: MetaInfo: Tag](
+    def saveEvent[Event: {BinaryCodec, MetaInfo, Tag}](
       id: Key,
       discriminator: Discriminator,
       event: Change[Event],
@@ -71,13 +65,13 @@ object PostgresCQRSPersistence {
 
     def traced(tracing: Tracing): CQRSPersistence =
       new CQRSPersistence {
-        def readEvents[Event: BinaryCodec: Tag: MetaInfo](
+        def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
           id: Key,
           discriminator: Discriminator,
         ): RIO[ZConnection, Chunk[Change[Event]]] =
           self.readEvents(id, discriminator) @@ tracing.aspects.span("PostgresCQRSPersistence.readEvents")
 
-        def readEvents[Event: BinaryCodec: Tag: MetaInfo](
+        def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
           id: Key,
           discriminator: Discriminator,
           snapshotVersion: Version,
@@ -86,28 +80,26 @@ object PostgresCQRSPersistence {
             "PostgresCQRSPersistence.readEvents.fromSnapshot",
           )
 
-        def readEvents[Event: BinaryCodec: Tag: MetaInfo](
+        def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
           discriminator: Discriminator,
-          ns: Option[NonEmptyList[Namespace]],
-          hierarchy: Option[Hierarchy],
-          props: Option[NonEmptyList[EventProperty]],
+          query: PersistenceQuery,
+          options: FetchOptions,
         ): RIO[ZConnection, Chunk[Change[Event]]] =
-          self.readEvents(discriminator, ns, hierarchy, props) @@ tracing.aspects.span(
+          self.readEvents(discriminator, query, options) @@ tracing.aspects.span(
             "PostgresCQRSPersistence.readEvents.query",
           )
 
-        def readEvents[Event: BinaryCodec: Tag: MetaInfo](
+        def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
           discriminator: Discriminator,
           snapshotVersion: Version,
-          ns: Option[NonEmptyList[Namespace]],
-          hierarchy: Option[Hierarchy],
-          props: Option[NonEmptyList[EventProperty]],
+          query: PersistenceQuery,
+          options: FetchOptions,
         ): RIO[ZConnection, Chunk[Change[Event]]] =
-          self.readEvents(discriminator, snapshotVersion, ns, hierarchy, props) @@ tracing.aspects.span(
+          self.readEvents(discriminator, snapshotVersion, query, options) @@ tracing.aspects.span(
             "PostgresCQRSPersistence.readEvents.query_fromSnapshot",
           )
 
-        def saveEvent[Event: BinaryCodec: MetaInfo: Tag](
+        def saveEvent[Event: {BinaryCodec, MetaInfo, Tag}](
           id: Key,
           discriminator: Discriminator,
           event: Change[Event],
@@ -155,78 +147,26 @@ object PostgresCQRSPersistence {
 
     def READ_EVENTS[Event: BinaryCodec](
       discriminator: Discriminator,
-      ns: Option[NonEmptyList[Namespace]],
-      hierarchy: Option[Hierarchy],
-      props: Option[NonEmptyList[EventProperty]],
+      query: PersistenceQuery,
+      options: FetchOptions,
     ): Query[Change[Event]] =
       given JdbcDecoder[Event] = byteArrayDecoder[Event]
-
-      @scala.annotation.tailrec
-      def propsQuery(
-        props: Option[NonEmptyList[EventProperty]],
-        q: SqlFragment = SqlFragment.empty,
-      ): SqlFragment = props match {
-        case None => q
-        case Some(NonEmptyList.Single(EventProperty(key, value))) =>
-          q ++ s""" AND props->>'$key' = """ ++ sql"""$value"""
-        case Some(NonEmptyList.Cons(EventProperty(key, value), ns)) =>
-          propsQuery(ns.some, q ++ s""" AND props->>'$key' = """ ++ sql"""$value""")
-      }
-
-      val nsQuery = ns.fold(SqlFragment.empty) {
-        case NonEmptyList.Single(n) => sql" AND namespace = $n"
-        case NonEmptyList.Cons(n, ns) => sql" AND namespace in (${n :: ns.toList})"
-      }
-
-      val hierarchyQuery = hierarchy.fold(SqlFragment.empty) {
-        case Hierarchy.Child(parentId) => sql""" AND parent_id = $parentId"""
-        case Hierarchy.GrandChild(grandParentId) => sql""" AND grand_parent_id = $grandParentId"""
-        case Hierarchy.Descendant(grandParentId, parentId) =>
-          sql""" AND parent_id = $parentId AND grand_parent_id = $grandParentId"""
-
-      }
 
       (sql"""
       SELECT
         version,
         payload
       FROM events
-      WHERE discriminator = $discriminator""" ++ nsQuery ++ hierarchyQuery ++ propsQuery(props) ++
+      WHERE discriminator = $discriminator""" ++ query.toSql.fold(SqlFragment.empty)(sql => sql" AND " ++ sql) ++ options.toSql.fold(SqlFragment.empty)(sql => sql" AND " ++ sql) ++
         sql""" ORDER BY version ASC""").query[(Version, Event)].map(Change.apply)
 
     def READ_EVENTS[Event: BinaryCodec](
       discriminator: Discriminator,
       snapshotVersion: Version,
-      ns: Option[NonEmptyList[Namespace]],
-      hierarchy: Option[Hierarchy],
-      props: Option[NonEmptyList[EventProperty]],
+      query: PersistenceQuery,
+      options: FetchOptions,
     ): Query[Change[Event]] =
       given JdbcDecoder[Event] = byteArrayDecoder[Event]
-
-      @scala.annotation.tailrec
-      def propsQuery(
-        props: Option[NonEmptyList[EventProperty]],
-        q: SqlFragment = SqlFragment.empty,
-      ): SqlFragment = props match {
-        case None => q
-        case Some(NonEmptyList.Single(EventProperty(key, value))) =>
-          q ++ s""" AND props->>'$key' = """ ++ sql"""$value"""
-        case Some(NonEmptyList.Cons(EventProperty(key, value), ns)) =>
-          propsQuery(ns.some, q ++ s""" AND props->>'$key' = """ ++ sql"""$value""")
-      }
-
-      val nsQuery = ns.fold(SqlFragment.empty) {
-        case NonEmptyList.Single(n) => sql" AND namespace = $n"
-        case NonEmptyList.Cons(n, ns) => sql" AND namespace in (${n :: ns.toList})"
-      }
-
-      val hierarchyQuery = hierarchy.fold(SqlFragment.empty) {
-        case Hierarchy.Child(parentId) => sql""" AND parent_id = $parentId"""
-        case Hierarchy.GrandChild(grandParentId) => sql""" AND grand_parent_id = $grandParentId"""
-        case Hierarchy.Descendant(grandParentId, parentId) =>
-          sql""" AND parent_id = $parentId AND grand_parent_id = $grandParentId"""
-
-      }
 
       (sql"""
       SELECT
@@ -234,10 +174,10 @@ object PostgresCQRSPersistence {
         payload
       FROM events
       WHERE discriminator = $discriminator
-        AND version > $snapshotVersion""" ++ nsQuery ++ hierarchyQuery ++ propsQuery(props) ++
+        AND version > $snapshotVersion""" ++ query.toSql.fold(SqlFragment.empty)(sql => sql" AND " ++ sql) ++ options.toSql.fold(SqlFragment.empty)(sql => sql" AND " ++ sql) ++
         sql""" ORDER BY version ASC""").query[(Version, Event)].map(Change.apply)
 
-    def SAVE_EVENT[Event: BinaryCodec: MetaInfo](
+    def SAVE_EVENT[Event: { BinaryCodec, MetaInfo }](
       id: Key,
       discriminator: Discriminator,
       event: Change[Event],

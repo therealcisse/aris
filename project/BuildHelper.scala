@@ -8,7 +8,7 @@ import scalafix.sbt.ScalafixPlugin.autoImport.*
 import xerial.sbt.Sonatype.autoImport.*
 
 object BuildHelper extends ScalaSettings {
-  val Scala3 = "3.5.1"
+  val Scala3 = "3.6.2"
 
   def getEnvVars(): Map[String, String] =
     Map(

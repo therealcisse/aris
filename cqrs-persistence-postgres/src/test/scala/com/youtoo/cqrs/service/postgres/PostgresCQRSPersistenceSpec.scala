@@ -31,10 +31,11 @@ object PostgresCQRSPersistenceSpec extends PgSpec {
 
   }
 
-  given MetaInfo[DummyEvent] with {
+  given MetaInfo[DummyEvent] {
     extension (self: DummyEvent) def namespace: Namespace = Namespace(0)
     extension (self: DummyEvent) def hierarchy: Option[Hierarchy] = Hierarchy.Descendant(Key(1L), Key(2L)).some
     extension (self: DummyEvent) def props: Chunk[EventProperty] = Chunk(EventProperty("type", "DummyEvent"))
+    extension (self: DummyEvent) def reference: Option[Reference] = None
 
   }
 
@@ -44,11 +45,12 @@ object PostgresCQRSPersistenceSpec extends PgSpec {
         check(namespaceGen, keyGen, versionGen, keyGen, keyGen, discriminatorGen) {
           (ns, key, version, grandParentId, parentId, discriminator) =>
 
-            given MetaInfo[DummyEvent] with {
+            given MetaInfo[DummyEvent] {
               extension (self: DummyEvent) def namespace: Namespace = ns
               extension (self: DummyEvent)
                 def hierarchy: Option[Hierarchy] = Hierarchy.Descendant(grandParentId, parentId).some
               extension (self: DummyEvent) def props: Chunk[EventProperty] = Chunk(EventProperty("type", "DummyEvent"))
+              extension (self: DummyEvent) def reference: Option[Reference] = None
 
             }
 
@@ -70,25 +72,22 @@ object PostgresCQRSPersistenceSpec extends PgSpec {
                   events1 <- atomically(
                     persistence.readEvents[DummyEvent](
                       discriminator,
-                      ns = None,
-                      hierarchy = Hierarchy.Descendant(grandParentId, parentId).some,
-                      props = None,
+                      query = PersistenceQuery.descendant(grandParentId, parentId),
+                      options = FetchOptions(),
                     ),
                   )
                   events2 <- atomically(
                     persistence.readEvents[DummyEvent](
                       discriminator,
-                      ns = None,
-                      hierarchy = Hierarchy.Descendant(Key(grandParentIdXXX), parentId).some,
-                      props = None,
+                      query = PersistenceQuery.descendant(Key(grandParentIdXXX), parentId),
+                      options = FetchOptions(),
                     ),
                   )
                   events3 <- atomically(
                     persistence.readEvents[DummyEvent](
                       discriminator,
-                      ns = None,
-                      hierarchy = Hierarchy.Descendant(grandParentId, Key(parentIdXXX)).some,
-                      props = None,
+                      query = PersistenceQuery.descendant(grandParentId, Key(parentIdXXX)),
+                      options = FetchOptions(),
                     ),
                   )
 
@@ -107,17 +106,15 @@ object PostgresCQRSPersistenceSpec extends PgSpec {
                   events1 <- atomically(
                     persistence.readEvents[DummyEvent](
                       discriminator,
-                      ns = None,
-                      hierarchy = Hierarchy.GrandChild(grandParentId).some,
-                      props = None,
+                      query = PersistenceQuery.grandChild(grandParentId),
+                      options = FetchOptions(),
                     ),
                   )
                   events2 <- atomically(
                     persistence.readEvents[DummyEvent](
                       discriminator,
-                      ns = None,
-                      hierarchy = Hierarchy.GrandChild(Key(grandParentIdXXX)).some,
-                      props = None,
+                      query = PersistenceQuery.grandChild(Key(grandParentIdXXX)),
+                      options = FetchOptions(),
                     ),
                   )
 
@@ -134,17 +131,15 @@ object PostgresCQRSPersistenceSpec extends PgSpec {
                   events1 <- atomically(
                     persistence.readEvents[DummyEvent](
                       discriminator,
-                      ns = None,
-                      hierarchy = Hierarchy.Child(parentId).some,
-                      props = None,
+                      query = PersistenceQuery.child(parentId),
+                      options = FetchOptions(),
                     ),
                   )
                   events2 <- atomically(
                     persistence.readEvents[DummyEvent](
                       discriminator,
-                      ns = None,
-                      hierarchy = Hierarchy.Child(Key(parentIdXXX)).some,
-                      props = None,
+                      query = PersistenceQuery.child(Key(parentIdXXX)),
+                      options = FetchOptions(),
                     ),
                   )
 
@@ -173,17 +168,15 @@ object PostgresCQRSPersistenceSpec extends PgSpec {
             events1 <- atomically(
               persistence.readEvents[DummyEvent](
                 discriminator,
-                ns = None,
-                hierarchy = None,
-                props = NonEmptyList(EventProperty("type", "DummyEvent")).some,
+                query = PersistenceQuery.props(EventProperty("type", "DummyEvent")),
+                options = FetchOptions(),
               ),
             )
             events2 <- atomically(
               persistence.readEvents[DummyEvent](
                 discriminator,
-                ns = None,
-                hierarchy = None,
-                props = NonEmptyList(EventProperty("type", "DummyEventXXX")).some,
+                query = PersistenceQuery.props(EventProperty("type", "DummyEventXXX")),
+                options = FetchOptions(),
               ),
             )
             b = assert(events0)(isNonEmpty) && assert(events1)(isNonEmpty) && assert(events2)(isEmpty)
@@ -221,13 +214,21 @@ object PostgresCQRSPersistenceSpec extends PgSpec {
 
             events0 <- atomically(
               persistence
-                .readEvents[DummyEvent](discriminator, ns = NonEmptyList(Namespace(0)).some, None, None),
+                .readEvents[DummyEvent](
+                  discriminator,
+                  query = PersistenceQuery.ns(Namespace(0)),
+                  options = FetchOptions(),
+                ),
             )
             b = assert(events0)(isNonEmpty)
 
             events1 <- atomically(
               persistence
-                .readEvents[DummyEvent](discriminator, ns = NonEmptyList(Namespace(1)).some, None, None),
+                .readEvents[DummyEvent](
+                  discriminator,
+                  query = PersistenceQuery.ns(Namespace(1)),
+                  options = FetchOptions(),
+                ),
             )
             c = assert(events1)(isEmpty)
 
@@ -369,11 +370,15 @@ object PostgresCQRSPersistenceSpec extends PgSpec {
         }
       },
       test("read all events by args is optimized") {
-        check(Gen.option(namespacesGen), Gen.option(hierarchyGen), Gen.option(eventPropertiesGen), discriminatorGen) {
+        check(Gen.option(namespaceGen), Gen.option(hierarchyGen), Gen.option(eventPropertiesGen), discriminatorGen) {
           case (ns, hierarchy, props, discriminator) =>
             val query =
               PostgresCQRSPersistence.Queries
-                .READ_EVENTS[DummyEvent](discriminator, ns, hierarchy, props)
+                .READ_EVENTS[DummyEvent](
+                  discriminator,
+                  query = PersistenceQuery.condition(namespace = ns, hierarchy = hierarchy, props = props),
+                  options = FetchOptions(),
+                )
             for {
 
               executionTime <- atomically(query.selectAll).timed.map(_._1)
@@ -388,14 +393,19 @@ object PostgresCQRSPersistenceSpec extends PgSpec {
       test("read snapshot events by args is optimized") {
         check(
           versionGen,
-          Gen.option(namespacesGen),
+          Gen.option(namespaceGen),
           Gen.option(hierarchyGen),
           Gen.option(eventPropertiesGen),
           discriminatorGen,
         ) { case (version, ns, hierarchy, props, discriminator) =>
           val query =
             PostgresCQRSPersistence.Queries
-              .READ_EVENTS[DummyEvent](discriminator, version, ns, hierarchy, props)
+              .READ_EVENTS[DummyEvent](
+                discriminator,
+                version,
+                query = PersistenceQuery.condition(namespace = ns, hierarchy = hierarchy, props = props),
+                options = FetchOptions(),
+              )
           for {
 
             executionTime <- atomically(query.selectAll).timed.map(_._1)

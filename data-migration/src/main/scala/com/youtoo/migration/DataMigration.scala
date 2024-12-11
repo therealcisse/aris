@@ -116,7 +116,7 @@ object DataMigration {
                             success =
                               _ => logDebug(s"Processed key: $key") *> restore(onSuccess) `as` s.addProcessed(key),
                             failure =
-                              e => logError(s"Processing failed: $key", e) *> restore(onError) `as` s.addFailed(key)
+                              e => logError(s"Processing failed: $key", e) *> restore(onError) `as` s.addFailed(key),
                           )
 
                         }
@@ -143,7 +143,7 @@ object DataMigration {
                           )
                     } yield cmd,
                   failure = e =>
-                    logError(s"Migration failed", e) `as` MigrationCommand.FailExecution(id = executionId, timestamp)
+                    logError(s"Migration failed", e) `as` MigrationCommand.FailExecution(id = executionId, timestamp),
                 )
 
                 _ <- MigrationCQRS.add(id = migrationKey, cmd = cmd)

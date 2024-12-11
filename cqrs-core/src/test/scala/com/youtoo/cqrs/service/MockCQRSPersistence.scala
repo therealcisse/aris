@@ -8,7 +8,6 @@ import com.youtoo.cqrs.domain.*
 
 import zio.*
 import zio.jdbc.*
-import zio.prelude.*
 import zio.schema.codec.*
 
 object MockCQRSPersistence extends Mock[CQRSPersistence] {
@@ -18,7 +17,7 @@ object MockCQRSPersistence extends Mock[CQRSPersistence] {
 
     object FullArgs
         extends Poly.Effect.Output[
-          (Discriminator, Option[NonEmptyList[Namespace]], Option[Hierarchy], Option[NonEmptyList[EventProperty]]),
+          (Discriminator, PersistenceQuery, FetchOptions),
           Throwable,
         ]
     object SnapshotArgs
@@ -26,9 +25,8 @@ object MockCQRSPersistence extends Mock[CQRSPersistence] {
           (
             Discriminator,
             Version,
-            Option[NonEmptyList[Namespace]],
-            Option[Hierarchy],
-            Option[NonEmptyList[EventProperty]],
+            PersistenceQuery,
+            FetchOptions,
           ),
           Throwable,
         ]
@@ -44,40 +42,38 @@ object MockCQRSPersistence extends Mock[CQRSPersistence] {
       for {
         proxy <- ZIO.service[Proxy]
       } yield new CQRSPersistence {
-        def readEvents[Event: BinaryCodec: Tag: MetaInfo](
+        def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
           id: Key,
           discriminator: Discriminator,
           snapshotVersion: Version,
         ): ZIO[ZConnection, Throwable, Chunk[Change[Event]]] =
           proxy(ReadEvents.Snapshot.of[Chunk[Change[Event]]], (id, discriminator, snapshotVersion))
 
-        def readEvents[Event: BinaryCodec: Tag: MetaInfo](
+        def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
           id: Key,
           discriminator: Discriminator,
         ): ZIO[ZConnection, Throwable, Chunk[Change[Event]]] =
           proxy(ReadEvents.Full.of[Chunk[Change[Event]]], (id, discriminator))
 
-        def readEvents[Event: BinaryCodec: Tag: MetaInfo](
+        def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
           discriminator: Discriminator,
           snapshotVersion: Version,
-          ns: Option[NonEmptyList[Namespace]],
-          hierarchy: Option[Hierarchy],
-          props: Option[NonEmptyList[EventProperty]],
+          query: PersistenceQuery,
+          options: FetchOptions,
         ): ZIO[ZConnection, Throwable, Chunk[Change[Event]]] =
           proxy(
             ReadEvents.SnapshotArgs.of[Chunk[Change[Event]]],
-            (discriminator, snapshotVersion, ns, hierarchy, props),
+            (discriminator, snapshotVersion, query, options),
           )
 
-        def readEvents[Event: BinaryCodec: Tag: MetaInfo](
+        def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
           discriminator: Discriminator,
-          ns: Option[NonEmptyList[Namespace]],
-          hierarchy: Option[Hierarchy],
-          props: Option[NonEmptyList[EventProperty]],
+          query: PersistenceQuery,
+          options: FetchOptions,
         ): ZIO[ZConnection, Throwable, Chunk[Change[Event]]] =
-          proxy(ReadEvents.FullArgs.of[Chunk[Change[Event]]], (discriminator, ns, hierarchy, props))
+          proxy(ReadEvents.FullArgs.of[Chunk[Change[Event]]], (discriminator, query, options))
 
-        def saveEvent[Event: BinaryCodec: MetaInfo: Tag](
+        def saveEvent[Event: {BinaryCodec, MetaInfo, Tag}](
           id: Key,
           discriminator: Discriminator,
           event: Change[Event],

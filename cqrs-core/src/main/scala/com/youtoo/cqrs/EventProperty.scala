@@ -14,7 +14,6 @@ object EventProperty {
 
   object Key extends Newtype[String] {
     import zio.schema.*
-
     extension (a: Key) inline def value: String = Key.unwrap(a)
 
     given Schema[Key] = derive

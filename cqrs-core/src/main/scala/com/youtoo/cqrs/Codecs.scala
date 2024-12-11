@@ -5,8 +5,6 @@ import zio.schema.*
 import zio.schema.codec.*
 
 object Codecs {
-  // inline given [T: Schema]: BinaryCodec[T] = ProtobufCodec.protobufCodec
-
   export protobuf.*
 
   object protobuf {
@@ -16,7 +14,7 @@ object Codecs {
 
   object json {
 
-    given [A: Schema]: BinaryCodec[A] = JsonCodec.schemaBasedBinaryCodec[A](JsonCodec.Config.default)
+    given [A: Schema] => BinaryCodec[A] = JsonCodec.schemaBasedBinaryCodec[A](JsonCodec.Config.default)
 
   }
 }

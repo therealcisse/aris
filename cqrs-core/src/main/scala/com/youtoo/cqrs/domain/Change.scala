@@ -11,7 +11,7 @@ case class Change[Event: BinaryCodec](version: Version, payload: Event)
 object Change {
   import zio.schema.*
 
-  given [Event: BinaryCodec: Schema]: Schema[Change[Event]] =
+  given [Event: { BinaryCodec, Schema }] => Schema[Change[Event]] =
     Schema.CaseClass2[Version, Event, Change[Event]](
       id0 = TypeId.fromTypeName("Change"),
       field01 = Schema.Field(

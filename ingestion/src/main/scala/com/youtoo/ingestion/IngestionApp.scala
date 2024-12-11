@@ -139,7 +139,7 @@ object IngestionApp extends ZIOApp {
               Body.fromCharSequence(s"""{"ingestions":$bytes}"""),
             )
 
-          } yield resp,
+          } yield resp
         )
       }
 

@@ -116,7 +116,7 @@ object MigrationApp extends ZIOApp {
               Body.fromCharSequence(s"""{"migrations":$bytes}"""),
             )
 
-          } yield resp,
+          } yield resp
         )
       }
 
