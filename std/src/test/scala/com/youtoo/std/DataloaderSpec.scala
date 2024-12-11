@@ -7,7 +7,7 @@ import zio.test.Assertion.*
 import java.util.concurrent.TimeUnit
 
 object DataloaderSpec extends ZIOSpecDefault {
-  given Dataloader.Keyed[Long] with {
+  given Dataloader.Keyed[Long] {
     extension (a: Long) def id: Key = Key(a)
 
   }

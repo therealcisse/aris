@@ -26,7 +26,7 @@ type MigrationCommandHandler = CmdHandler[MigrationCommand, MigrationEvent]
 object MigrationCommand {
   given Schema[MigrationCommand] = DeriveSchema.gen
 
-  given MigrationCommandHandler with {
+  given MigrationCommandHandler  {
     def applyCmd(cmd: MigrationCommand): NonEmptyList[MigrationEvent] =
       cmd match {
         case MigrationCommand.RegisterMigration(id, timestamp) =>

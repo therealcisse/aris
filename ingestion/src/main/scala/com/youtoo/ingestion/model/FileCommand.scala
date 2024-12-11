@@ -31,7 +31,7 @@ type FileCommandHandler = CmdHandler[FileCommand, FileEvent]
 object FileCommand {
   given Schema[FileCommand] = DeriveSchema.gen
 
-  given FileCommandHandler with {
+  given FileCommandHandler  {
     def applyCmd(cmd: FileCommand): NonEmptyList[FileEvent] =
       cmd match {
         case FileCommand.AddFile(provider, id, name, metadata, sig) =>

@@ -2,6 +2,8 @@ package com.youtoo
 package ingestion
 package service
 
+import cats.implicits.*
+
 import zio.test.*
 import zio.prelude.*
 import zio.mock.*
@@ -73,7 +75,12 @@ object ProviderServiceSpec extends MockSpecDefault {
         val events = NonEmptyList(expectedChange)
 
         val eventStoreMock = MockFileEventStore.ReadEventsByFilters(
-          equalTo((Some(NonEmptyList(Namespace(1))), None, None)),
+          equalTo(
+            (
+              PersistenceQuery.ns(Namespace(1)),
+              FetchOptions(),
+            ),
+          ),
           value(Some(events)),
         )
 
@@ -103,7 +110,15 @@ object ProviderServiceSpec extends MockSpecDefault {
         val events = NonEmptyList(expectedChange)
 
         val eventStoreMock = MockFileEventStore.ReadEventsByFilters(
-          equalTo((Some(NonEmptyList(Namespace(0))), Some(Hierarchy.Child(providerId.asKey)), None)),
+          equalTo(
+            (
+              PersistenceQuery.condition(
+                namespace = Namespace(0).some,
+                hierarchy = Hierarchy.Child(providerId.asKey).some,
+              ),
+              FetchOptions(),
+            ),
+          ),
           value(Some(events)),
         )
 

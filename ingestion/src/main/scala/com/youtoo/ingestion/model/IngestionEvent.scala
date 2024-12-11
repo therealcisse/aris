@@ -27,7 +27,7 @@ object IngestionEvent {
 
   given Schema[IngestionEvent] = DeriveSchema.gen
 
-  given MetaInfo[IngestionEvent] with {
+  given MetaInfo[IngestionEvent]  {
 
     extension (self: IngestionEvent)
       def namespace: Namespace = self match {
@@ -41,11 +41,11 @@ object IngestionEvent {
       }
 
     extension (self: IngestionEvent) def hierarchy: Option[Hierarchy] = None
-
     extension (self: IngestionEvent) def props: Chunk[EventProperty] = Chunk.empty
+    extension (self: IngestionEvent) def reference: Option[Reference] = None
   }
 
-  given IngestionEventHandler with {
+  given IngestionEventHandler  {
 
     def applyEvents(events: NonEmptyList[Change[IngestionEvent]]): Ingestion =
       events match {

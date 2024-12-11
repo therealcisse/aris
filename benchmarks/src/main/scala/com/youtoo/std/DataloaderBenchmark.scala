@@ -47,7 +47,7 @@ object DataloaderBenchmark {
       ZIO.succeed(ids.map(_.value).toList)
   }
 
-  given Dataloader.Keyed[Long] with {
+  given Dataloader.Keyed[Long] {
     extension (a: Long) def id: Key = Key(a)
   }
 

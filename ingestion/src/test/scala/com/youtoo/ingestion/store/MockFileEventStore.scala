@@ -16,13 +16,13 @@ object MockFileEventStore extends Mock[FileEventStore] {
   object ReadEventsByIdAndVersion extends Effect[(Key, Version), Throwable, Option[NonEmptyList[Change[FileEvent]]]]
   object ReadEventsByFilters
       extends Effect[
-        (Option[NonEmptyList[Namespace]], Option[Hierarchy], Option[NonEmptyList[EventProperty]]),
+        (PersistenceQuery, FetchOptions),
         Throwable,
         Option[NonEmptyList[Change[FileEvent]]],
       ]
   object ReadEventsByVersionAndFilters
       extends Effect[
-        (Version, Option[NonEmptyList[Namespace]], Option[Hierarchy], Option[NonEmptyList[EventProperty]]),
+        (Version, PersistenceQuery, FetchOptions),
         Throwable,
         Option[NonEmptyList[Change[FileEvent]]],
       ]
@@ -34,17 +34,15 @@ object MockFileEventStore extends Mock[FileEventStore] {
       def readEvents(id: Key, snapshotVersion: Version): Task[Option[NonEmptyList[Change[FileEvent]]]] =
         proxy(ReadEventsByIdAndVersion, (id, snapshotVersion))
       def readEvents(
-        ns: Option[NonEmptyList[Namespace]],
-        hierarchy: Option[Hierarchy],
-        props: Option[NonEmptyList[EventProperty]],
-      ): Task[Option[NonEmptyList[Change[FileEvent]]]] = proxy(ReadEventsByFilters, (ns, hierarchy, props))
+        query: PersistenceQuery,
+        options: FetchOptions,
+      ): Task[Option[NonEmptyList[Change[FileEvent]]]] = proxy(ReadEventsByFilters, (query, options))
       def readEvents(
         snapshotVersion: Version,
-        ns: Option[NonEmptyList[Namespace]],
-        hierarchy: Option[Hierarchy],
-        props: Option[NonEmptyList[EventProperty]],
+        query: PersistenceQuery,
+        options: FetchOptions,
       ): Task[Option[NonEmptyList[Change[FileEvent]]]] =
-        proxy(ReadEventsByVersionAndFilters, (snapshotVersion, ns, hierarchy, props))
+        proxy(ReadEventsByVersionAndFilters, (snapshotVersion, query, options))
       def save(id: Key, event: Change[FileEvent]): Task[Long] = proxy(Save, (id, event))
     }
   }

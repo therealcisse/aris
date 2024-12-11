@@ -24,7 +24,7 @@ type IngestionCommandHandler = CmdHandler[IngestionCommand, IngestionEvent]
 object IngestionCommand {
   given Schema[IngestionCommand] = DeriveSchema.gen
 
-  given IngestionCommandHandler with {
+  given IngestionCommandHandler  {
     def applyCmd(cmd: IngestionCommand): NonEmptyList[IngestionEvent] =
       cmd match {
         case IngestionCommand.StartIngestion(id, timestamp) =>

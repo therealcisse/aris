@@ -21,6 +21,59 @@ object MemoryCQRSPersistence {
   import zio.jdbc.*
   import zio.schema.*
 
+  extension [Event: MetaInfo](q: PersistenceQuery.Condition) def isMatch(ch: Change[Event]): Boolean =
+    val refMatch = q.reference match {
+      case None => true
+      case Some(value) => ch.payload.reference.contains(value)
+    }
+
+    val nsMatch = q.namespace match {
+      case None => true
+      case Some(value) => ch.payload.namespace == value
+    }
+
+    val hierarchyMatch = q.hierarchy match {
+      case None => true
+      case h =>
+        (ch.payload.hierarchy, h).tupled match {
+          case None => false
+
+          case Some(Hierarchy.Descendant(gpId0, pId0), Hierarchy.Descendant(gpId1, pId1)) =>
+            gpId0 == gpId1 && pId0 == pId1
+          case Some(Hierarchy.Descendant(_, pId0), Hierarchy.Child(pId1)) => pId0 == pId1
+          case Some(Hierarchy.Descendant(gpId0, _), Hierarchy.GrandChild(gpId1)) => gpId0 == gpId1
+
+          case Some(Hierarchy.Child(pId0), Hierarchy.Child(pId1)) => pId0 == pId1
+          case Some(Hierarchy.GrandChild(gpId0), Hierarchy.GrandChild(gpId1)) => gpId0 == gpId1
+
+          case _ => false
+        }
+    }
+
+    val propsMatch = q.props match {
+      case None => true
+      case Some(p) => p.toChunk == ch.payload.props
+    }
+
+    refMatch && nsMatch && hierarchyMatch && propsMatch
+
+  extension [Event: MetaInfo](q: PersistenceQuery) def isMatch(ch: Change[Event]): Boolean = q match {
+    case condition: PersistenceQuery.Condition => condition.isMatch(ch)
+    case PersistenceQuery.any(condition, more*) =>
+      more.foldLeft(condition.isMatch(ch)) {
+        case (a, n) => a || n.isMatch(ch)
+
+      }
+
+    case PersistenceQuery.forall(query, more*) =>
+      more.foldLeft(query.isMatch(ch)) {
+        case (a, n) => a && n.isMatch(ch)
+
+      }
+
+
+  }
+
   type State = State.Type
 
   object State extends Newtype[State.Info] {
@@ -72,9 +125,8 @@ object MemoryCQRSPersistence {
     extension (s: State)
       def fetch[Event: MetaInfo](
         discriminator: Discriminator,
-        ns: Option[NonEmptyList[Namespace]],
-        hierarchy: Option[Hierarchy],
-        props: Option[NonEmptyList[EventProperty]],
+        query: PersistenceQuery,
+        options: FetchOptions,
       ): Chunk[Change[Event]] =
         val p = State.unwrap(s)
 
@@ -84,50 +136,28 @@ object MemoryCQRSPersistence {
             val all = map.sets.values.flatten.asInstanceOf[Iterable[Change[Event]]]
 
             val matches = all.filter { ch =>
-
-              val nsMatch = ns match {
-                case None => true
-                case Some(value) => value.toSet.contains(ch.payload.namespace)
-              }
-
-              val hierarchyMatch = hierarchy match {
-                case None => true
-                case h =>
-                  (ch.payload.hierarchy, h).tupled match {
-                    case None => false
-
-                    case Some(Hierarchy.Descendant(gpId0, pId0), Hierarchy.Descendant(gpId1, pId1)) =>
-                      gpId0 == gpId1 && pId0 == pId1
-                    case Some(Hierarchy.Descendant(_, pId0), Hierarchy.Child(pId1)) => pId0 == pId1
-                    case Some(Hierarchy.Descendant(gpId0, _), Hierarchy.GrandChild(gpId1)) => gpId0 == gpId1
-
-                    case Some(Hierarchy.Child(pId0), Hierarchy.Child(pId1)) => pId0 == pId1
-                    case Some(Hierarchy.GrandChild(gpId0), Hierarchy.GrandChild(gpId1)) => gpId0 == gpId1
-
-                    case _ => false
-                  }
-              }
-
-              val propsMatch = props match {
-                case None => true
-                case Some(p) => p.toChunk == ch.payload.props
-              }
-
-              nsMatch && hierarchyMatch && propsMatch
+                query.isMatch(ch)
             }
 
-            Chunk.fromIterable(matches).sorted
+            val res = Chunk.fromIterable(matches).sorted
+
+            options match {
+              case FetchOptions(Some(o), Some(l)) => res.dropWhile(_.version.value <= o.value).take(l.toInt)
+              case FetchOptions(Some(o), None)    => res.dropWhile(_.version.value <= o.value)
+              case FetchOptions(None, Some(l))    => res.take(l.toInt)
+              case FetchOptions(None, None)       => res
+            }
+
         }
 
     extension (s: State)
       def fetch[Event: MetaInfo](
         discriminator: Discriminator,
         snapshotVersion: Version,
-        ns: Option[NonEmptyList[Namespace]],
-        hierarchy: Option[Hierarchy],
-        props: Option[NonEmptyList[EventProperty]],
+        query: PersistenceQuery,
+        options: FetchOptions,
       ): Chunk[Change[Event]] =
-        val p = s.fetch[Event](discriminator, ns, hierarchy, props)
+        val p = s.fetch[Event](discriminator, query, options)
         p.filter(_.version.value > snapshotVersion.value)
 
   }
@@ -143,37 +173,35 @@ object MemoryCQRSPersistence {
     }
 
   class MemoryCQRSPersistenceLive(ref: Ref.Synchronized[State]) extends CQRSPersistence { self =>
-    def readEvents[Event: BinaryCodec: Tag: MetaInfo](
+    def readEvents[Event:{ BinaryCodec, Tag, MetaInfo}](
       id: Key,
       discriminator: Discriminator,
     ): RIO[ZConnection, Chunk[Change[Event]]] =
       ref.get.map(_.fetch(id, discriminator))
 
-    def readEvents[Event: BinaryCodec: Tag: MetaInfo](
+    def readEvents[Event:{ BinaryCodec, Tag, MetaInfo}](
       id: Key,
       discriminator: Discriminator,
       snapshotVersion: Version,
     ): RIO[ZConnection, Chunk[Change[Event]]] =
       ref.get.map(_.fetch(id, discriminator, snapshotVersion))
 
-    def readEvents[Event: BinaryCodec: Tag: MetaInfo](
+    def readEvents[Event:{ BinaryCodec, Tag, MetaInfo}](
       discriminator: Discriminator,
-      ns: Option[NonEmptyList[Namespace]],
-      hierarchy: Option[Hierarchy],
-      props: Option[NonEmptyList[EventProperty]],
+      query: PersistenceQuery,
+      options: FetchOptions,
     ): RIO[ZConnection, Chunk[Change[Event]]] =
-      ref.get.map(_.fetch(discriminator, ns, hierarchy, props))
+      ref.get.map(_.fetch(discriminator, query, options))
 
-    def readEvents[Event: BinaryCodec: Tag: MetaInfo](
+    def readEvents[Event:{ BinaryCodec, Tag, MetaInfo}](
       discriminator: Discriminator,
       snapshotVersion: Version,
-      ns: Option[NonEmptyList[Namespace]],
-      hierarchy: Option[Hierarchy],
-      props: Option[NonEmptyList[EventProperty]],
+      query: PersistenceQuery,
+      options: FetchOptions,
     ): RIO[ZConnection, Chunk[Change[Event]]] =
-      ref.get.map(_.fetch(discriminator, snapshotVersion, ns, hierarchy, props))
+      ref.get.map(_.fetch(discriminator, snapshotVersion, query, options))
 
-    def saveEvent[Event: BinaryCodec: MetaInfo: Tag](
+    def saveEvent[Event: {BinaryCodec, MetaInfo, Tag}](
       id: Key,
       discriminator: Discriminator,
       event: Change[Event],
@@ -188,13 +216,13 @@ object MemoryCQRSPersistence {
 
     def traced(tracing: Tracing): CQRSPersistence =
       new CQRSPersistence {
-        def readEvents[Event: BinaryCodec: Tag: MetaInfo](
+        def readEvents[Event:{ BinaryCodec, Tag, MetaInfo}](
           id: Key,
           discriminator: Discriminator,
         ): RIO[ZConnection, Chunk[Change[Event]]] =
           self.readEvents(id, discriminator) @@ tracing.aspects.span("MemoryCQRSPersistence.readEvents")
 
-        def readEvents[Event: BinaryCodec: Tag: MetaInfo](
+        def readEvents[Event:{ BinaryCodec, Tag, MetaInfo}](
           id: Key,
           discriminator: Discriminator,
           snapshotVersion: Version,
@@ -203,28 +231,26 @@ object MemoryCQRSPersistence {
             "MemoryCQRSPersistence.readEvents.fromSnapshot",
           )
 
-        def readEvents[Event: BinaryCodec: Tag: MetaInfo](
+        def readEvents[Event:{ BinaryCodec, Tag, MetaInfo}](
           discriminator: Discriminator,
-          ns: Option[NonEmptyList[Namespace]],
-          hierarchy: Option[Hierarchy],
-          props: Option[NonEmptyList[EventProperty]],
+          query: PersistenceQuery,
+          options: FetchOptions,
         ): RIO[ZConnection, Chunk[Change[Event]]] =
-          self.readEvents(discriminator, ns, hierarchy, props) @@ tracing.aspects.span(
+          self.readEvents(discriminator, query, options) @@ tracing.aspects.span(
             "MemoryCQRSPersistence.readEvents.query",
           )
 
-        def readEvents[Event: BinaryCodec: Tag: MetaInfo](
+        def readEvents[Event:{ BinaryCodec, Tag, MetaInfo}](
           discriminator: Discriminator,
           snapshotVersion: Version,
-          ns: Option[NonEmptyList[Namespace]],
-          hierarchy: Option[Hierarchy],
-          props: Option[NonEmptyList[EventProperty]],
+          query: PersistenceQuery,
+          options: FetchOptions,
         ): RIO[ZConnection, Chunk[Change[Event]]] =
-          self.readEvents(discriminator, snapshotVersion, ns, hierarchy, props) @@ tracing.aspects.span(
+          self.readEvents(discriminator, snapshotVersion, query, options) @@ tracing.aspects.span(
             "MemoryCQRSPersistence.readEvents.query_fromSnapshot",
           )
 
-        def saveEvent[Event: BinaryCodec: MetaInfo: Tag](
+        def saveEvent[Event: {BinaryCodec, MetaInfo, Tag}](
           id: Key,
           discriminator: Discriminator,
           event: Change[Event],

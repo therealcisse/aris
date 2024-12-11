@@ -20,7 +20,7 @@ import zio.schema.codec.*
 object RestEndpoint {
 
   extension (body: Body)
-    inline def fromBody[A: BinaryCodec: Tag]: RIO[Tracing, A] =
+    inline def fromBody[A: {BinaryCodec, Tag}]: RIO[Tracing, A] =
       for {
         ch <- body.asChunk
         a <- ZIO.fromEither {

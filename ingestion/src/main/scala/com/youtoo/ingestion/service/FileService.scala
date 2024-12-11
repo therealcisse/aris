@@ -99,9 +99,11 @@ object FileService {
       atomically {
         for {
           events <- eventStore.readEvents(
-            ns = NonEmptyList(Namespace(0)).some,
-            hierarchy = None,
-            props = NonEmptyList(EventProperty("name", name.value)).some,
+            query = PersistenceQuery.condition(
+              namespace = Namespace(0).some,
+              props = NonEmptyList(EventProperty("name", name.value)).some,
+            ),
+            options = FetchOptions(),
           )
           inn = events flatMap { es =>
             EventHandler.applyEvents(es)
@@ -117,9 +119,11 @@ object FileService {
       atomically {
         for {
           events <- eventStore.readEvents(
-            ns = NonEmptyList(Namespace(0)).some,
-            hierarchy = None,
-            props = NonEmptyList(EventProperty("sig", sig.value)).some,
+            query = PersistenceQuery.condition(
+              namespace = Namespace(0).some,
+              props = NonEmptyList(EventProperty("sig", sig.value)).some,
+            ),
+            options = FetchOptions(),
           )
           inn = events flatMap { es =>
             EventHandler.applyEvents(es)

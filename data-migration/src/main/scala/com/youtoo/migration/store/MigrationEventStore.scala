@@ -40,22 +40,20 @@ object MigrationEventStore {
       }
 
     def readEvents(
-      ns: Option[NonEmptyList[Namespace]],
-      hierarchy: Option[Hierarchy],
-      props: Option[NonEmptyList[EventProperty]],
+      query: PersistenceQuery,
+      options: FetchOptions,
     ): RIO[ZConnection, Option[NonEmptyList[Change[MigrationEvent]]]] =
-      persistence.readEvents[MigrationEvent](MigrationEvent.discriminator, ns, hierarchy, props).map { es =>
+      persistence.readEvents[MigrationEvent](MigrationEvent.discriminator, query, options).map { es =>
         NonEmptyList.fromIterableOption(es)
       }
 
     def readEvents(
       snapshotVersion: Version,
-      ns: Option[NonEmptyList[Namespace]],
-      hierarchy: Option[Hierarchy],
-      props: Option[NonEmptyList[EventProperty]],
+      query: PersistenceQuery,
+      options: FetchOptions,
     ): RIO[ZConnection, Option[NonEmptyList[Change[MigrationEvent]]]] =
       persistence
-        .readEvents[MigrationEvent](MigrationEvent.discriminator, snapshotVersion, ns, hierarchy, props)
+        .readEvents[MigrationEvent](MigrationEvent.discriminator, snapshotVersion, query, options)
         .map { es =>
           NonEmptyList.fromIterableOption(es)
         }

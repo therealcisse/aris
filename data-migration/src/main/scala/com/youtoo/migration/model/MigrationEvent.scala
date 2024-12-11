@@ -30,7 +30,7 @@ object MigrationEvent {
 
   given Schema[MigrationEvent] = DeriveSchema.gen
 
-  given MetaInfo[MigrationEvent] with {
+  given MetaInfo[MigrationEvent]  {
     extension (self: MigrationEvent)
       def namespace: Namespace = self match {
         case MigrationEvent.MigrationRegistered(_, _) => Namespace(0)
@@ -56,10 +56,11 @@ object MigrationEvent {
       }
 
     extension (self: MigrationEvent) def props: Chunk[EventProperty] = Chunk.empty
+    extension (self: MigrationEvent) def reference: Option[Reference] = None
 
   }
 
-  given MigrationEventHandler with {
+  given MigrationEventHandler  {
 
     def applyEvents(events: NonEmptyList[Change[MigrationEvent]]): Migration =
       events match {
@@ -100,7 +101,7 @@ object MigrationEvent {
             val execution = state.state.executions
               .get(id)
               .getOrElse(
-                throw new IllegalArgumentException(s"Execution with id $id not found"),
+                throw new IllegalArgumentException(s"Execution  id $id not found"),
               )
             execution match {
               case processing: Execution.Processing =>
@@ -120,7 +121,7 @@ object MigrationEvent {
             val execution = state.state.executions
               .get(id)
               .getOrElse(
-                throw new IllegalArgumentException(s"Execution with id $id not found"),
+                throw new IllegalArgumentException(s"Execution  id $id not found"),
               )
 
             execution match {
@@ -147,7 +148,7 @@ object MigrationEvent {
             val execution = state.state.executions
               .get(id)
               .getOrElse(
-                throw new IllegalArgumentException(s"Execution with id $id not found"),
+                throw new IllegalArgumentException(s"Execution  id $id not found"),
               )
 
             execution match {
@@ -172,7 +173,7 @@ object MigrationEvent {
             val execution = state.state.executions
               .get(id)
               .getOrElse(
-                throw new IllegalArgumentException(s"Execution with id $id not found"),
+                throw new IllegalArgumentException(s"Execution  id $id not found"),
               )
 
             execution match {
@@ -194,7 +195,7 @@ object MigrationEvent {
             val execution = state.state.executions
               .get(id)
               .getOrElse(
-                throw new IllegalArgumentException(s"Execution with id $id not found"),
+                throw new IllegalArgumentException(s"Execution  id $id not found"),
               )
 
             execution match {
@@ -216,7 +217,7 @@ object MigrationEvent {
             val execution = state.state.executions
               .get(id)
               .getOrElse(
-                throw new IllegalArgumentException(s"Execution with id $id not found"),
+                throw new IllegalArgumentException(s"Execution  id $id not found"),
               )
 
             execution match {

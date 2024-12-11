@@ -28,7 +28,7 @@ object FileEvent {
 
   given Schema[FileEvent] = DeriveSchema.gen
 
-  given MetaInfo[FileEvent] with {
+  given MetaInfo[FileEvent]  {
 
     extension (self: FileEvent)
       def namespace: Namespace = self match {
@@ -60,6 +60,8 @@ object FileEvent {
           )
 
       }
+
+    extension (self: FileEvent) def reference: Option[Reference] = None
 
   }
 

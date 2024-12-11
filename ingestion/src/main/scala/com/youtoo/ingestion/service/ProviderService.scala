@@ -107,9 +107,8 @@ object ProviderService {
       atomically {
         for {
           events <- eventStore.readEvents(
-            ns = NonEmptyList(Namespace(1)).some,
-            hierarchy = None,
-            props = None,
+            query = PersistenceQuery.ns(Namespace(1)),
+            options = FetchOptions(),
           )
           inn = events.fold(Nil) { es =>
             EventHandler.applyEvents(es)
@@ -127,9 +126,11 @@ object ProviderService {
       atomically {
         for {
           events <- eventStore.readEvents(
-            ns = NonEmptyList(Namespace(0)).some,
-            hierarchy = Hierarchy.Child(parentId = provider.asKey).some,
-            props = None,
+            query = PersistenceQuery.condition(
+              namespace = Namespace(0).some,
+              hierarchy = Hierarchy.Child(parentId = provider.asKey).some,
+            ),
+            options = FetchOptions(),
           )
           inn = events flatMap { es =>
             EventHandler.applyEvents(es)
