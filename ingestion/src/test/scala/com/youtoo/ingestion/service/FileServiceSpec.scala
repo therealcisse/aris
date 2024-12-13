@@ -12,8 +12,7 @@ import zio.mock.Expectation.*
 import zio.*
 import zio.jdbc.*
 
-import com.youtoo.cqrs.service.*
-import com.youtoo.cqrs.service.postgres.*
+import com.youtoo.postgres.*
 
 import com.youtoo.ingestion.model.*
 import com.youtoo.cqrs.Codecs.given
@@ -21,7 +20,7 @@ import com.youtoo.cqrs.*
 import com.youtoo.ingestion.store.*
 import com.youtoo.cqrs.domain.*
 
-object FileServiceSpec extends MockSpecDefault {
+object FileServiceSpec extends MockSpecDefault, TestSupport {
   override val bootstrap: ZLayer[Any, Any, TestEnvironment] =
     Log.layer >>> testEnvironment
 

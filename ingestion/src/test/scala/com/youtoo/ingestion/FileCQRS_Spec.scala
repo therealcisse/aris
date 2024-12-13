@@ -8,20 +8,20 @@ import zio.*
 import zio.jdbc.*
 import zio.mock.*
 
+import com.youtoo.postgres.*
 import com.youtoo.cqrs.*
 import com.youtoo.ingestion.model.*
 import com.youtoo.ingestion.store.*
 
-import com.youtoo.cqrs.service.*
 import com.youtoo.cqrs.store.*
 
 import com.youtoo.cqrs.domain.*
 
-object FileCQRSSpec extends MockSpecDefault {
+object FileCQRS_Spec extends MockSpecDefault {
   override val bootstrap: ZLayer[Any, Any, TestEnvironment] =
     Log.layer >>> testEnvironment
 
-  def spec = suite("FileCQRSSpec")(
+  def spec = suite("FileCQRS_Spec")(
     test("should add command") {
       check(keyGen, fileCommandGen) { case (id, cmd) =>
         val Cmd = summon[CmdHandler[FileCommand, FileEvent]]

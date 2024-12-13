@@ -2,10 +2,11 @@ package com.youtoo
 package ingestion
 package repository
 
+import com.youtoo.postgres.*
 import com.youtoo.cqrs.*
 import com.youtoo.ingestion.model.*
 import com.youtoo.cqrs.service.postgres.*
-import com.youtoo.cqrs.config.*
+import com.youtoo.postgres.config.*
 import com.youtoo.cqrs.service.*
 
 import zio.*
@@ -14,7 +15,7 @@ import zio.test.*
 import zio.test.Assertion.*
 import zio.jdbc.*
 
-object IngestionRepositorySpec extends PgSpec {
+object IngestionRepositorySpec extends PgSpec, TestSupport {
 
   def spec: Spec[ZConnectionPool & DatabaseConfig & FlywayMigration & TestEnvironment & Scope, Any] =
     suite("IngestionRepositorySpec")(

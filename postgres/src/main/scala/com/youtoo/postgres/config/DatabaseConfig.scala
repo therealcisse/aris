@@ -1,5 +1,5 @@
 package com.youtoo
-package cqrs
+package postgres
 package config
 
 import zio.*

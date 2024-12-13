@@ -8,10 +8,10 @@ import zio.prelude.*
 
 import com.youtoo.cqrs.Codecs.*
 
+import com.youtoo.postgres.*
 import com.youtoo.cqrs.*
 import com.youtoo.cqrs.domain.*
 import com.youtoo.ingestion.model.*
-import com.youtoo.cqrs.service.*
 import com.youtoo.ingestion.store.*
 
 trait FileCQRS extends CQRS[FileEvent, FileCommand] {}

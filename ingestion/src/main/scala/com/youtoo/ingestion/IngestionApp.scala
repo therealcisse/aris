@@ -8,6 +8,7 @@ import zio.jdbc.*
 
 import cats.implicits.*
 
+import com.youtoo.postgres.*
 import com.youtoo.cqrs.*
 import com.youtoo.cqrs.store.*
 import com.youtoo.cqrs.service.*
@@ -15,10 +16,9 @@ import com.youtoo.cqrs.service.*
 import com.youtoo.ingestion.model.*
 import com.youtoo.ingestion.service.*
 import com.youtoo.ingestion.repository.*
-import com.youtoo.cqrs.service.postgres.*
 import com.youtoo.cqrs.service.memory.*
 import com.youtoo.ingestion.store.*
-import com.youtoo.cqrs.config.*
+import com.youtoo.postgres.config.*
 
 import zio.http.{Version as _, *}
 import zio.http.netty.NettyConfig

@@ -1,6 +1,5 @@
 package com.youtoo
-package cqrs
-package service
+package postgres
 
 import zio.*
 import zio.jdbc.*

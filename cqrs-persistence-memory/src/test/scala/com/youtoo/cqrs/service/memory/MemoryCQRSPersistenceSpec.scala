@@ -3,6 +3,7 @@ package cqrs
 package service
 package memory
 
+import com.youtoo.postgres.*
 import com.youtoo.cqrs.service.*
 
 import com.youtoo.cqrs.domain.*

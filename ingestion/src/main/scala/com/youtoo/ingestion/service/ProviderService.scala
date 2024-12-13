@@ -8,7 +8,7 @@ import zio.telemetry.opentelemetry.tracing.Tracing
 
 import com.youtoo.cqrs.Codecs.given
 
-import com.youtoo.cqrs.service.*
+import com.youtoo.postgres.*
 
 import com.youtoo.ingestion.model.*
 

@@ -8,22 +8,22 @@ import zio.*
 import zio.jdbc.*
 import zio.mock.*
 
+import com.youtoo.postgres.*
 import com.youtoo.cqrs.*
 import com.youtoo.ingestion.model.*
 import com.youtoo.ingestion.store.*
 
-import com.youtoo.cqrs.service.*
 import com.youtoo.cqrs.store.*
 
 import com.youtoo.cqrs.domain.*
 
-object IngestionCQRSSpec extends MockSpecDefault {
+object IngestionCQRS_Spec extends MockSpecDefault {
   override val bootstrap: ZLayer[Any, Any, TestEnvironment] =
     Log.layer >>> testEnvironment ++ Runtime.setConfigProvider(
       ConfigProvider.fromMap(Map("Ingestion.snapshots.threshold" -> "10")),
     )
 
-  def spec = suite("IngestionCQRSSpec")(
+  def spec = suite("IngestionCQRS_Spec")(
     test("should add command") {
       check(keyGen, ingestionCommandGen) { case (id, cmd) =>
         val Cmd = summon[CmdHandler[IngestionCommand, IngestionEvent]]

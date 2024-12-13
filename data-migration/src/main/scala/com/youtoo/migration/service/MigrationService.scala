@@ -4,7 +4,7 @@ package service
 
 import cats.implicits.*
 
-import com.youtoo.cqrs.service.*
+import com.youtoo.postgres.*
 
 import com.youtoo.migration.model.*
 import com.youtoo.migration.repository.*

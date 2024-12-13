@@ -2,6 +2,8 @@ package com.youtoo
 package cqrs
 package config
 
+import com.youtoo.postgres.config.*
+
 import zio.test.*
 import zio.test.Assertion.*
 

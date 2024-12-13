@@ -2,9 +2,10 @@ package com.youtoo
 package migration
 package repository
 
+import com.youtoo.postgres.*
 import com.youtoo.migration.model.*
 import com.youtoo.cqrs.service.postgres.*
-import com.youtoo.cqrs.config.*
+import com.youtoo.postgres.config.*
 import com.youtoo.cqrs.service.*
 
 import zio.*
@@ -13,7 +14,7 @@ import zio.test.*
 import zio.test.Assertion.*
 import zio.jdbc.*
 
-object MigrationRepositorySpec extends PgSpec {
+object MigrationRepositorySpec extends PgSpec, TestSupport {
 
   def spec: Spec[ZConnectionPool & DatabaseConfig & FlywayMigration & TestEnvironment & Scope, Any] =
     suite("MigrationRepositorySpec")(

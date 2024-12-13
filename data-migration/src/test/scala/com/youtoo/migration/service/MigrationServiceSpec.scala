@@ -12,6 +12,7 @@ import zio.*
 import zio.jdbc.*
 import zio.mock.*
 
+import com.youtoo.postgres.*
 import com.youtoo.cqrs.service.*
 import com.youtoo.cqrs.service.postgres.*
 

@@ -10,8 +10,8 @@ import com.youtoo.cqrs.Codecs.*
 
 import com.youtoo.cqrs.domain.*
 import com.youtoo.migration.model.*
+import com.youtoo.postgres.*
 import com.youtoo.cqrs.*
-import com.youtoo.cqrs.service.*
 import com.youtoo.migration.store.*
 
 trait MigrationCQRS extends CQRS[MigrationEvent, MigrationCommand] {}

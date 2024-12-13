@@ -11,6 +11,7 @@ import zio.logging.backend.SLF4J
 
 import cats.implicits.*
 
+import com.youtoo.postgres.*
 import com.youtoo.cqrs.*
 import com.youtoo.cqrs.store.*
 import com.youtoo.cqrs.service.*
@@ -20,7 +21,7 @@ import com.youtoo.migration.service.*
 import com.youtoo.migration.repository.*
 import com.youtoo.cqrs.service.postgres.*
 import com.youtoo.migration.store.*
-import com.youtoo.cqrs.config.*
+import com.youtoo.postgres.config.*
 
 import com.youtoo.std.*
 

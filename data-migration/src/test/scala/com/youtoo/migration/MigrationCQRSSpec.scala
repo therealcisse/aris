@@ -11,8 +11,8 @@ import zio.mock.*
 import com.youtoo.migration.model.*
 import com.youtoo.migration.store.*
 
+import com.youtoo.postgres.*
 import com.youtoo.cqrs.*
-import com.youtoo.cqrs.service.*
 import com.youtoo.cqrs.store.*
 
 import com.youtoo.cqrs.domain.*

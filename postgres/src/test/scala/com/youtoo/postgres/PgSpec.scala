@@ -1,9 +1,7 @@
 package com.youtoo
-package cqrs
-package service
 package postgres
 
-import com.youtoo.cqrs.config.*
+import com.youtoo.postgres.config.*
 
 import zio.*
 import zio.test.*

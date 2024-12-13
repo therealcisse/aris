@@ -3,7 +3,8 @@ package cqrs
 package service
 package postgres
 
-import com.youtoo.cqrs.config.*
+import com.youtoo.postgres.*
+import com.youtoo.postgres.config.*
 import com.youtoo.cqrs.service.*
 
 import com.youtoo.cqrs.domain.*
@@ -20,7 +21,7 @@ import zio.schema.*
 
 import zio.telemetry.opentelemetry.tracing.*
 
-object PostgresCQRSPersistenceSpec extends PgSpec {
+object PostgresCQRSPersistenceSpec extends PgSpec, TestSupport {
   case class DummyEvent(id: String)
 
   inline val grandParentIdXXX = 11L

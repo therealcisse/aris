@@ -16,8 +16,12 @@ ThisBuild / resolvers ++= Resolver.sonatypeOssRepos("snapshots")
 ThisBuild / version := git.gitHeadCommit.value.map(commit => s"0.1.0-${commit.take(7)}").getOrElse("0.1.0-SNAPSHOT")
 ThisBuild / git.useGitDescribe := true
 
+ThisBuild / Test / javaOptions ++= Seq(
+  "-Dlogback.configurationFile=logback-test.xml",
+  )
+
 ThisBuild / git.gitTagToVersionNumber := { tag: String =>
-  if(tag matches "[0-9]+\\..*") Some(tag)
+  if (tag matches "[0-9]+\\..*") Some(tag)
   else None
 }
 
@@ -38,7 +42,7 @@ def installGitHook: Unit = if (!sys.env.contains("CI")) {
 
 // Register the onLoad command to install the hook
 onLoad in Global := {
-  val previousOnLoad = (onLoad in Global).value
+  val previousOnLoad = (Global / onLoad).value
   state => {
     installGitHook
     previousOnLoad(state)
@@ -57,6 +61,8 @@ lazy val aggregatedProjects: Seq[ProjectReference] =
     benchmarks,
     log,
     observability,
+    lock,
+    `cqrs-persistence-postgres`,
   )
 
 inThisBuild(replSettings)
@@ -87,6 +93,35 @@ lazy val log = (project in file("log"))
     ),
   )
 
+lazy val lock = (project in file("lock"))
+  .settings(stdSettings("lock"))
+  // .settings(publishSetting(false))
+  .enablePlugins(BuildInfoPlugin)
+  .settings(buildInfoSettings("com.youtoo"))
+  .dependsOn(
+    core % "compile->compile;test->compile",
+    postgres % "compile->compile;test->compile;test->test",
+  )
+  .settings(
+    testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
+    libraryDependencies ++= Dependencies.`open-telemetry`,
+    libraryDependencies ++= Seq(
+      flyway,
+      hicariCP,
+      `postgres-driver`,
+      `testcontainers-scala-postgresql`,
+      `zio-jdbc`,
+      zio,
+      cats,
+      `zio-prelude`,
+      `zio-schema`,
+      `zio-test`,
+      `zio-test-sbt`,
+      `zio-test-magnolia`,
+      `zio-mock`,
+    ),
+  )
+
 lazy val kernel = (project in file("kernel"))
   .settings(stdSettings("kernel"))
   // .settings(publishSetting(false))
@@ -103,6 +138,31 @@ lazy val kernel = (project in file("kernel"))
       `zio-prelude`,
       `zio-schema`,
       zio,
+      `zio-test`,
+      `zio-test-sbt`,
+      `zio-test-magnolia`,
+      `zio-mock`,
+    ),
+  )
+
+lazy val postgres = (project in file("postgres"))
+  .settings(stdSettings("postgres"))
+  // .settings(publishSetting(false))
+  .enablePlugins(BuildInfoPlugin)
+  .settings(buildInfoSettings("com.youtoo"))
+  .dependsOn(log % "compile->compile;test->compile")
+  .settings(
+    testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
+    libraryDependencies ++= Dependencies.`open-telemetry`,
+    libraryDependencies ++= Seq(
+      mockito,
+      cats,
+      `zio-jdbc`,
+      flyway,
+      hicariCP,
+      `postgres-driver`,
+      `testcontainers-scala-postgresql`,
+      `zio-jdbc`,
       `zio-test`,
       `zio-test-sbt`,
       `zio-test-magnolia`,
@@ -151,7 +211,7 @@ lazy val std = (project in file("std"))
   .settings(stdSettings("std"))
   .settings(
     Test / parallelExecution := false,
-    testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
+    testFrameworks += new TestFramework("zio.test.sbt.ztestframework"),
     libraryDependencies ++= Dependencies.`open-telemetry`,
     libraryDependencies ++= Seq(
       cats,
@@ -164,8 +224,11 @@ lazy val std = (project in file("std"))
     ),
   )
 
-lazy val postgres = (project in file("cqrs-persistence-postgres"))
-  .dependsOn(core % "compile->test")
+lazy val `cqrs-persistence-postgres` = (project in file("cqrs-persistence-postgres"))
+  .dependsOn(
+    core % "compile->test",
+    postgres % "compile->compile;test->compile;test->test",
+  )
   .settings(stdSettings("cqrs-persistence-postgres"))
   // .settings(publishSetting(false))
   .settings(
@@ -173,11 +236,6 @@ lazy val postgres = (project in file("cqrs-persistence-postgres"))
     Test / unmanagedResourceDirectories ++= (Compile / unmanagedResourceDirectories).value,
     libraryDependencies ++= Dependencies.`open-telemetry`,
     libraryDependencies ++= Seq(
-      flyway,
-      hicariCP,
-      `postgres-driver`,
-      `testcontainers-scala-postgresql`,
-      `zio-jdbc`,
       `zio-test`,
       `zio-test-sbt`,
       `zio-test-magnolia`,
@@ -186,7 +244,10 @@ lazy val postgres = (project in file("cqrs-persistence-postgres"))
   )
 
 lazy val memory = (project in file("cqrs-persistence-memory"))
-  .dependsOn(core % "compile->test")
+  .dependsOn(
+    core % "compile->test",
+    postgres % "compile->compile;test->compile;test->test",
+  )
   .settings(stdSettings("cqrs-persistence-memory"))
   // .settings(publishSetting(false))
   .settings(
@@ -207,7 +268,7 @@ lazy val memory = (project in file("cqrs-persistence-memory"))
 lazy val ingestion = (project in file("ingestion"))
   .dependsOn(
     memory % "compile->compile;test->test",
-    postgres % "compile->compile;test->test",
+    `cqrs-persistence-postgres` % "compile->compile;test->test",
     core % "compile->compile;test->test",
     log % "compile->compile;test->compile",
     observability % "compile->compile",
@@ -247,10 +308,11 @@ lazy val dataMigration = (project in file("data-migration"))
   .dependsOn(
     std % "compile->compile;test->test",
     memory % "compile->compile;test->test",
-    postgres % "compile->compile;test->test",
+    `cqrs-persistence-postgres` % "compile->compile;test->test",
     core % "compile->compile;test->test",
     log % "compile->compile;test->compile",
     observability % "compile->compile",
+    postgres % "compile->compile;test->test",
   )
   .settings(stdSettings("data-migration"))
   .enablePlugins(DockerPlugin, JavaAppPackaging)
@@ -297,6 +359,7 @@ lazy val loadtests = (project in file("loadtests"))
 lazy val benchmarks = (project in file("benchmarks"))
   .dependsOn(
     std % "compile->compile;test->test",
+    postgres % "compile->compile;test->test",
     kernel % "compile->compile;test->test",
     dataMigration % "compile->compile;test->test",
   )
