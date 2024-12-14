@@ -50,6 +50,7 @@ onLoad in Global := {
 }
 lazy val aggregatedProjects: Seq[ProjectReference] =
   Seq(
+    job,
     kernel,
     core,
     std,
@@ -336,6 +337,36 @@ lazy val dataMigration = (project in file("data-migration"))
       // `zio-config-typesafe`,
       `zio-metrics-connectors-prometheus`,
       `testcontainers-scala-postgresql`,
+      `zio-test`,
+      `zio-test-sbt`,
+      `zio-test-magnolia`,
+      `zio-mock`,
+    ),
+  )
+
+lazy val job = (project in file("job"))
+  .settings(stdSettings("job"))
+  // .settings(publishSetting(false))
+  .enablePlugins(BuildInfoPlugin)
+  .settings(buildInfoSettings("com.youtoo"))
+  .dependsOn(
+    core % "compile->compile;test->compile",
+    postgres % "compile->compile;test->compile;test->test",
+    `cqrs-persistence-postgres` % "compile->compile;test->test",
+  )
+  .settings(
+    testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
+    libraryDependencies ++= Dependencies.`open-telemetry`,
+    libraryDependencies ++= Seq(
+      flyway,
+      hicariCP,
+      `postgres-driver`,
+      `testcontainers-scala-postgresql`,
+      `zio-jdbc`,
+      zio,
+      cats,
+      `zio-prelude`,
+      `zio-schema`,
       `zio-test`,
       `zio-test-sbt`,
       `zio-test-magnolia`,
