@@ -20,12 +20,6 @@ object MockFileEventStore extends Mock[FileEventStore] {
         Throwable,
         Option[NonEmptyList[Change[FileEvent]]],
       ]
-  object ReadEventsByVersionAndFilters
-      extends Effect[
-        (Version, PersistenceQuery, FetchOptions),
-        Throwable,
-        Option[NonEmptyList[Change[FileEvent]]],
-      ]
   object Save extends Effect[(Key, Change[FileEvent]), Throwable, Long]
 
   val compose: URLayer[Proxy, FileEventStore] = ZLayer.fromFunction { (proxy: Proxy) =>
@@ -37,12 +31,6 @@ object MockFileEventStore extends Mock[FileEventStore] {
         query: PersistenceQuery,
         options: FetchOptions,
       ): Task[Option[NonEmptyList[Change[FileEvent]]]] = proxy(ReadEventsByFilters, (query, options))
-      def readEvents(
-        snapshotVersion: Version,
-        query: PersistenceQuery,
-        options: FetchOptions,
-      ): Task[Option[NonEmptyList[Change[FileEvent]]]] =
-        proxy(ReadEventsByVersionAndFilters, (snapshotVersion, query, options))
       def save(id: Key, event: Change[FileEvent]): Task[Long] = proxy(Save, (id, event))
     }
   }

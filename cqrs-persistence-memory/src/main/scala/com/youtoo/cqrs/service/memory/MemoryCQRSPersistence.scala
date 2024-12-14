@@ -150,16 +150,6 @@ object MemoryCQRSPersistence {
 
         }
 
-    extension (s: State)
-      def fetch[Event: MetaInfo](
-        discriminator: Discriminator,
-        snapshotVersion: Version,
-        query: PersistenceQuery,
-        options: FetchOptions,
-      ): Chunk[Change[Event]] =
-        val p = s.fetch[Event](discriminator, query, options)
-        p.filter(_.version.value > snapshotVersion.value)
-
   }
 
   def live(): ZLayer[Tracing, Throwable, CQRSPersistence] =
@@ -192,14 +182,6 @@ object MemoryCQRSPersistence {
       options: FetchOptions,
     ): RIO[ZConnection, Chunk[Change[Event]]] =
       ref.get.map(_.fetch(discriminator, query, options))
-
-    def readEvents[Event:{ BinaryCodec, Tag, MetaInfo}](
-      discriminator: Discriminator,
-      snapshotVersion: Version,
-      query: PersistenceQuery,
-      options: FetchOptions,
-    ): RIO[ZConnection, Chunk[Change[Event]]] =
-      ref.get.map(_.fetch(discriminator, snapshotVersion, query, options))
 
     def saveEvent[Event: {BinaryCodec, MetaInfo, Tag}](
       id: Key,
@@ -238,16 +220,6 @@ object MemoryCQRSPersistence {
         ): RIO[ZConnection, Chunk[Change[Event]]] =
           self.readEvents(discriminator, query, options) @@ tracing.aspects.span(
             "MemoryCQRSPersistence.readEvents.query",
-          )
-
-        def readEvents[Event:{ BinaryCodec, Tag, MetaInfo}](
-          discriminator: Discriminator,
-          snapshotVersion: Version,
-          query: PersistenceQuery,
-          options: FetchOptions,
-        ): RIO[ZConnection, Chunk[Change[Event]]] =
-          self.readEvents(discriminator, snapshotVersion, query, options) @@ tracing.aspects.span(
-            "MemoryCQRSPersistence.readEvents.query_fromSnapshot",
           )
 
         def saveEvent[Event: {BinaryCodec, MetaInfo, Tag}](

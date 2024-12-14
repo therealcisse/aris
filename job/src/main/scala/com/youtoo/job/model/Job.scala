@@ -6,31 +6,27 @@ import zio.*
 import zio.prelude.*
 import zio.schema.*
 
-case class Job(id: Job.Id, tag: Job.Tag, total: JobMeasurement, status: JobStatus)
+case class Job(
+  id: Job.Id,
+  tag: Job.Tag,
+  total: JobMeasurement,
+  status: JobStatus,
+)
 
 object Job {
   given Schema[Job] = DeriveSchema.gen
 
   type Id = Id.Type
-
   object Id extends Newtype[Key] {
-    import zio.schema.*
-
     def gen: Task[Id] = Key.gen.map(wrap)
-
     def apply(value: Long): Id = Id(Key(value))
-
     extension (a: Id) inline def asKey: Key = Id.unwrap(a)
-
     given Schema[Id] = derive
   }
 
   type Tag = Tag.Type
   object Tag extends Newtype[String] {
-    import zio.schema.*
-
     extension (a: Tag) inline def value: String = Tag.unwrap(a)
-
     given Schema[Tag] = derive
   }
 
@@ -40,8 +36,18 @@ object Job {
   }
 
   object CompletionReason {
-
     given Schema[CompletionReason] = DeriveSchema.gen
+  }
 
+  extension (job: Job) {
+    def created: Timestamp = job.status match {
+      case JobStatus.Running(started, _, _) => started
+      case JobStatus.Completed(execution, _, _) => execution.started
+    }
+
+    def lastModified: Timestamp = job.status match {
+      case JobStatus.Running(_, lastUpdated, _) => lastUpdated
+      case JobStatus.Completed(_, completed, _) => completed
+    }
   }
 }

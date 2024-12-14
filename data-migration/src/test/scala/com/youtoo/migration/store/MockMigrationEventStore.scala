@@ -25,12 +25,6 @@ object MockMigrationEventStore extends Mock[MigrationEventStore] {
             NonEmptyList[Change[MigrationEvent]],
           ],
         ]
-    object SnapshotArgs
-        extends Effect[
-          (Version, PersistenceQuery, FetchOptions),
-          Throwable,
-          Option[NonEmptyList[Change[MigrationEvent]]],
-        ]
   }
 
   object Save extends Effect[(Key, Change[MigrationEvent]), Throwable, Long]
@@ -45,13 +39,6 @@ object MockMigrationEventStore extends Mock[MigrationEventStore] {
 
         def readEvents(id: Key, snapshotVersion: Version): Task[Option[NonEmptyList[Change[MigrationEvent]]]] =
           proxy(ReadEvents.Snapshot, (id, snapshotVersion))
-
-        def readEvents(
-          snapshotVersion: Version,
-          query: PersistenceQuery,
-          options: FetchOptions,
-        ): Task[Option[NonEmptyList[Change[MigrationEvent]]]] =
-          proxy(ReadEvents.SnapshotArgs, (snapshotVersion, query, options))
 
         def readEvents(
           query: PersistenceQuery,

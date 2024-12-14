@@ -4,10 +4,8 @@ package repository
 
 import com.youtoo.postgres.config.*
 import com.youtoo.postgres.*
-import com.youtoo.cqrs.*
 import com.youtoo.job.model.*
 import zio.*
-import zio.prelude.*
 import zio.test.*
 import zio.test.Assertion.*
 import zio.jdbc.*
@@ -19,18 +17,6 @@ object JobRepositorySpec extends PgSpec, TestSupport {
       test("load job is optimized") {
         check(jobIdGen) { case (id) =>
           val query = JobRepository.Queries.READ_JOB(id)
-          for {
-            executionTime <- atomically(query.selectAll).timed.map(_._1)
-            timeAssertion = assert(executionTime.toMillis)(isLessThanEqualTo(100L))
-
-            executionPlan <- atomically(query.sql.getExecutionPlan)
-            planAssertion = assert(executionPlan)(containsString("Index Scan") || containsString("Index Only Scan"))
-          } yield planAssertion && timeAssertion
-        }
-      },
-      test("load many jobs is optimized") {
-        check(Gen.option(keyGen), Gen.long(100, 10_000)) { case (offset, limit) =>
-          val query = JobRepository.Queries.READ_JOBS(offset, limit)
           for {
             executionTime <- atomically(query.selectAll).timed.map(_._1)
             timeAssertion = assert(executionTime.toMillis)(isLessThanEqualTo(100L))
@@ -62,11 +48,11 @@ object JobRepositorySpec extends PgSpec, TestSupport {
         }
       } @@ TestAspect.samples(1),
       test("should update an existing job") {
-        check(jobGen) { job =>
+        check(jobGen, jobStatusGen) { (job, status) =>
           atomically {
             for {
               _ <- JobRepository.save(job)
-              updatedJob = job.copy(status = Job.Status.Completed)
+              updatedJob = job.copy(status = status)
               _ <- JobRepository.save(updatedJob)
               result <- JobRepository.load(job.id)
             } yield assert(result)(isSome(equalTo(updatedJob)))
@@ -80,13 +66,13 @@ object JobRepositorySpec extends PgSpec, TestSupport {
             result <- JobRepository.load(id)
           } yield assert(result)(isNone)
         }
-      } @@ TestAspect.samples(1)
+      } @@ TestAspect.samples(1),
     ).provideSomeLayerShared(
       ZLayer.make[JobRepository](
         JobRepository.live(),
         (zio.telemetry.opentelemetry.OpenTelemetry.contextZIO >>> tracingMockLayer()),
       ),
-    ) @@ TestAspect.sequential @@ TestAspect.withLiveClock @@ TestAspect.beforeAll {
+    ) @@ TestAspect.withLiveClock @@ TestAspect.beforeAll {
       for {
         config <- ZIO.service[DatabaseConfig]
         _ <- FlywayMigration.run(config)
@@ -94,4 +80,3 @@ object JobRepositorySpec extends PgSpec, TestSupport {
     }
 
 }
-

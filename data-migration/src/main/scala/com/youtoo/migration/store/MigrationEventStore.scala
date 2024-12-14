@@ -47,17 +47,6 @@ object MigrationEventStore {
         NonEmptyList.fromIterableOption(es)
       }
 
-    def readEvents(
-      snapshotVersion: Version,
-      query: PersistenceQuery,
-      options: FetchOptions,
-    ): RIO[ZConnection, Option[NonEmptyList[Change[MigrationEvent]]]] =
-      persistence
-        .readEvents[MigrationEvent](MigrationEvent.discriminator, snapshotVersion, query, options)
-        .map { es =>
-          NonEmptyList.fromIterableOption(es)
-        }
-
     def save(id: Key, event: Change[MigrationEvent]): RIO[ZConnection, Long] =
       persistence.saveEvent(id, MigrationEvent.discriminator, event)
 

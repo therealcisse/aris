@@ -11,7 +11,7 @@ object IngestionEventHandlerFuzzSpec extends ZIOSpecDefault {
 
   def spec = suite("IngestionEventHandlerFuzzSpec")(
     test("Fuzz test IngestionEventHandler does not crash on invalid inputs") {
-      check(eventSequenceGen) { events =>
+      check(ingestionEventSequenceGen) { events =>
         val result = ZIO.attempt(EventHandler.applyEvents(events))
         result.fold(
           _ => assertCompletes, // Test passes if an exception is thrown (as expected)
@@ -20,7 +20,7 @@ object IngestionEventHandlerFuzzSpec extends ZIOSpecDefault {
       }
     },
     test("Fuzz test IngestionEventHandler with random events") {
-      check(validEventSequenceGen) { events =>
+      check(validIngestionEventSequenceGen) { events =>
         val result = ZIO.attempt(EventHandler.applyEvents(events)).either
         result.map {
           case Left(_) =>

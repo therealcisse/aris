@@ -10,7 +10,7 @@ import zio.prelude.*
 enum JobCommand {
   case StartJob(id: Job.Id, timestamp: Timestamp, total: JobMeasurement, tag: Job.Tag)
   case ReportProgress(id: Job.Id, timestamp: Timestamp, progress: Progress)
-  case Done(id: Job.Id, timestamp: Timestamp, reason: Job.CompletionReason)
+  case CompleteJob(id: Job.Id, timestamp: Timestamp, reason: Job.CompletionReason)
 }
 
 type JobCommandHandler = CmdHandler[JobCommand, JobEvent]
@@ -25,7 +25,7 @@ object JobCommand {
           NonEmptyList(JobEvent.JobStarted(id, timestamp, total, tag))
         case JobCommand.ReportProgress(id, timestamp, progress) =>
           NonEmptyList(JobEvent.ProgressReported(id, timestamp, progress))
-        case JobCommand.Done(id, timestamp, reason) =>
+        case JobCommand.CompleteJob(id, timestamp, reason) =>
           NonEmptyList(JobEvent.JobCompleted(id, timestamp, reason))
       }
   }

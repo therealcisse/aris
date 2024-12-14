@@ -1,8 +1,6 @@
 package com.youtoo
 package job
 
-import com.youtoo.cqrs.Codecs.given
-
 import zio.*
 import zio.test.*
 import zio.test.Assertion.*
@@ -39,7 +37,7 @@ val variableMeasurementGen: Gen[Any, JobMeasurement.Variable] =
 
 val jobMeasurementGen: Gen[Any, JobMeasurement] = Gen.oneOf(
   deterministicMeasurementGen,
-  variableMeasurementGen
+  variableMeasurementGen,
 )
 
 val jobStatusRunningGen: Gen[Any, JobStatus.Running] =
@@ -49,21 +47,21 @@ val jobStatusRunningGen: Gen[Any, JobStatus.Running] =
     progress <- progressGen
   } yield JobStatus.Running(started, lastUpdated, progress)
 
-val jobReasonGen: Gen[Any, Job.CompletionReason] = Gen.oneOf(
+val jobCompletionReasonGen: Gen[Any, Job.CompletionReason] = Gen.oneOf(
   Gen.const(Job.CompletionReason.Success()),
-  Gen.alphaNumericStringBounded(5, 100).map(Job.CompletionReason.Failure.apply)
+  Gen.alphaNumericStringBounded(5, 100).map(Job.CompletionReason.Failure.apply),
 )
 
 val jobStatusCompletedGen: Gen[Any, JobStatus.Completed] =
   for {
     running <- jobStatusRunningGen
     timestamp <- timestampGen
-    reason <- jobReasonGen
+    reason <- jobCompletionReasonGen
   } yield JobStatus.Completed(running, timestamp, reason)
 
 val jobStatusGen: Gen[Any, JobStatus] = Gen.oneOf(
   jobStatusRunningGen,
-  jobStatusCompletedGen
+  jobStatusCompletedGen,
 )
 
 val jobTagGen: Gen[Any, Job.Tag] =
@@ -77,7 +75,7 @@ given jobGen: Gen[Any, Job] =
     status <- jobStatusGen
   } yield Job(id, tag, total, status)
 
-val startJobCommandGen: Gen[Any, JobCommand.StartJob] =
+val startJobCommandGen: Gen[Any, JobCommand] =
   for {
     id <- jobIdGen
     timestamp <- timestampGen
@@ -85,27 +83,35 @@ val startJobCommandGen: Gen[Any, JobCommand.StartJob] =
     tag <- jobTagGen
   } yield JobCommand.StartJob(id, timestamp, total, tag)
 
-val reportProgressCommandGen: Gen[Any, JobCommand.ReportProgress] =
+val reportProgressCommandGen: Gen[Any, JobCommand] =
   for {
     id <- jobIdGen
     timestamp <- timestampGen
     progress <- progressGen
   } yield JobCommand.ReportProgress(id, timestamp, progress)
 
-val doneCommandGen: Gen[Any, JobCommand.Done] =
+val doneCommandGen: Gen[Any, JobCommand.CompleteJob] =
   for {
     id <- jobIdGen
     timestamp <- timestampGen
-    reason <- jobReasonGen
-  } yield JobCommand.Done(id, timestamp, reason)
+    reason <- jobCompletionReasonGen
+  } yield JobCommand.CompleteJob(id, timestamp, reason)
 
 val jobCommandGen: Gen[Any, JobCommand] = Gen.oneOf(
   startJobCommandGen,
   reportProgressCommandGen,
-  doneCommandGen
+  doneCommandGen,
 )
 
-val jobStartedEventGen: Gen[Any, JobEvent.JobStarted] =
+val validCommandSequenceGen: Gen[Any, NonEmptyList[JobCommand]] =
+  for {
+    startCmd <- startJobCommandGen
+    progressCmds <- Gen.listOf(reportProgressCommandGen)
+    done <- doneCommandGen
+    cmds = progressCmds ::: (done :: Nil)
+  } yield NonEmptyList(startCmd, cmds*)
+
+val jobStartedEventGen: Gen[Any, JobEvent] =
   for {
     id <- jobIdGen
     timestamp <- timestampGen
@@ -113,24 +119,24 @@ val jobStartedEventGen: Gen[Any, JobEvent.JobStarted] =
     tag <- jobTagGen
   } yield JobEvent.JobStarted(id, timestamp, total, tag)
 
-val progressReportedEventGen: Gen[Any, JobEvent.ProgressReported] =
+val progressReportedEventGen: Gen[Any, JobEvent] =
   for {
     id <- jobIdGen
     timestamp <- timestampGen
     progress <- progressGen
   } yield JobEvent.ProgressReported(id, timestamp, progress)
 
-val jobCompletedEventGen: Gen[Any, JobEvent.JobCompleted] =
+val jobCompletedEventGen: Gen[Any, JobEvent] =
   for {
     id <- jobIdGen
     timestamp <- timestampGen
-    reason <- jobReasonGen
+    reason <- jobCompletionReasonGen
   } yield JobEvent.JobCompleted(id, timestamp, reason)
 
 val jobEventGen: Gen[Any, JobEvent] = Gen.oneOf(
   jobStartedEventGen,
   progressReportedEventGen,
-  jobCompletedEventGen
+  jobCompletedEventGen,
 )
 
 val changeEventGen: Gen[Any, Change[JobEvent]] =
@@ -158,21 +164,18 @@ val jobStartedChangeGen: Gen[Any, Change[JobEvent]] =
     version <- versionGen
   } yield Change(version, JobEvent.JobStarted(id, timestamp, measurement, tag))
 
-val followupEventGen: Gen[Any, JobEvent] = Gen.oneOf(
-  progressReportedEventGen,
-  jobCompletedEventGen
-)
-
 val validEventSequenceGen: Gen[Any, NonEmptyList[Change[JobEvent]]] =
   for {
     startChange <- jobStartedChangeGen
-    otherEvents <- Gen.listOf(followupEventGen)
-    changes <- Gen.fromZIO {
+    otherEvents <- Gen.listOf(progressReportedEventGen)
+    progressChanges <- Gen.fromZIO {
       ZIO.foreach(otherEvents) { event =>
         for {
           version <- Version.gen.orDie
         } yield Change(version, event)
       }
     }
+    done <- jobCompletedEventGen
+    version <- versionGen
+    changes = progressChanges ::: (Change(version, done) :: Nil)
   } yield NonEmptyList(startChange, changes*)
-

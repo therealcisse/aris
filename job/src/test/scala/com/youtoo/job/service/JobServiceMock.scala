@@ -40,4 +40,3 @@ object JobServiceMock extends Mock[JobService] {
       }
     }
 }
-

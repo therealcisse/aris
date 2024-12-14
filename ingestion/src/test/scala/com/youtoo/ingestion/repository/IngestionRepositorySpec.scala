@@ -99,7 +99,7 @@ object IngestionRepositorySpec extends PgSpec, TestSupport {
         IngestionRepository.live(),
         (zio.telemetry.opentelemetry.OpenTelemetry.contextZIO >>> tracingMockLayer()),
       ),
-    ) @@ TestAspect.sequential @@ TestAspect.withLiveClock @@ TestAspect.beforeAll {
+    ) @@ TestAspect.withLiveClock @@ TestAspect.beforeAll {
       for {
         config <- ZIO.service[DatabaseConfig]
         _ <- FlywayMigration.run(config)

@@ -30,4 +30,3 @@ object JobRepositoryMock extends Mock[JobRepository] {
       }
     }
 }
-

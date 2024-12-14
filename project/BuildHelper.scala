@@ -28,8 +28,13 @@ object BuildHelper extends ScalaSettings {
     "-language:postfixOps",
     "-Xmax-inlines",
     "4096",
-    "-Xfatal-warnings",
-  )
+  ) ++ {
+    if (sys.env.contains("CI")) {
+      Seq("-Xfatal-warnings")
+    } else {
+      Nil // to enable Scalafix locally
+    }
+  }
 
   def extraOptions(scalaVersion: String) =
     CrossVersion.partialVersion(scalaVersion) match {

@@ -10,7 +10,11 @@ enum JobStatus {
 }
 
 object JobStatus {
-
   given Schema[JobStatus] = DeriveSchema.gen
 
+  extension (status: JobStatus)
+    def isCompleted: Boolean = status match {
+      case _: JobStatus.Completed => true
+      case _ => false
+    }
 }

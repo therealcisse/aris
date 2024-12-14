@@ -71,5 +71,5 @@ val genPersistenceQuery: Gen[Any, PersistenceQuery] =
 val genFetchOptions: Gen[Any, FetchOptions] =
   for {
     offset <- Gen.option(keyGen)
-    limit <- Gen.option(Gen.long)
+    limit <- Gen.option(Gen.long(0, 1000))
   } yield FetchOptions(offset, limit)

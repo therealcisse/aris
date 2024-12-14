@@ -25,12 +25,6 @@ object MockIngestionEventStore extends Mock[IngestionEventStore] {
             NonEmptyList[Change[IngestionEvent]],
           ],
         ]
-    object SnapshotArgs
-        extends Effect[
-          (Version, PersistenceQuery, FetchOptions),
-          Throwable,
-          Option[NonEmptyList[Change[IngestionEvent]]],
-        ]
   }
 
   object Save extends Effect[(Key, Change[IngestionEvent]), Throwable, Long]
@@ -45,13 +39,6 @@ object MockIngestionEventStore extends Mock[IngestionEventStore] {
 
         def readEvents(id: Key, snapshotVersion: Version): Task[Option[NonEmptyList[Change[IngestionEvent]]]] =
           proxy(ReadEvents.Snapshot, (id, snapshotVersion))
-
-        def readEvents(
-          snapshotVersion: Version,
-          query: PersistenceQuery,
-          options: FetchOptions,
-        ): Task[Option[NonEmptyList[Change[IngestionEvent]]]] =
-          proxy(ReadEvents.SnapshotArgs, (snapshotVersion, query, options))
 
         def readEvents(
           query: PersistenceQuery,

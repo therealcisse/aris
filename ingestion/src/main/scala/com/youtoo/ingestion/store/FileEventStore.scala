@@ -44,15 +44,6 @@ object FileEventStore {
             NonEmptyList.fromIterableOption(es)
           }
 
-        def readEvents(
-          snapshotVersion: Version,
-          query: PersistenceQuery,
-          options: FetchOptions,
-        ): RIO[ZConnection, Option[NonEmptyList[Change[FileEvent]]]] =
-          persistence.readEvents[FileEvent](FileEvent.discriminator, snapshotVersion, query, options).map { es =>
-            NonEmptyList.fromIterableOption(es)
-          }
-
         def save(id: Key, event: Change[FileEvent]): RIO[ZConnection, Long] =
           persistence.saveEvent(id, FileEvent.discriminator, event)
 

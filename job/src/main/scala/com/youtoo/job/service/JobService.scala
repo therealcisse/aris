@@ -137,7 +137,7 @@ object JobService {
         .provideEnvironment(ZEnvironment(jobCQRS))
 
     def completeJob(id: Job.Id, timestamp: Timestamp, reason: Job.CompletionReason): Task[Unit] =
-      JobCQRS.add(id.asKey, JobCommand.Done(id, timestamp, reason)).provideEnvironment(ZEnvironment(jobCQRS))
+      JobCQRS.add(id.asKey, JobCommand.CompleteJob(id, timestamp, reason)).provideEnvironment(ZEnvironment(jobCQRS))
 
     def traced(tracing: Tracing): JobService = new JobService {
       def load(id: Job.Id): Task[Option[Job]] =

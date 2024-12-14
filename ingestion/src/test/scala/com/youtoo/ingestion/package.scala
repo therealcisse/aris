@@ -114,7 +114,7 @@ def isValidState(status: Ingestion.Status): Boolean = status match {
 val commandSequenceGen: Gen[Any, List[IngestionCommand]] =
   Gen.listOf(ingestionCommandGen)
 
-val eventSequenceGen: Gen[Any, NonEmptyList[Change[IngestionEvent]]] =
+val ingestionEventSequenceGen: Gen[Any, NonEmptyList[Change[IngestionEvent]]] =
   for {
     events <- Gen.listOf(ingestionEventGen)
     if events.nonEmpty
@@ -127,7 +127,7 @@ val eventSequenceGen: Gen[Any, NonEmptyList[Change[IngestionEvent]]] =
     }
   } yield NonEmptyList.fromIterable(changes.head, changes.tail)
 
-val validEventSequenceGen: Gen[Any, NonEmptyList[Change[IngestionEvent]]] =
+val validIngestionEventSequenceGen: Gen[Any, NonEmptyList[Change[IngestionEvent]]] =
   for {
     id <- ingestionIdGen
     version <- versionGen
@@ -283,3 +283,18 @@ val providerAddedGen: Gen[Any, FileEvent.ProviderAdded] =
     name <- Gen.alphaNumericStringBounded(5, 50).map(Provider.Name(_))
     location <- Gen.alphaNumericStringBounded(5, 50).map(Provider.Location.File(_))
   } yield FileEvent.ProviderAdded(id, name, location)
+
+val fileEventSequenceGen: Gen[Any, NonEmptyList[Change[FileEvent]]] =
+  for {
+    events <- Gen.listOf(
+      fileEventGen,
+    )
+    if events.nonEmpty
+    changes <- Gen.fromZIO {
+      ZIO.foreach(events) { case event =>
+        for {
+          v <- Version.gen.orDie
+        } yield Change(v, event)
+      }
+    }
+  } yield NonEmptyList.fromIterable(changes.head, changes.tail)

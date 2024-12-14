@@ -36,7 +36,7 @@ object IngestionServiceSpec extends MockSpecDefault, TestSupport {
       check(
         Gen.option(ingestionGen),
         Gen.option(versionGen),
-        validEventSequenceGen,
+        validIngestionEventSequenceGen,
       ) { case (ingestion, version, events) =>
         val maxChange = events.toList.maxBy(_.version)
 

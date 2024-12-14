@@ -36,16 +36,11 @@ trait JdbcCodecs {
   given JdbcDecoder[Timestamp] = JdbcDecoder[Long].map(Timestamp.apply)
 
   extension (o: FetchOptions)
-    def toSql: Option[SqlFragment] =
-      val offsetQuery = o.offset.map(offset => sql" OFFSET $offset ")
-      val limitQuery = o.limit.map(limit => sql" LIMIT $limit ")
+    def toSql: (Option[SqlFragment], Option[SqlFragment]) =
+      val offsetQuery = o.offset.map(offset => sql"version > $offset")
+      val limitQuery = o.limit.map(limit => sql"LIMIT $limit")
 
-      (offsetQuery, limitQuery) match {
-        case (None, None) => None
-        case (Some(l), None) => Some(l)
-        case (None, Some(r)) => Some(r)
-        case (Some(l), Some(r)) => Some(l ++ r)
-      }
+      (offsetQuery, limitQuery)
 
   extension (q: PersistenceQuery)
     def toSql: Option[SqlFragment] =

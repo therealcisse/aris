@@ -9,16 +9,11 @@ import zio.test.Assertion.*
 import zio.jdbc.*
 
 object FetchOptionsSpec extends ZIOSpecDefault, JdbcCodecs {
-  def expectedFetchOptionsSql(options: FetchOptions): Option[SqlFragment] = {
-    val offsetQuery = options.offset.map(offset => sql" OFFSET $offset ")
-    val limitQuery = options.limit.map(limit => sql" LIMIT $limit ")
+  def expectedFetchOptionsSql(options: FetchOptions): (Option[SqlFragment], Option[SqlFragment]) = {
+    val offsetQuery = options.offset.map(offset => sql"version > $offset")
+    val limitQuery = options.limit.map(limit => sql"LIMIT $limit")
 
-    (offsetQuery, limitQuery) match {
-      case (None, None) => None
-      case (Some(l), None) => Some(l)
-      case (None, Some(r)) => Some(r)
-      case (Some(l), Some(r)) => Some(l ++ r)
-    }
+    (offsetQuery, limitQuery)
   }
 
   def spec = suite("FetchOptionsSpec")(
@@ -32,19 +27,25 @@ object FetchOptionsSpec extends ZIOSpecDefault, JdbcCodecs {
       },
       test("should return None when both offset and limit are None") {
         val options = FetchOptions(None, None)
-        assert(options.toSql)(isNone)
+        val (f, l) = options.toSql
+        assert(f)(isNone) && assert(l)(isNone)
       },
       test("should return SQL fragment with only offset") {
         val options = FetchOptions(Some(Key(10)), None)
-        assert(options.toSql.map(_.toString))(isSome(equalTo("Sql( OFFSET ? , 10)")))
+        val (f, l) = options.toSql
+        assert(f.map(_.toString))(isSome(equalTo("Sql(version > ?, 10)"))) && assert(l.map(_.toString))(isNone)
       },
       test("should return SQL fragment with only limit") {
         val options = FetchOptions(None, Some(5L))
-        assert(options.toSql.map(_.toString))(isSome(equalTo("Sql( LIMIT ? , 5)")))
+        val (f, l) = options.toSql
+        assert(f.map(_.toString))(isNone) && assert(l.map(_.toString))(isSome(equalTo("Sql(LIMIT ?, 5)")))
       },
       test("should return SQL fragment with both offset and limit") {
         val options = FetchOptions(Some(Key(10)), Some(5L))
-        assert(options.toSql.map(_.toString))(isSome(equalTo("Sql( OFFSET ?  LIMIT ? , 10, 5)")))
+        val (f, l) = options.toSql
+        assert(f.map(_.toString))(isSome(equalTo("Sql(version > ?, 10)"))) && assert(l.map(_.toString))(
+          isSome(equalTo("Sql(LIMIT ?, 5)")),
+        )
       },
     ),
   )

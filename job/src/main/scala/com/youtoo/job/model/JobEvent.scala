@@ -41,7 +41,12 @@ object JobEvent {
         case NonEmptyList.Single(ch) =>
           ch.payload match {
             case JobEvent.JobStarted(id, timestamp, total, tag) =>
-              Job(id, tag, total, JobStatus.Running(started = timestamp, lastUpdated = timestamp, progress = Progress(0)))
+              Job(
+                id,
+                tag,
+                total,
+                JobStatus.Running(started = timestamp, lastUpdated = timestamp, progress = Progress(0)),
+              )
 
             case _ => throw IllegalArgumentException("Unexpected event, current state is empty")
           }
@@ -49,7 +54,15 @@ object JobEvent {
         case NonEmptyList.Cons(ch, ls) =>
           ch.payload match {
             case JobEvent.JobStarted(id, timestamp, total, tag) =>
-              applyEvents(zero = Job(id, tag, total, JobStatus.Running(started = timestamp, lastUpdated = timestamp, progress = Progress(0))), ls)
+              applyEvents(
+                zero = Job(
+                  id,
+                  tag,
+                  total,
+                  JobStatus.Running(started = timestamp, lastUpdated = timestamp, progress = Progress(0)),
+                ),
+                ls,
+              )
 
             case _ => throw IllegalArgumentException("Unexpected event, current state is empty")
           }

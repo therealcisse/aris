@@ -260,6 +260,51 @@ object PostgresCQRSPersistenceSpec extends PgSpec, TestSupport {
           } yield a
         }
       },
+      test("should retrieve events with fetch options") {
+        check(keyGen, Gen.setOfN(100)(Gen.long), discriminatorGen, Gen.long(0, 100)) { (key, indices, discriminator, l) =>
+          for {
+            persistence <- ZIO.service[CQRSPersistence]
+
+            _ <- atomically {
+              ZIO.foreachDiscard(indices) { index =>
+                for {
+                  version <- Version.gen
+                  ch = Change(version = version, payload = DummyEvent(s"${index + 1}"))
+
+                  _ <- persistence.saveEvent(key, discriminator, ch)
+                } yield ()
+              }
+            }
+
+            es <- atomically(persistence.readEvents[DummyEvent](
+              discriminator,
+              query = PersistenceQuery.condition(),
+              FetchOptions(None, Some(l)),
+            ))
+
+            a = assert(es.size)(equalTo(l))
+
+          } yield a
+        }
+      },
+      test("should retrieve events with query and fetch option") {
+        check(
+          discriminatorGen,
+          genPersistenceQuery,
+          genFetchOptions,
+        ) { (discriminator, query, options) =>
+          for {
+            persistence <- ZIO.service[CQRSPersistence]
+
+            _ <- atomically(persistence.readEvents[DummyEvent](
+              discriminator,
+              query = query,
+              options = options,
+            ))
+
+          } yield assertCompletes
+        }
+      },
       test("should retrieve events from given version") {
         check(keyGen, Gen.listOfN(100)(versionGen), Gen.listOfN(100)(versionGen), discriminatorGen) {
           (key, versions, moreVersions, discriminator) =>
@@ -371,14 +416,18 @@ object PostgresCQRSPersistenceSpec extends PgSpec, TestSupport {
         }
       },
       test("read all events by args is optimized") {
-        check(Gen.option(namespaceGen), Gen.option(hierarchyGen), Gen.option(eventPropertiesGen), discriminatorGen) {
-          case (ns, hierarchy, props, discriminator) =>
+        check(
+          genPersistenceQuery,
+          genFetchOptions,
+          discriminatorGen
+        ) {
+          case (q, options, discriminator) =>
             val query =
               PostgresCQRSPersistence.Queries
                 .READ_EVENTS[DummyEvent](
                   discriminator,
-                  query = PersistenceQuery.condition(namespace = ns, hierarchy = hierarchy, props = props),
-                  options = FetchOptions(),
+                  query = q,
+                  options = options,
                 )
             for {
 
@@ -391,40 +440,13 @@ object PostgresCQRSPersistenceSpec extends PgSpec, TestSupport {
             } yield planAssertion && timeAssertion
         }
       },
-      test("read snapshot events by args is optimized") {
-        check(
-          versionGen,
-          Gen.option(namespaceGen),
-          Gen.option(hierarchyGen),
-          Gen.option(eventPropertiesGen),
-          discriminatorGen,
-        ) { case (version, ns, hierarchy, props, discriminator) =>
-          val query =
-            PostgresCQRSPersistence.Queries
-              .READ_EVENTS[DummyEvent](
-                discriminator,
-                version,
-                query = PersistenceQuery.condition(namespace = ns, hierarchy = hierarchy, props = props),
-                options = FetchOptions(),
-              )
-          for {
-
-            executionTime <- atomically(query.selectAll).timed.map(_._1)
-            timeAssertion = assert(executionTime.toMillis)(isLessThanEqualTo(100L))
-
-            executionPlan <- atomically(query.sql.getExecutionPlan)
-            planAssertion = assert(executionPlan)(containsString("Index Scan") || containsString("Index Only Scan"))
-
-          } yield planAssertion && timeAssertion
-        }
-      },
     ).provideSomeLayerShared(
       ZLayer.make[Tracing & CQRSPersistence](
         tracingMockLayer(),
         zio.telemetry.opentelemetry.OpenTelemetry.contextZIO,
         PostgresCQRSPersistence.live(),
       ),
-    ) @@ TestAspect.withLiveClock @@ TestAspect.beforeAll {
+    ) @@ TestAspect.withLiveClock @@ TestAspect.nondeterministic @@ TestAspect.beforeAll {
       for {
         config <- ZIO.service[DatabaseConfig]
         _ <- FlywayMigration.run(config)

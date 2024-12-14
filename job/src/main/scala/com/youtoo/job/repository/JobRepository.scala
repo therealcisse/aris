@@ -23,6 +23,9 @@ object JobRepository {
   inline def load(id: Job.Id): RIO[JobRepository & ZConnection, Option[Job]] =
     ZIO.serviceWithZIO[JobRepository](_.load(id))
 
+  inline def loadMany(offset: Option[Key], limit: Long): RIO[JobRepository & ZConnection, Chunk[Key]] =
+    ZIO.serviceWithZIO[JobRepository](_.loadMany(offset, limit))
+
   inline def save(job: Job): RIO[JobRepository & ZConnection, Long] =
     ZIO.serviceWithZIO[JobRepository](_.save(job))
 
@@ -77,8 +80,15 @@ object JobRepository {
         java.util.Base64.getEncoder.encodeToString(summon[BinaryCodec[JobMeasurement]].encode(job.total).toArray)
 
       sql"""
-      INSERT INTO jobs (id, tag, total, status)
-      VALUES (${job.id}, ${job.tag}, decode($total, 'base64'), decode($status, 'base64'))
+      INSERT INTO jobs (id, tag, total, status, created, modified)
+      VALUES (
+        ${job.id},
+        ${job.tag},
+        decode($total, 'base64'),
+        decode($status, 'base64'),
+        ${job.created},
+        ${job.lastModified}
+      )
       ON CONFLICT (id) DO UPDATE
       SET status = decode($status, 'base64')
       """

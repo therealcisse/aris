@@ -12,8 +12,8 @@ import zio.*
 import zio.jdbc.*
 
 import com.youtoo.postgres.*
-import com.youtoo.cqrs.service.*
 import com.youtoo.cqrs.*
+import com.youtoo.cqrs.service.postgres.*
 
 import com.youtoo.job.repository.*
 import com.youtoo.job.model.*
@@ -21,42 +21,76 @@ import com.youtoo.cqrs.store.*
 import com.youtoo.job.store.*
 
 object JobServiceSpec extends MockSpecDefault, TestSupport {
+  inline val Threshold = 10
 
   override val bootstrap: ZLayer[Any, Any, TestEnvironment] =
-    // Assuming similar logging and configuration as IngestionServiceSpec
-    Log.layer >>> testEnvironment
+    Log.layer >>> testEnvironment ++ Runtime.setConfigProvider(
+      ConfigProvider.fromMap(Map("Job.snapshots.threshold" -> s"$Threshold")),
+    )
 
   def spec = suite("JobServiceSpec")(
     test("should load job") {
       check(
         Gen.option(jobGen),
-        Gen.option(versionGen), // These generators need to be similar to those used in your context
-        validEventSequenceGen
+        Gen.option(versionGen), // These generators need to be similar to those used job your context
+        validEventSequenceGen,
       ) { case (job, version, events) =>
         val maxChange = events.toList.maxBy(_.version)
         val (id, deps) = (job, version).tupled match {
           // Handling case of job and version being None
           case None =>
             val sendSnapshot = events.size >= Threshold
-            val jobInstance @ Job(id, _, _) = EventHandler[JobEvent, Job].applyEvents(events)
+            val job @ Job(id, _, _, _) = summon[EventHandler[JobEvent, Job]].applyEvents(events)
 
             val loadMock = JobRepositoryMock.Load(equalTo(id), value(None))
             val readSnapshotMock = MockSnapshotStore.ReadSnapshot(equalTo(id), value(None))
-            val saveMock = JobRepositoryMock.Save(equalTo(jobInstance), value(1L))
+            val saveMock = JobRepositoryMock.Save(equalTo(job), value(1L))
             val saveSnapshotMock = MockSnapshotStore.SaveSnapshot(equalTo((id.asKey, maxChange.version)), value(1L))
-            val readEventsMock = MockJobEventStore.ReadEvents.Full(equalTo(id.asKey), value(events.some))
+            val readEventsMock = JobEventStoreMock.ReadEventsById(equalTo(id.asKey), value(events.some))
 
             val layers =
               if sendSnapshot then
                 ((loadMock ++ readSnapshotMock) || (readSnapshotMock ++ loadMock)) ++ readEventsMock ++
-                ((saveMock ++ saveSnapshotMock) || (saveSnapshotMock ++ saveMock))
-              else ((loadMock ++ readSnapshotMock) || (readSnapshotMock ++ loadMock)) ++ readEventsMock
+                  ((saveMock ++ saveSnapshotMock) || (saveSnapshotMock ++ saveMock)) ++ MockJobCQRS.empty
+              else
+                ((loadMock ++ readSnapshotMock) || (readSnapshotMock ++ loadMock)) ++ readEventsMock ++ MockJobCQRS.empty
 
-            (id, layers.toLayer)
-          case Some((jobInstance @ Job(id, _, _), v)) =>
-            // Other cases similar to IngestionService
-            // Convenient MockConfig similar to what's shown above
-            ???
+            (id, layers)
+
+          case Some((job @ Job(id, _, _, _), v)) if !job.status.isCompleted =>
+            val sendSnapshot = (events.size - 1) >= Threshold
+
+            val es = NonEmptyList.fromIterableOption(events.tail)
+
+            val inn = es match {
+              case None => job
+              case Some(nel) => summon[EventHandler[JobEvent, Job]].applyEvents(job, nel)
+            }
+
+            val readSnapshotMock = MockSnapshotStore.ReadSnapshot(equalTo(id.asKey), value(v.some))
+            val loadMock = JobRepositoryMock.Load(equalTo(id), value(job.some))
+            val saveMock = JobRepositoryMock.Save(equalTo(inn), value(1L))
+            val saveSnapshotMock = MockSnapshotStore.SaveSnapshot(equalTo((id.asKey, maxChange.version)), value(1L))
+            val readEventsMock = JobEventStoreMock.ReadEventsByIdAndVersion(equalTo((id.asKey, v)), value(es))
+
+            val layers =
+              if sendSnapshot then
+                ((readSnapshotMock ++ loadMock) || (loadMock ++ readSnapshotMock)) ++ readEventsMock ++ ((saveMock ++ saveSnapshotMock) || (saveSnapshotMock ++ saveMock)) ++ MockJobCQRS.empty
+              else
+                ((readSnapshotMock ++ loadMock) || (loadMock ++ readSnapshotMock)) ++ readEventsMock ++ MockJobCQRS.empty
+
+            (id, layers)
+
+          case Some((job @ Job(id, _, _, _), v)) =>
+            val readSnapshotMock = MockSnapshotStore.ReadSnapshot(equalTo(id.asKey), value(v.some))
+            val loadMock = JobRepositoryMock.Load(equalTo(id), value(job.some))
+            val readEventsMock = JobEventStoreMock.ReadEventsByIdAndVersion(equalTo((id.asKey, v)), value(None))
+
+            val layers =
+              ((readSnapshotMock ++ loadMock) || (loadMock ++ readSnapshotMock)) ++ readEventsMock ++ MockJobCQRS.empty
+
+            (id, layers)
+
         }
 
         (for {
@@ -84,12 +118,13 @@ object JobServiceSpec extends MockSpecDefault, TestSupport {
             JobRepository & ZConnectionPool & zio.telemetry.opentelemetry.tracing.Tracing,
             JobService,
           ](
+            JobCQRS.live(),
             PostgresCQRSPersistence.live(),
             JobEventStore.live(),
             SnapshotStore.live(),
             SnapshotStrategy.live(),
             JobService.live(),
-          )
+          ),
         )
       }
     },
@@ -110,63 +145,104 @@ object JobServiceSpec extends MockSpecDefault, TestSupport {
             JobRepository & ZConnectionPool & zio.telemetry.opentelemetry.tracing.Tracing,
             JobService,
           ](
+            JobCQRS.live(),
             PostgresCQRSPersistence.live(),
             JobEventStore.live(),
             SnapshotStore.live(),
             SnapshotStrategy.live(),
             JobService.live(),
-          )
+          ),
         )
       }
     },
     test("should start a job using JobCQRS") {
       check(jobIdGen, timestampGen, jobMeasurementGen, jobTagGen) { (id, timestamp, total, tag) =>
-        val mockEnv = JobRepoMock.StartJob(
-          equalTo((id, timestamp, total, tag)),
-          unit
+        val mockEnv = MockJobCQRS.Add(
+          equalTo(
+            (
+              id,
+              JobCommand.StartJob(id, timestamp, total, tag),
+            ),
+          ),
         )
-
-        val testLayer = mockEnv.toLayer >>> Transactional.live >>> JobService.layer
 
         (for {
           _ <- JobService.startJob(id, timestamp, total, tag)
         } yield assertCompletes)
-          .provideLayer(testLayer)
+          .provideSomeLayer[ZConnectionPool & zio.telemetry.opentelemetry.tracing.Tracing](
+            mockEnv.toLayer >>> ZLayer.makeSome[
+              JobCQRS & ZConnectionPool & zio.telemetry.opentelemetry.tracing.Tracing,
+              JobService,
+            ](
+              JobRepository.live(),
+              PostgresCQRSPersistence.live(),
+              JobEventStore.live(),
+              SnapshotStore.live(),
+              SnapshotStrategy.live(),
+              JobService.live(),
+            ),
+          )
       }
     },
     test("should report progress of a job using JobCQRS") {
       check(jobIdGen, timestampGen, progressGen) { (id, timestamp, progress) =>
-        val mockEnv = JobRepoMock.ReportProgress(
-          equalTo((id, timestamp, progress)),
-          unit
+        val mockEnv = MockJobCQRS.Add(
+          equalTo(
+            (
+              id,
+              JobCommand.ReportProgress(id, timestamp, progress),
+            ),
+          ),
         )
-
-        val testLayer = mockEnv.toLayer >>> Transactional.live >>> JobService.layer
 
         (for {
           _ <- JobService.reportProgress(id, timestamp, progress)
         } yield assertCompletes)
-          .provideLayer(testLayer)
+          .provideSomeLayer[ZConnectionPool & zio.telemetry.opentelemetry.tracing.Tracing](
+            mockEnv.toLayer >>> ZLayer.makeSome[
+              JobCQRS & ZConnectionPool & zio.telemetry.opentelemetry.tracing.Tracing,
+              JobService,
+            ](
+              JobRepository.live(),
+              PostgresCQRSPersistence.live(),
+              JobEventStore.live(),
+              SnapshotStore.live(),
+              SnapshotStrategy.live(),
+              JobService.live(),
+            ),
+          )
       }
     },
     test("should complete a job using JobCQRS") {
-      check(jobIdGen, timestampGen, completionReasonGen) { (id, timestamp, reason) =>
-        val mockEnv = JobRepoMock.CompleteJob(
-          equalTo((id, timestamp, reason)),
-          unit
+      check(jobIdGen, timestampGen, jobCompletionReasonGen) { (id, timestamp, reason) =>
+        val mockEnv = MockJobCQRS.Add(
+          equalTo(
+            (
+              id,
+              JobCommand.CompleteJob(id, timestamp, reason),
+            ),
+          ),
         )
-
-        val testLayer = mockEnv.toLayer >>> Transactional.live >>> JobService.layer
 
         (for {
           _ <- JobService.completeJob(id, timestamp, reason)
         } yield assertCompletes)
-          .provideLayer(testLayer)
+          .provideSomeLayer[ZConnectionPool & zio.telemetry.opentelemetry.tracing.Tracing](
+            mockEnv.toLayer >>> ZLayer.makeSome[
+              JobCQRS & ZConnectionPool & zio.telemetry.opentelemetry.tracing.Tracing,
+              JobService,
+            ](
+              JobRepository.live(),
+              PostgresCQRSPersistence.live(),
+              JobEventStore.live(),
+              SnapshotStore.live(),
+              SnapshotStrategy.live(),
+              JobService.live(),
+            ),
+          )
       }
-    }
-
+    },
   ).provideSomeLayerShared(
     ZConnectionMock.pool() ++ (zio.telemetry.opentelemetry.OpenTelemetry.contextZIO >>> tracingMockLayer()),
   ) @@ TestAspect.withLiveClock
 }
-

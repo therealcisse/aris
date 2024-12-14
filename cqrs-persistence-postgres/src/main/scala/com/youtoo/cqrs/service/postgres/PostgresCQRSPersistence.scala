@@ -42,14 +42,6 @@ object PostgresCQRSPersistence {
     ): RIO[ZConnection, Chunk[Change[Event]]] =
       Queries.READ_EVENTS(discriminator, query, options).selectAll
 
-    def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
-      discriminator: Discriminator,
-      snapshotVersion: Version,
-      query: PersistenceQuery,
-      options: FetchOptions,
-    ): RIO[ZConnection, Chunk[Change[Event]]] =
-      Queries.READ_EVENTS(discriminator, snapshotVersion, query, options).selectAll
-
     def saveEvent[Event: {BinaryCodec, MetaInfo, Tag}](
       id: Key,
       discriminator: Discriminator,
@@ -87,16 +79,6 @@ object PostgresCQRSPersistence {
         ): RIO[ZConnection, Chunk[Change[Event]]] =
           self.readEvents(discriminator, query, options) @@ tracing.aspects.span(
             "PostgresCQRSPersistence.readEvents.query",
-          )
-
-        def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
-          discriminator: Discriminator,
-          snapshotVersion: Version,
-          query: PersistenceQuery,
-          options: FetchOptions,
-        ): RIO[ZConnection, Chunk[Change[Event]]] =
-          self.readEvents(discriminator, snapshotVersion, query, options) @@ tracing.aspects.span(
-            "PostgresCQRSPersistence.readEvents.query_fromSnapshot",
           )
 
         def saveEvent[Event: {BinaryCodec, MetaInfo, Tag}](
@@ -152,30 +134,15 @@ object PostgresCQRSPersistence {
     ): Query[Change[Event]] =
       given JdbcDecoder[Event] = byteArrayDecoder[Event]
 
-      (sql"""
-      SELECT
-        version,
-        payload
-      FROM events
-      WHERE discriminator = $discriminator""" ++ query.toSql.fold(SqlFragment.empty)(sql => sql" AND " ++ sql) ++ options.toSql.fold(SqlFragment.empty)(sql => sql" AND " ++ sql) ++
-        sql""" ORDER BY version ASC""").query[(Version, Event)].map(Change.apply)
-
-    def READ_EVENTS[Event: BinaryCodec](
-      discriminator: Discriminator,
-      snapshotVersion: Version,
-      query: PersistenceQuery,
-      options: FetchOptions,
-    ): Query[Change[Event]] =
-      given JdbcDecoder[Event] = byteArrayDecoder[Event]
+      val (offsetQuery, limitQuery) = options.toSql
 
       (sql"""
       SELECT
         version,
         payload
       FROM events
-      WHERE discriminator = $discriminator
-        AND version > $snapshotVersion""" ++ query.toSql.fold(SqlFragment.empty)(sql => sql" AND " ++ sql) ++ options.toSql.fold(SqlFragment.empty)(sql => sql" AND " ++ sql) ++
-        sql""" ORDER BY version ASC""").query[(Version, Event)].map(Change.apply)
+      WHERE discriminator = $discriminator""" ++ query.toSql.fold(SqlFragment.empty)(ql => sql" AND " ++ ql) ++ offsetQuery.fold(SqlFragment.empty)(ql => sql" AND " ++ ql) ++
+      sql""" ORDER BY version ASC""" ++ limitQuery.fold(SqlFragment.empty)(ql => sql" " ++ ql)).query[(Version, Event)].map(Change.apply)
 
     def SAVE_EVENT[Event: { BinaryCodec, MetaInfo }](
       id: Key,
