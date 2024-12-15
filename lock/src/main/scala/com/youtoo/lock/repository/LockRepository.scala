@@ -6,6 +6,7 @@ import zio.*
 import zio.jdbc.*
 
 import zio.telemetry.opentelemetry.tracing.Tracing
+import zio.telemetry.opentelemetry.common.*
 
 trait LockRepository {
   def acquire(lock: Lock): RIO[ZConnection, Boolean]
@@ -35,10 +36,12 @@ object LockRepository {
     def traced(tracing: Tracing): LockRepository = new LockRepository {
       def acquire(lock: Lock): RIO[ZConnection, Boolean] = self.acquire(lock) @@ tracing.aspects.span(
         "LockRepository.acquire",
+        attributes = Attributes(Attribute.string("lock", lock.value)),
       )
 
       def release(lock: Lock): RIO[ZConnection, Boolean] = self.release(lock) @@ tracing.aspects.span(
         "LockRepository.release",
+        attributes = Attributes(Attribute.string("lock", lock.value)),
       )
 
       def locks: RIO[ZConnection, Chunk[Lock]] = self.locks @@ tracing.aspects.span(

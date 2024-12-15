@@ -11,6 +11,7 @@ import com.youtoo.job.model.*
 import zio.*
 import zio.jdbc.*
 import zio.telemetry.opentelemetry.tracing.Tracing
+import zio.telemetry.opentelemetry.common.*
 import zio.schema.codec.*
 
 trait JobRepository {
@@ -47,11 +48,25 @@ object JobRepository {
     def traced(tracing: Tracing): JobRepository =
       new JobRepository {
         def load(id: Job.Id): RIO[ZConnection, Option[Job]] =
-          self.load(id) @@ tracing.aspects.span("JobRepository.load")
+          self.load(id) @@ tracing.aspects.span(
+            "JobRepository.load",
+            attributes = Attributes(Attribute.long("jobId", id.asKey.value)),
+          )
         def loadMany(offset: Option[Key], limit: Long): RIO[ZConnection, Chunk[Key]] =
-          self.loadMany(offset, limit) @@ tracing.aspects.span("JobRepository.loadMany")
+          self.loadMany(offset, limit) @@ tracing.aspects.span(
+            "JobRepository.loadMany",
+            attributes = Attributes(
+              List(
+                Attribute.long("offset", offset.map(_.value).getOrElse(0L)),
+                Attribute.long("limit", limit),
+              )*,
+            ),
+          )
         def save(job: Job): RIO[ZConnection, Long] =
-          self.save(job) @@ tracing.aspects.span("JobRepository.save")
+          self.save(job) @@ tracing.aspects.span(
+            "JobRepository.save",
+            attributes = Attributes(Attribute.long("jobId", job.id.asKey.value)),
+          )
       }
   }
 

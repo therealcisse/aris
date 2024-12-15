@@ -15,6 +15,7 @@ import com.youtoo.cqrs.service.*
 import com.youtoo.cqrs.Codecs.given
 
 import zio.telemetry.opentelemetry.tracing.Tracing
+import zio.telemetry.opentelemetry.common.*
 
 trait IngestionRepository {
   def load(id: Ingestion.Id): ZIO[ZConnection, Throwable, Option[Ingestion]]
@@ -55,11 +56,25 @@ object IngestionRepository {
     def traced(tracing: Tracing): IngestionRepository =
       new IngestionRepository {
         def load(id: Ingestion.Id): ZIO[ZConnection, Throwable, Option[Ingestion]] =
-          self.load(id) @@ tracing.aspects.span("IngestionRepository.load")
+          self.load(id) @@ tracing.aspects.span(
+            "IngestionRepository.load",
+            attributes = Attributes(Attribute.long("jobId", id.asKey.value)),
+          )
         def loadMany(offset: Option[Key], limit: Long): ZIO[ZConnection, Throwable, Chunk[Key]] =
-          self.loadMany(offset, limit) @@ tracing.aspects.span("IngestionRepository.loadMany")
+          self.loadMany(offset, limit) @@ tracing.aspects.span(
+            "IngestionRepository.loadMany",
+            attributes = Attributes(
+              List(
+                Attribute.long("offset", offset.map(_.value).getOrElse(0L)),
+                Attribute.long("limit", limit),
+              )*,
+            ),
+          )
         def save(o: Ingestion): ZIO[ZConnection, Throwable, Long] =
-          self.save(o) @@ tracing.aspects.span("IngestionRepository.save")
+          self.save(o) @@ tracing.aspects.span(
+            "IngestionRepository.save",
+            attributes = Attributes(Attribute.long("jobId", o.id.asKey.value)),
+          )
 
       }
 

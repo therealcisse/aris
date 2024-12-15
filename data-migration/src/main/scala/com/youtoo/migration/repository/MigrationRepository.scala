@@ -5,6 +5,7 @@ package repository
 import com.youtoo.migration.model.*
 
 import zio.telemetry.opentelemetry.tracing.Tracing
+import zio.telemetry.opentelemetry.common.*
 
 import com.youtoo.cqrs.service.postgres.*
 
@@ -60,11 +61,25 @@ object MigrationRepository {
     def traced(tracing: Tracing): MigrationRepository =
       new MigrationRepository {
         def load(id: Migration.Id): ZIO[ZConnection, Throwable, Option[Migration]] =
-          self.load(id) @@ tracing.aspects.span("MigrationRepository.load")
+          self.load(id) @@ tracing.aspects.span(
+            "MigrationRepository.load",
+            attributes = Attributes(Attribute.long("migrationId", id.asKey.value)),
+          )
         def loadMany(offset: Option[Key], limit: Long): ZIO[ZConnection, Throwable, Chunk[Key]] =
-          self.loadMany(offset, limit) @@ tracing.aspects.span("MigrationRepository.loadMany")
+          self.loadMany(offset, limit) @@ tracing.aspects.span(
+            "MigrationRepository.loadMany",
+            attributes = Attributes(
+              List(
+                Attribute.long("offset", offset.map(_.value).getOrElse(0L)),
+                Attribute.long("limit", limit),
+              )*,
+            ),
+          )
         def save(o: Migration): ZIO[ZConnection, Throwable, Long] =
-          self.save(o) @@ tracing.aspects.span("MigrationRepository.save")
+          self.save(o) @@ tracing.aspects.span(
+            "MigrationRepository.save",
+            attributes = Attributes(Attribute.long("migrationId", o.id.asKey.value)),
+          )
 
       }
 

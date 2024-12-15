@@ -10,7 +10,8 @@ if [[ -n $(git status --porcelain) ]]; then
 fi
 
 # Run sbt tests
-CI= sbt test
+CI= sbt ';clean ;test'
+
 if [[ $? -ne 0 ]]; then
   echo "Tests failed. Aborting push."
   exit 1

@@ -3,6 +3,7 @@ package ingestion
 package service
 
 import zio.telemetry.opentelemetry.tracing.Tracing
+import zio.telemetry.opentelemetry.common.*
 
 import cats.implicits.*
 
@@ -157,15 +158,32 @@ object FileService {
           name: IngestionFile.Name,
           metadata: IngestionFile.Metadata,
           sig: IngestionFile.Sig,
-        ): Task[Unit] = self.addFile(provider, id, name, metadata, sig) @@ tracing.aspects.span("FileService.addFile")
+        ): Task[Unit] = self.addFile(provider, id, name, metadata, sig) @@ tracing.aspects.span(
+          "FileService.addFile",
+          attributes = Attributes(
+            Attribute.long("providerId", provider.asKey.value),
+            Attribute.long("id", id.asKey.value),
+            Attribute.string("name", name.value),
+            Attribute.string("sig", sig.value),
+          ),
+        )
 
         def loadNamed(name: IngestionFile.Name): Task[Option[IngestionFile]] =
-          self.loadNamed(name) @@ tracing.aspects.span("FileService.loadNamed")
+          self.loadNamed(name) @@ tracing.aspects.span(
+            "FileService.loadNamed",
+            attributes = Attributes(Attribute.string("name", name.value)),
+          )
         def loadSig(sig: IngestionFile.Sig): Task[Option[IngestionFile]] =
-          self.loadSig(sig) @@ tracing.aspects.span("FileService.loadSig")
+          self.loadSig(sig) @@ tracing.aspects.span(
+            "FileService.loadSig",
+            attributes = Attributes(Attribute.string("sig", sig.value)),
+          )
 
         def load(id: IngestionFile.Id): Task[Option[IngestionFile]] =
-          self.load(id) @@ tracing.aspects.span("FileService.load")
+          self.load(id) @@ tracing.aspects.span(
+            "FileService.load",
+            attributes = Attributes(Attribute.long("id", id.asKey.value)),
+          )
       }
 
   }

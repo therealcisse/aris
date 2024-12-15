@@ -4,6 +4,7 @@ package std
 import zio.*
 
 import zio.telemetry.opentelemetry.tracing.Tracing
+import zio.telemetry.opentelemetry.common.*
 
 trait Interrupter {
   def watch[R](id: Key): ZIO[R & Scope, Throwable, Promise[Throwable, Unit]]
@@ -69,8 +70,14 @@ object Interrupter {
     def traced(tracing: Tracing): Interrupter =
       new Interrupter {
         def watch[R](id: Key): ZIO[R & Scope, Throwable, Promise[Throwable, Unit]] =
-          self.watch(id) @@ tracing.aspects.span("Interrupter.watch")
-        def interrupt(id: Key): Task[Unit] = self.interrupt(id) @@ tracing.aspects.span("Interrupter.interrupt")
+          self.watch(id) @@ tracing.aspects.span(
+            "Interrupter.watch",
+            attributes = Attributes(Attribute.long("id", id.value)),
+          )
+        def interrupt(id: Key): Task[Unit] = self.interrupt(id) @@ tracing.aspects.span(
+          "Interrupter.interrupt",
+          attributes = Attributes(Attribute.long("id", id.value)),
+        )
 
       }
 

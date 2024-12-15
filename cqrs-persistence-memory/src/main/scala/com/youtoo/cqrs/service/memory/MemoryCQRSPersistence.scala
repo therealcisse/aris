@@ -6,6 +6,7 @@ package memory
 import cats.implicits.*
 
 import zio.telemetry.opentelemetry.tracing.Tracing
+import zio.telemetry.opentelemetry.common.*
 
 import com.youtoo.cqrs.domain.*
 
@@ -202,7 +203,13 @@ object MemoryCQRSPersistence {
           id: Key,
           discriminator: Discriminator,
         ): RIO[ZConnection, Chunk[Change[Event]]] =
-          self.readEvents(id, discriminator) @@ tracing.aspects.span("MemoryCQRSPersistence.readEvents")
+          self.readEvents(id, discriminator) @@ tracing.aspects.span(
+            "MemoryCQRSPersistence.readEvents",
+            attributes = Attributes(
+              Attribute.long("key", id.value),
+              Attribute.string("discriminator", discriminator.value),
+            ),
+          )
 
         def readEvents[Event:{ BinaryCodec, Tag, MetaInfo}](
           id: Key,
@@ -211,6 +218,10 @@ object MemoryCQRSPersistence {
         ): RIO[ZConnection, Chunk[Change[Event]]] =
           self.readEvents(id, discriminator, snapshotVersion) @@ tracing.aspects.span(
             "MemoryCQRSPersistence.readEvents.fromSnapshot",
+            attributes = Attributes(
+              Attribute.long("key", id.value),
+              Attribute.string("discriminator", discriminator.value),
+            ),
           )
 
         def readEvents[Event:{ BinaryCodec, Tag, MetaInfo}](
@@ -220,6 +231,9 @@ object MemoryCQRSPersistence {
         ): RIO[ZConnection, Chunk[Change[Event]]] =
           self.readEvents(discriminator, query, options) @@ tracing.aspects.span(
             "MemoryCQRSPersistence.readEvents.query",
+            attributes = Attributes(
+              Attribute.string("discriminator", discriminator.value),
+            ),
           )
 
         def saveEvent[Event: {BinaryCodec, MetaInfo, Tag}](
@@ -227,13 +241,29 @@ object MemoryCQRSPersistence {
           discriminator: Discriminator,
           event: Change[Event],
         ): RIO[ZConnection, Long] =
-          self.saveEvent(id, discriminator, event) @@ tracing.aspects.span("MemoryCQRSPersistence.saveEvent")
+          self.saveEvent(id, discriminator, event) @@ tracing.aspects.span(
+            "MemoryCQRSPersistence.saveEvent",
+            attributes = Attributes(
+              Attribute.long("key", id.value),
+              Attribute.string("discriminator", discriminator.value),
+            ),
+          )
 
         def readSnapshot(id: Key): RIO[ZConnection, Option[Version]] =
-          self.readSnapshot(id) @@ tracing.aspects.span("MemoryCQRSPersistence.readSnapshot")
+          self.readSnapshot(id) @@ tracing.aspects.span(
+            "MemoryCQRSPersistence.readSnapshot",
+            attributes = Attributes(
+              Attribute.long("snapshotId", id.value),
+            ),
+          )
 
         def saveSnapshot(id: Key, version: Version): RIO[ZConnection, Long] =
-          self.saveSnapshot(id, version) @@ tracing.aspects.span("MemoryCQRSPersistence.saveSnapshot")
+          self.saveSnapshot(id, version) @@ tracing.aspects.span(
+            "MemoryCQRSPersistence.saveSnapshot",
+            attributes = Attributes(
+              Attribute.long("snapshotId", id.value),
+            ),
+          )
       }
 
   }

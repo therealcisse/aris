@@ -8,6 +8,7 @@ import com.youtoo.postgres.*
 import com.youtoo.lock.repository.*
 
 import zio.telemetry.opentelemetry.tracing.Tracing
+import zio.telemetry.opentelemetry.common.*
 
 trait LockManager {
   def aquireScoped(lock: Lock): ZIO[Scope & Tracing, Throwable, Boolean]
@@ -57,6 +58,7 @@ object LockManager {
       def aquireScoped(lock: Lock): ZIO[Scope & Tracing, Throwable, Boolean] =
         self.aquireScoped(lock) @@ tracing.aspects.span(
           "LockManager.aquireScoped",
+          attributes = Attributes(Attribute.string("lock", lock.value)),
         )
 
       def locks: Task[Chunk[Lock]] = self.locks @@ tracing.aspects.span(

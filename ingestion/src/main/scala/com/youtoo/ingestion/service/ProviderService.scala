@@ -5,6 +5,7 @@ package service
 import cats.implicits.*
 
 import zio.telemetry.opentelemetry.tracing.Tracing
+import zio.telemetry.opentelemetry.common.*
 
 import com.youtoo.cqrs.Codecs.given
 
@@ -144,9 +145,15 @@ object ProviderService {
           id: Provider.Id,
           name: Provider.Name,
           location: Provider.Location,
-        ): Task[Unit] = self.addProvider(id, name, location) @@ tracing.aspects.span("FileService.addProvider")
+        ): Task[Unit] = self.addProvider(id, name, location) @@ tracing.aspects.span(
+          "FileService.addProvider",
+          attributes = Attributes(Attribute.long("providerId", id.asKey.value)),
+        )
 
-        def load(id: Provider.Id): Task[Option[Provider]] = self.load(id) @@ tracing.aspects.span("FileService.load")
+        def load(id: Provider.Id): Task[Option[Provider]] = self.load(id) @@ tracing.aspects.span(
+          "FileService.load",
+          attributes = Attributes(Attribute.long("providerId", id.asKey.value)),
+        )
         def loadAll(offset: Option[Key], limit: Long): Task[List[Provider]] =
           self.loadAll(offset, limit) @@ tracing.aspects.span("FileService.loadAll")
 
@@ -155,7 +162,10 @@ object ProviderService {
           offset: Option[Key],
           limit: Long,
         ): Task[Option[NonEmptyList[IngestionFile]]] =
-          self.getFiles(provider, offset, limit) @@ tracing.aspects.span("FileService.getFiles")
+          self.getFiles(provider, offset, limit) @@ tracing.aspects.span(
+            "FileService.getFiles",
+            attributes = Attributes(Attribute.long("providerId", provider.asKey.value)),
+          )
       }
 
   }

@@ -11,6 +11,7 @@ import com.youtoo.migration.repository.*
 import com.youtoo.cqrs.*
 
 import zio.telemetry.opentelemetry.tracing.Tracing
+import zio.telemetry.opentelemetry.common.*
 
 import zio.*
 
@@ -120,10 +121,24 @@ object MigrationService {
     def traced(tracing: Tracing): MigrationService =
       new MigrationService {
         def load(id: Migration.Id): Task[Option[Migration]] =
-          self.load(id) @@ tracing.aspects.span("MigrationService.load")
+          self.load(id) @@ tracing.aspects.span(
+            "MigrationService.load",
+            attributes = Attributes(Attribute.long("migrationId", id.asKey.value)),
+          )
         def loadMany(offset: Option[Key], limit: Long): Task[Chunk[Key]] =
-          self.loadMany(offset, limit) @@ tracing.aspects.span("MigrationService.loadMany")
-        def save(o: Migration): Task[Long] = self.save(o) @@ tracing.aspects.span("MigrationService.save")
+          self.loadMany(offset, limit) @@ tracing.aspects.span(
+            "MigrationService.loadMany",
+            attributes = Attributes(
+              List(
+                Attribute.long("offset", offset.map(_.value).getOrElse(0L)),
+                Attribute.long("limit", limit),
+              )*,
+            ),
+          )
+        def save(o: Migration): Task[Long] = self.save(o) @@ tracing.aspects.span(
+          "MigrationService.save",
+          attributes = Attributes(Attribute.long("migrationId", o.id.asKey.value)),
+        )
       }
 
   }

@@ -14,6 +14,7 @@ import com.youtoo.cqrs.store.*
 import com.youtoo.cqrs.*
 
 import zio.telemetry.opentelemetry.tracing.*
+import zio.telemetry.opentelemetry.common.*
 
 trait JobService {
   def load(id: Job.Id): Task[Option[Job]]
@@ -141,17 +142,32 @@ object JobService {
 
     def traced(tracing: Tracing): JobService = new JobService {
       def load(id: Job.Id): Task[Option[Job]] =
-        self.load(id) @@ tracing.aspects.span("JobService.load")
+        self.load(id) @@ tracing.aspects.span(
+          "JobService.load",
+          attributes = Attributes(Attribute.long("jobId", id.asKey.value)),
+        )
       def loadMany(offset: Option[Key], limit: Long): Task[Chunk[Key]] =
         self.loadMany(offset, limit) @@ tracing.aspects.span("JobService.loadMany")
       def save(job: Job): Task[Long] =
-        self.save(job) @@ tracing.aspects.span("JobService.save")
+        self.save(job) @@ tracing.aspects.span(
+          "JobService.save",
+          attributes = Attributes(Attribute.long("jobId", job.id.asKey.value)),
+        )
       def startJob(id: Job.Id, timestamp: Timestamp, total: JobMeasurement, tag: Job.Tag): Task[Unit] =
-        self.startJob(id, timestamp, total, tag) @@ tracing.aspects.span("JobService.startJob")
+        self.startJob(id, timestamp, total, tag) @@ tracing.aspects.span(
+          "JobService.startJob",
+          attributes = Attributes(Attribute.long("jobId", id.asKey.value)),
+        )
       def reportProgress(id: Job.Id, timestamp: Timestamp, progress: Progress): Task[Unit] =
-        self.reportProgress(id, timestamp, progress) @@ tracing.aspects.span("JobService.reportProgress")
+        self.reportProgress(id, timestamp, progress) @@ tracing.aspects.span(
+          "JobService.reportProgress",
+          attributes = Attributes(Attribute.long("jobId", id.asKey.value)),
+        )
       def completeJob(id: Job.Id, timestamp: Timestamp, reason: Job.CompletionReason): Task[Unit] =
-        self.completeJob(id, timestamp, reason) @@ tracing.aspects.span("JobService.completeJob")
+        self.completeJob(id, timestamp, reason) @@ tracing.aspects.span(
+          "JobService.completeJob",
+          attributes = Attributes(Attribute.long("jobId", id.asKey.value)),
+        )
     }
   }
 }
