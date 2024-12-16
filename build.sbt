@@ -215,6 +215,7 @@ lazy val std = (project in file("std"))
     testFrameworks += new TestFramework("zio.test.sbt.ztestframework"),
     libraryDependencies ++= Dependencies.`open-telemetry`,
     libraryDependencies ++= Seq(
+      cronUtils,
       cats,
       zio,
       `zio-prelude`,

@@ -104,4 +104,6 @@ object Dependencies {
     "io.opentelemetry" % "opentelemetry-sdk-testing" % "1.43.0" % Test,
     "io.grpc" % "grpc-netty-shaded" % "1.47.0",
   )
+
+  val cronUtils = "com.cronutils" % "cron-utils" % "9.2.1"
 }
