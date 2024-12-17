@@ -10,6 +10,7 @@ import com.youtoo.ingestion.model.*
 import com.youtoo.ingestion.repository.*
 
 import zio.telemetry.opentelemetry.tracing.Tracing
+import zio.telemetry.opentelemetry.common.*
 
 import zio.*
 
@@ -120,10 +121,17 @@ object IngestionService {
     def traced(tracing: Tracing): IngestionService =
       new IngestionService {
         def load(id: Ingestion.Id): Task[Option[Ingestion]] =
-          self.load(id) @@ tracing.aspects.span("IngestionService.load")
+          self.load(id) @@ tracing.aspects.span(
+            "IngestionService.load",
+            attributes = Attributes(Attribute.long("ingestionId", id.asKey.value)),
+          )
         def loadMany(offset: Option[Key], limit: Long): Task[Chunk[Key]] =
           self.loadMany(offset, limit) @@ tracing.aspects.span("IngestionService.loadMany")
-        def save(o: Ingestion): Task[Long] = self.save(o) @@ tracing.aspects.span("IngestionService.save")
+        def save(o: Ingestion): Task[Long] =
+          self.save(o) @@ tracing.aspects.span(
+            "IngestionService.save",
+            attributes = Attributes(Attribute.long("ingestionId", o.id.asKey.value)),
+          )
       }
 
   }

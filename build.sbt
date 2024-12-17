@@ -50,6 +50,7 @@ onLoad in Global := {
 }
 lazy val aggregatedProjects: Seq[ProjectReference] =
   Seq(
+    mail,
     job,
     kernel,
     core,
@@ -358,6 +359,38 @@ lazy val job = (project in file("job"))
   .settings(
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
     libraryDependencies ++= Dependencies.`open-telemetry`,
+    libraryDependencies ++= Seq(
+      flyway,
+      hicariCP,
+      `postgres-driver`,
+      `testcontainers-scala-postgresql`,
+      `zio-jdbc`,
+      zio,
+      cats,
+      `zio-prelude`,
+      `zio-schema`,
+      `zio-test`,
+      `zio-test-sbt`,
+      `zio-test-magnolia`,
+      `zio-mock`,
+    ),
+  )
+
+lazy val mail = (project in file("mail"))
+  .settings(stdSettings("mail"))
+  // .settings(publishSetting(false))
+  .enablePlugins(BuildInfoPlugin)
+  .settings(buildInfoSettings("com.youtoo"))
+  .dependsOn(
+    core % "compile->compile;test->compile",
+    postgres % "compile->compile;test->compile;test->test",
+    `cqrs-persistence-postgres` % "compile->compile;test->test",
+    job % "compile->compile;test->test",
+  )
+  .settings(
+    testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
+    libraryDependencies ++= Dependencies.`open-telemetry`,
+    libraryDependencies ++= Dependencies.gmail,
     libraryDependencies ++= Seq(
       flyway,
       hicariCP,
