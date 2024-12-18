@@ -62,7 +62,7 @@ val ingestionCommandGen: Gen[Any, IngestionCommand] =
 
 given versionGen: Gen[Any, Version] = Gen.fromZIO(Version.gen.orDie)
 
-val ingestionStartedGen: Gen[Any, IngestionEvent.IngestionStarted] =
+val ingestionStartedGen: Gen[Any, IngestionEvent] =
   for {
     id <- ingestionIdGen
     timestamp <- timestampGen
@@ -84,7 +84,7 @@ val ingestionFileProcessedGen: Gen[Any, IngestionEvent.IngestionFileProcessed] =
 val ingestionFileFailedGen: Gen[Any, IngestionEvent.IngestionFileFailed] =
   keyGen.map(IngestionFile.Id.apply).map(IngestionEvent.IngestionFileFailed.apply)
 
-val ingestionCompletedGen: Gen[Any, IngestionEvent.IngestionCompleted] =
+val ingestionCompletedGen: Gen[Any, IngestionEvent] =
   timestampGen.map(IngestionEvent.IngestionCompleted.apply)
 
 val ingestionEventGen: Gen[Any, IngestionEvent] =
@@ -129,27 +129,28 @@ val ingestionEventSequenceGen: Gen[Any, NonEmptyList[Change[IngestionEvent]]] =
 
 val validIngestionEventSequenceGen: Gen[Any, NonEmptyList[Change[IngestionEvent]]] =
   for {
-    id <- ingestionIdGen
+    startEvent <- ingestionStartedGen
     version <- versionGen
-    timestamp <- timestampGen
-    startEvent = Change(version, IngestionEvent.IngestionStarted(id, timestamp))
+    startChange = Change(version, startEvent)
     otherEvents <- Gen.listOf(
       Gen.oneOf(
         ingestionFilesResolvedGen,
         ingestionFileProcessedGen,
         ingestionFileFailedGen,
-        ingestionCompletedGen,
-      ),
-    )
-    changes <- Gen.fromZIO {
 
-      ZIO.foreach(otherEvents) { case event =>
+        )
+    )
+    progressChanges <- Gen.fromZIO {
+      ZIO.foreach(otherEvents) { event =>
         for {
-          v <- Version.gen.orDie
-        } yield Change(v, event)
+          version <- Version.gen.orDie
+        } yield Change(version, event)
       }
     }
-  } yield NonEmptyList.fromIterable(startEvent, changes)
+    done <- ingestionCompletedGen
+    version <- versionGen
+    changes = progressChanges ::: (Change(version, done) :: Nil)
+  } yield NonEmptyList(startChange, changes*)
 
 object IngestionStatusGenerators {
   val genIngestionFileId: Gen[Any, IngestionFile.Id] = keyGen.map(IngestionFile.Id.apply)

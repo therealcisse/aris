@@ -4,12 +4,8 @@ package integration
 
 import zio.*
 
-import com.youtoo.mail.integration.internal.GmailSupport
-
-import com.youtoo.mail.service.*
 import com.youtoo.mail.model.*
 
-import com.google.api.services.gmail.Gmail
 import zio.prelude.*
 
 import scala.jdk.CollectionConverters.*
@@ -33,30 +29,17 @@ object MailClient {
 
   given Config[BatchSize.Type] = Config.long.nested("mailBatchSize").withDefault(1024L).map(BatchSize(_))
 
-  def live(): ZLayer[Scope & Tracing & MailService, Throwable, MailClient] =
+  def live(): ZLayer[Scope & Tracing & GmailPool, Throwable, MailClient] =
     ZLayer.scoped {
 
       for {
         tracing <- ZIO.service[Tracing]
-        service <- ZIO.service[MailService]
-
-        pool <- ZKeyedPool.make(
-          get = (id: MailAccount.Id) =>
-            for {
-              account <- service.loadAccount(id)
-
-              gmail <- account.fold(ZIO.fail(IllegalArgumentException("Account not found"))) { account =>
-                GmailSupport.authenticate(account.settings.authConfig)
-              }
-
-            } yield gmail,
-          size = 1,
-        )
+        pool <- ZIO.service[GmailPool]
 
       } yield new MailClientLive(pool).traced(tracing)
     }
 
-  class MailClientLive(pool: ZKeyedPool[Throwable, MailAccount.Id, Gmail]) extends MailClient { self =>
+  class MailClientLive(pool: GmailPool) extends MailClient { self =>
     def loadLabels(accountKey: MailAccount.Id): RIO[Scope, Chunk[MailLabels.LabelInfo]] =
       for {
         service <- pool.get(accountKey)

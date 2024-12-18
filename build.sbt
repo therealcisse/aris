@@ -392,6 +392,7 @@ lazy val mail = (project in file("mail"))
     libraryDependencies ++= Dependencies.`open-telemetry`,
     libraryDependencies ++= Dependencies.gmail,
     libraryDependencies ++= Seq(
+      mockito,
       flyway,
       hicariCP,
       `postgres-driver`,

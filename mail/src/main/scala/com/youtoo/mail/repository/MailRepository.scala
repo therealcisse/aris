@@ -28,6 +28,25 @@ trait MailRepository {
 }
 
 object MailRepository {
+  inline def loadMails(options: FetchOptions): RIO[MailRepository & ZConnection, Chunk[MailData]] =
+    ZIO.serviceWithZIO[MailRepository](_.loadMails(options))
+
+  inline def loadAccounts(options: FetchOptions): RIO[MailRepository & ZConnection, Chunk[MailAccount]] =
+    ZIO.serviceWithZIO[MailRepository](_.loadAccounts(options))
+
+  inline def loadAccount(key: MailAccount.Id): RIO[MailRepository & ZConnection, Option[MailAccount]] =
+    ZIO.serviceWithZIO[MailRepository](_.loadAccount(key))
+
+  inline def save(account: MailAccount): RIO[MailRepository & ZConnection, Long] =
+    ZIO.serviceWithZIO[MailRepository](_.save(account))
+
+  inline def loadMail(id: MailData.Id): RIO[MailRepository & ZConnection, Option[MailData]] =
+    ZIO.serviceWithZIO[MailRepository](_.loadMail(id))
+
+  inline def save(data: MailData): RIO[MailRepository & ZConnection, Long] =
+    ZIO.serviceWithZIO[MailRepository](_.save(data))
+
+
   def live(): ZLayer[Tracing, Throwable, MailRepository] =
     ZLayer.fromFunction(tracing => new MailRepositoryLive().traced(tracing))
 
@@ -107,11 +126,11 @@ object MailRepository {
 
       (sql"""
         SELECT id, raw_body, account_id, internal_date, timestamp
-        FROM mails
-        """ ++ offsetQuery.fold(SqlFragment.empty)(offset => sql" WHERE id > $offset") ++ limitQuery.fold(
+        FROM mail_data
+        """ ++ offsetQuery.fold(SqlFragment.empty)(ql => sql" WHERE " ++ ql) ++ sql" ORDER BY id DESC" ++ limitQuery.fold(
         SqlFragment.empty,
-      )(limit => sql" LIMIT $limit") ++ sql" ORDER BY key DESC")
-        .query[
+      )(ql => sql" " ++ ql)
+      ).query[
           (
             MailData.Id,
             MailData.Body,
@@ -128,10 +147,10 @@ object MailRepository {
       (sql"""
         SELECT key, name, email, settings, timestamp
         FROM mail_account
-        """ ++ offsetQuery.fold(SqlFragment.empty)(offset => sql" WHERE key > $offset") ++ limitQuery.fold(
+        """ ++ offsetQuery.fold(SqlFragment.empty)(ql => sql" WHERE " ++ ql) ++ sql" ORDER BY key DESC" ++ limitQuery.fold(
         SqlFragment.empty,
-      )(limit => sql" LIMIT $limit") ++ sql" ORDER BY key DESC")
-        .query[
+      )(ql => sql" " ++ ql)
+      ).query[
           (
             MailAccount.Id,
             MailAccount.Name,
@@ -174,7 +193,7 @@ object MailRepository {
     def LOAD_MAIL(id: MailData.Id): Query[MailData] =
       sql"""
     SELECT id, raw_body, account_id, internal_date, timestamp
-    FROM mail
+    FROM mail_data
     WHERE id = $id
     """.query[
         (
@@ -188,7 +207,7 @@ object MailRepository {
 
     def SAVE_MAIL(mail: MailData): SqlFragment =
       sql"""
-    INSERT INTO mail (id, raw_body, account_id, internal_date, timestamp)
+    INSERT INTO mail_data (id, raw_body, account_id, internal_date, timestamp)
     VALUES (
       ${mail.id},
       ${mail.body},
