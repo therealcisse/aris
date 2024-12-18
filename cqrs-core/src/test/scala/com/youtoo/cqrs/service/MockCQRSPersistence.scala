@@ -12,12 +12,12 @@ import zio.schema.codec.*
 
 object MockCQRSPersistence extends Mock[CQRSPersistence] {
   object ReadEvents {
-    object Full extends Poly.Effect.Output[(Key, Discriminator), Throwable]
-    object Snapshot extends Poly.Effect.Output[(Key, Discriminator, Version), Throwable]
+    object Full extends Poly.Effect.Output[(Key, Discriminator, Catalog), Throwable]
+    object Snapshot extends Poly.Effect.Output[(Key, Discriminator, Version, Catalog), Throwable]
 
     object FullArgs
         extends Poly.Effect.Output[
-          (Discriminator, PersistenceQuery, FetchOptions),
+          (Discriminator, PersistenceQuery, FetchOptions, Catalog),
           Throwable,
         ]
     object SnapshotArgs
@@ -27,6 +27,7 @@ object MockCQRSPersistence extends Mock[CQRSPersistence] {
             Version,
             PersistenceQuery,
             FetchOptions,
+            Catalog,
           ),
           Throwable,
         ]
@@ -46,39 +47,89 @@ object MockCQRSPersistence extends Mock[CQRSPersistence] {
           id: Key,
           discriminator: Discriminator,
           snapshotVersion: Version,
+          catalog: Catalog,
         ): ZIO[ZConnection, Throwable, Chunk[Change[Event]]] =
-          proxy(ReadEvents.Snapshot.of[Chunk[Change[Event]]], (id, discriminator, snapshotVersion))
+            proxy(
+            ReadEvents.Snapshot.of[Chunk[Change[Event]]],
+            (
+              id,
+              discriminator,
+              snapshotVersion,
+              catalog,
+            )
+          )
 
         def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
           id: Key,
           discriminator: Discriminator,
+          catalog: Catalog,
         ): ZIO[ZConnection, Throwable, Chunk[Change[Event]]] =
-          proxy(ReadEvents.Full.of[Chunk[Change[Event]]], (id, discriminator))
+          proxy(
+            ReadEvents.Full.of[Chunk[Change[Event]]],
+            (
+              id,
+              discriminator,
+              catalog,
+            )
+          )
 
         def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
           discriminator: Discriminator,
           snapshotVersion: Version,
           query: PersistenceQuery,
           options: FetchOptions,
+          catalog: Catalog,
         ): ZIO[ZConnection, Throwable, Chunk[Change[Event]]] =
           proxy(
             ReadEvents.SnapshotArgs.of[Chunk[Change[Event]]],
-            (discriminator, snapshotVersion, query, options),
+            (
+              discriminator,
+              snapshotVersion,
+              query,
+              options,
+              catalog,
+            ),
           )
 
         def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
           discriminator: Discriminator,
           query: PersistenceQuery,
           options: FetchOptions,
+          catalog: Catalog,
         ): ZIO[ZConnection, Throwable, Chunk[Change[Event]]] =
-          proxy(ReadEvents.FullArgs.of[Chunk[Change[Event]]], (discriminator, query, options))
+          proxy(
+            ReadEvents.FullArgs.of[Chunk[Change[Event]]],
+            (
+              discriminator,
+              query,
+              options,
+              catalog,
+            )
+          )
 
         def saveEvent[Event: {BinaryCodec, MetaInfo, Tag}](
           id: Key,
           discriminator: Discriminator,
           event: Change[Event],
+          catalog: Catalog,
         ): ZIO[ZConnection, Throwable, Long] =
-          proxy(SaveEvent.of[(Key, Discriminator, Change[Event]), Long], (id, discriminator, event))
+          proxy(
+            SaveEvent.of[
+              (
+                  Key,
+                  Discriminator,
+                  Change[Event],
+                  Catalog,
+              ),
+              Long
+            ],
+            (
+              id,
+              discriminator,
+              event,
+              catalog,
+            )
+          )
 
         def readSnapshot(id: Key): ZIO[ZConnection, Throwable, Option[Version]] =
           proxy(ReadSnapshot, id)

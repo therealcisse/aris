@@ -11,10 +11,10 @@ object MailLabels {
   import zio.schema.*
   import zio.prelude.*
 
-  case class Label(id: LabelKey, name: Name, total: TotalMessages)
+  case class LabelInfo(id: LabelKey, name: Name, total: TotalMessages)
 
-  object Label {
-    given Schema[Label] = DeriveSchema.gen
+  object LabelInfo {
+    given Schema[LabelInfo] = DeriveSchema.gen
   }
 
   type LabelKey = LabelKey.Type

@@ -26,29 +26,33 @@ object PostgresCQRSPersistence {
     def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
       id: Key,
       discriminator: Discriminator,
+      catalog: Catalog,
     ): RIO[ZConnection, Chunk[Change[Event]]] =
-      Queries.READ_EVENTS(id, discriminator).selectAll
+      Queries.READ_EVENTS(id, discriminator, catalog).selectAll
 
     def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
       id: Key,
       discriminator: Discriminator,
       snapshotVersion: Version,
+      catalog: Catalog,
     ): RIO[ZConnection, Chunk[Change[Event]]] =
-      Queries.READ_EVENTS(id, discriminator, snapshotVersion).selectAll
+      Queries.READ_EVENTS(id, discriminator, snapshotVersion, catalog).selectAll
 
     def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
       discriminator: Discriminator,
       query: PersistenceQuery,
       options: FetchOptions,
+      catalog: Catalog,
     ): RIO[ZConnection, Chunk[Change[Event]]] =
-      Queries.READ_EVENTS(discriminator, query, options).selectAll
+      Queries.READ_EVENTS(discriminator, query, options, catalog).selectAll
 
     def saveEvent[Event: {BinaryCodec, MetaInfo, Tag}](
       id: Key,
       discriminator: Discriminator,
       event: Change[Event],
+      catalog: Catalog,
     ): RIO[ZConnection, Long] =
-      Queries.SAVE_EVENT(id, discriminator, event).insert
+      Queries.SAVE_EVENT(id, discriminator, event, catalog).insert
 
     def readSnapshot(id: Key): RIO[ZConnection, Option[Version]] =
       Queries.READ_SNAPSHOT(id).selectOne
@@ -61,8 +65,9 @@ object PostgresCQRSPersistence {
         def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
           id: Key,
           discriminator: Discriminator,
+          catalog: Catalog,
         ): RIO[ZConnection, Chunk[Change[Event]]] =
-          self.readEvents(id, discriminator) @@ tracing.aspects.span(
+          self.readEvents(id, discriminator, catalog) @@ tracing.aspects.span(
             "PostgresCQRSPersistence.readEvents",
             attributes = Attributes(
               Attribute.long("key", id.value),
@@ -74,8 +79,9 @@ object PostgresCQRSPersistence {
           id: Key,
           discriminator: Discriminator,
           snapshotVersion: Version,
+          catalog: Catalog,
         ): RIO[ZConnection, Chunk[Change[Event]]] =
-          self.readEvents(id, discriminator, snapshotVersion) @@ tracing.aspects.span(
+          self.readEvents(id, discriminator, snapshotVersion, catalog) @@ tracing.aspects.span(
             "PostgresCQRSPersistence.readEvents.fromSnapshot",
             attributes = Attributes(
               Attribute.long("key", id.value),
@@ -87,8 +93,9 @@ object PostgresCQRSPersistence {
           discriminator: Discriminator,
           query: PersistenceQuery,
           options: FetchOptions,
+          catalog: Catalog,
         ): RIO[ZConnection, Chunk[Change[Event]]] =
-          self.readEvents(discriminator, query, options) @@ tracing.aspects.span(
+          self.readEvents(discriminator, query, options, catalog) @@ tracing.aspects.span(
             "PostgresCQRSPersistence.readEvents.query",
             attributes = Attributes(Attribute.string("discriminator", discriminator.value)),
           )
@@ -97,8 +104,9 @@ object PostgresCQRSPersistence {
           id: Key,
           discriminator: Discriminator,
           event: Change[Event],
+          catalog: Catalog,
         ): RIO[ZConnection, Long] =
-          self.saveEvent(id, discriminator, event) @@ tracing.aspects.span(
+          self.saveEvent(id, discriminator, event, catalog) @@ tracing.aspects.span(
             "PostgresCQRSPersistence.saveEvent",
             attributes = Attributes(
               Attribute.long("key", id.value),
@@ -123,55 +131,65 @@ object PostgresCQRSPersistence {
 
   object Queries extends JdbcCodecs {
 
-    def READ_EVENTS[Event: BinaryCodec](id: Key, discriminator: Discriminator): Query[Change[Event]] =
+    def READ_EVENTS[Event: BinaryCodec](id: Key, discriminator: Discriminator, catalog: Catalog): Query[Change[Event]] =
       given JdbcDecoder[Event] = byteArrayDecoder[Event]
 
-      sql"""
-      SELECT
-        version,
-        payload
-      FROM events
-      WHERE aggregate_id = $id AND discriminator = $discriminator
-      ORDER BY version ASC
-      """.query[(Version, Event)].map(Change.apply)
+      SqlFragment
+        .select("version", "payload")
+        .from(catalog.tableName)
+        .where(
+          sql"""
+          aggregate_id = $id AND discriminator = $discriminator
+          ORDER BY version ASC
+          """
+        ).query[(Version, Event)].map(Change.apply)
 
     def READ_EVENTS[Event: BinaryCodec](
       id: Key,
       discriminator: Discriminator,
       snapshotVersion: Version,
+      catalog: Catalog,
     ): Query[Change[Event]] =
       given JdbcDecoder[Event] = byteArrayDecoder[Event]
 
-      sql"""
-      SELECT
-        version,
-        payload
-      FROM events
-      WHERE aggregate_id = $id AND discriminator = $discriminator AND version > $snapshotVersion
-      ORDER BY version ASC
-      """.query[(Version, Event)].map(Change.apply)
+      SqlFragment
+        .select("version", "payload")
+        .from(catalog.tableName)
+        .where(
+          sql"""
+          aggregate_id = $id AND discriminator = $discriminator AND version > $snapshotVersion
+          ORDER BY version ASC
+          """
+        ).query[(Version, Event)].map(Change.apply)
 
     def READ_EVENTS[Event: BinaryCodec](
       discriminator: Discriminator,
       query: PersistenceQuery,
       options: FetchOptions,
+      catalog: Catalog,
     ): Query[Change[Event]] =
       given JdbcDecoder[Event] = byteArrayDecoder[Event]
 
       val (offsetQuery, limitQuery) = options.toSql
 
-      (sql"""
-      SELECT
-        version,
-        payload
-      FROM events
-      WHERE discriminator = $discriminator""" ++ query.toSql.fold(SqlFragment.empty)(ql => sql" AND " ++ ql) ++ offsetQuery.fold(SqlFragment.empty)(ql => sql" AND " ++ ql) ++
-      sql""" ORDER BY version ASC""" ++ limitQuery.fold(SqlFragment.empty)(ql => sql" " ++ ql)).query[(Version, Event)].map(Change.apply)
+      SqlFragment
+        .select("version", "payload")
+        .from(catalog.tableName)
+        .where(
+          sql"""discriminator = $discriminator""" ++ query.toSql.fold(SqlFragment.empty)(ql => sql" AND " ++ ql) ++ offsetQuery.fold(SqlFragment.empty)(ql => sql" AND " ++ ql) ++
+          sql""" ORDER BY version ASC""" ++ limitQuery.fold(SqlFragment.empty)(ql => sql" " ++ ql)
+        ).query[
+        (
+          Version,
+          Event,
+          )
+        ].map(Change.apply)
 
     def SAVE_EVENT[Event: { BinaryCodec, MetaInfo }](
       id: Key,
       discriminator: Discriminator,
       event: Change[Event],
+      catalog: Catalog,
     ): SqlFragment =
       val payload = java.util.Base64.getEncoder.encodeToString(summon[BinaryCodec[Event]].encode(event.payload).toArray)
 
@@ -179,8 +197,16 @@ object PostgresCQRSPersistence {
 
       event.payload.hierarchy match {
         case None =>
-          sql"""
-          INSERT INTO events (version, aggregate_id, discriminator, namespace, props, payload)
+
+          SqlFragment.insertInto(catalog.tableName)(
+            "version",
+            "aggregate_id",
+            "discriminator",
+            "namespace",
+            "props",
+            "payload",
+
+            ) ++ sql"""
           VALUES (
             ${event.version},
             ${id},
@@ -198,8 +224,16 @@ object PostgresCQRSPersistence {
           """
 
         case Some(Hierarchy.GrandChild(grandParentId)) =>
-          sql"""
-          INSERT INTO events (version, aggregate_id, discriminator, namespace, grand_parent_id, props, payload)
+          SqlFragment.insertInto(catalog.tableName)(
+            "version",
+            "aggregate_id",
+            "discriminator",
+            "namespace",
+            "grand_parent_id",
+            "props",
+            "payload",
+
+            ) ++ sql"""
           VALUES (
             ${event.version},
             ${id},
@@ -219,8 +253,16 @@ object PostgresCQRSPersistence {
           """
 
         case Some(Hierarchy.Child(parentId)) =>
-          sql"""
-          INSERT INTO events (version, aggregate_id, discriminator, namespace, parent_id, props, payload)
+          SqlFragment.insertInto(catalog.tableName)(
+            "version",
+            "aggregate_id",
+            "discriminator",
+            "namespace",
+            "parent_id",
+            "props",
+            "payload",
+
+            ) ++ sql"""
           VALUES (
             ${event.version},
             ${id},
@@ -240,8 +282,17 @@ object PostgresCQRSPersistence {
           """
 
         case Some(Hierarchy.Descendant(grandParentId, parentId)) =>
-          sql"""
-          INSERT INTO events (version, aggregate_id, discriminator, namespace, parent_id, grand_parent_id, props, payload)
+          SqlFragment.insertInto(catalog.tableName)(
+            "version",
+            "aggregate_id",
+            "discriminator",
+            "namespace",
+            "parent_id",
+            "grand_parent_id",
+            "props",
+            "payload",
+
+            ) ++ sql"""
           VALUES (
             ${event.version},
             ${id},

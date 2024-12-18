@@ -2,8 +2,6 @@ package com.youtoo
 package mail
 package model
 
-import com.youtoo.job.model.*
-
 import zio.prelude.*
 import zio.schema.*
 

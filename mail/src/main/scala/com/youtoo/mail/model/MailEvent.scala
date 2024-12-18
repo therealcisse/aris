@@ -4,10 +4,7 @@ package model
 
 import zio.*
 
-import zio.prelude.*
-
 import com.youtoo.cqrs.*
-import com.youtoo.cqrs.domain.*
 import com.youtoo.job.model.*
 
 enum MailEvent {
@@ -43,42 +40,42 @@ object MailEvent {
     extension (self: MailEvent) def reference: Option[Reference] = None
   }
 
-  class LoadMail(accountKey: MailAccount.Id) extends EventHandler[MailEvent, Mail] {
-    def applyEvents(events: NonEmptyList[Change[MailEvent]]): Mail =
-      events match {
-        case NonEmptyList.Single(ch) =>
-          ch.payload match {
-            case MailEvent.SyncStarted(labels, timestamp, jobId) =>
-              Mail(accountKey = accountKey, state = Mail.State())
-
-            case _ => throw IllegalArgumentException("Unexpected event, current state is empty")
-          }
-
-        case NonEmptyList.Cons(ch, ls) =>
-          ch.payload match {
-            case MailEvent.SyncStarted(labels, timestamp, jobId) =>
-              applyEvents(zero = Mail(accountKey = accountKey, state = Mail.State()), ls)
-
-            case _ => throw IllegalArgumentException("Unexpected event, current state is empty")
-          }
-
-      }
-
-    def applyEvents(zero: Mail, events: NonEmptyList[Change[MailEvent]]): Mail =
-      events.foldLeft(zero) { (state, e) =>
-
-        e.payload match {
-          case MailEvent.SyncStarted(labels, timestamp, jobId) =>
-            state.copy(accountKey = accountKey, state = Mail.State())
-
-          case MailEvent.MailSynced(timestamp, mailKeys, token, jobId) =>
-            state
-
-          case MailEvent.SyncCompleted(timestamp, jobId) =>
-            state
-        }
-      }
-
-  }
+  // class LoadMail(accountKey: MailAccount.Id) extends EventHandler[MailEvent, Mail] {
+  //   def applyEvents(events: NonEmptyList[Change[MailEvent]]): Mail =
+  //     events match {
+  //       case NonEmptyList.Single(ch) =>
+  //         ch.payload match {
+  //           case MailEvent.SyncStarted(labels, timestamp, jobId) =>
+  //             Mail(accountKey = accountKey, state = Mail.State())
+  //
+  //           case _ => throw IllegalArgumentException("Unexpected event, current state is empty")
+  //         }
+  //
+  //       case NonEmptyList.Cons(ch, ls) =>
+  //         ch.payload match {
+  //           case MailEvent.SyncStarted(labels, timestamp, jobId) =>
+  //             applyEvents(zero = Mail(accountKey = accountKey, state = Mail.State()), ls)
+  //
+  //           case _ => throw IllegalArgumentException("Unexpected event, current state is empty")
+  //         }
+  //
+  //     }
+  //
+  //   def applyEvents(zero: Mail, events: NonEmptyList[Change[MailEvent]]): Mail =
+  //     events.foldLeft(zero) { (state, e) =>
+  //
+  //       e.payload match {
+  //         case MailEvent.SyncStarted(labels, timestamp, jobId) =>
+  //           state.copy(accountKey = accountKey, state = Mail.State())
+  //
+  //         case MailEvent.MailSynced(timestamp, mailKeys, token, jobId) =>
+  //           state
+  //
+  //         case MailEvent.SyncCompleted(timestamp, jobId) =>
+  //           state
+  //       }
+  //     }
+  //
+  // }
 
 }

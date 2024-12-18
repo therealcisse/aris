@@ -60,21 +60,22 @@ object PostgresCQRSPersistenceSpec extends PgSpec, TestSupport {
 
               event = Change(version = version, DummyEvent("test"))
 
-              saveResult <- atomically(persistence.saveEvent(key, discriminator, event))
+              saveResult <- atomically(persistence.saveEvent(key, discriminator, event, Catalog.Default))
 
               a = assert(saveResult)(equalTo(1L))
 
-              events0 <- atomically(persistence.readEvents[DummyEvent](key, discriminator))
+              events0 <- atomically(persistence.readEvents[DummyEvent](key, discriminator, Catalog.Default))
               b = assert(events0)(isNonEmpty)
 
               c <- (
                 for {
-                  events0 <- atomically(persistence.readEvents[DummyEvent](key, discriminator))
+                  events0 <- atomically(persistence.readEvents[DummyEvent](key, discriminator, Catalog.Default))
                   events1 <- atomically(
                     persistence.readEvents[DummyEvent](
                       discriminator,
                       query = PersistenceQuery.descendant(grandParentId, parentId),
                       options = FetchOptions(),
+                      catalog = Catalog.Default,
                     ),
                   )
                   events2 <- atomically(
@@ -82,6 +83,7 @@ object PostgresCQRSPersistenceSpec extends PgSpec, TestSupport {
                       discriminator,
                       query = PersistenceQuery.descendant(Key(grandParentIdXXX), parentId),
                       options = FetchOptions(),
+                      catalog = Catalog.Default,
                     ),
                   )
                   events3 <- atomically(
@@ -89,6 +91,7 @@ object PostgresCQRSPersistenceSpec extends PgSpec, TestSupport {
                       discriminator,
                       query = PersistenceQuery.descendant(grandParentId, Key(parentIdXXX)),
                       options = FetchOptions(),
+                      catalog = Catalog.Default,
                     ),
                   )
 
@@ -103,12 +106,13 @@ object PostgresCQRSPersistenceSpec extends PgSpec, TestSupport {
 
               d <- (
                 for {
-                  events0 <- atomically(persistence.readEvents[DummyEvent](key, discriminator))
+                  events0 <- atomically(persistence.readEvents[DummyEvent](key, discriminator, Catalog.Default))
                   events1 <- atomically(
                     persistence.readEvents[DummyEvent](
                       discriminator,
                       query = PersistenceQuery.grandChild(grandParentId),
                       options = FetchOptions(),
+                      catalog = Catalog.Default,
                     ),
                   )
                   events2 <- atomically(
@@ -116,6 +120,7 @@ object PostgresCQRSPersistenceSpec extends PgSpec, TestSupport {
                       discriminator,
                       query = PersistenceQuery.grandChild(Key(grandParentIdXXX)),
                       options = FetchOptions(),
+                      catalog = Catalog.Default,
                     ),
                   )
 
@@ -128,12 +133,13 @@ object PostgresCQRSPersistenceSpec extends PgSpec, TestSupport {
 
               e <- (
                 for {
-                  events0 <- atomically(persistence.readEvents[DummyEvent](key, discriminator))
+                  events0 <- atomically(persistence.readEvents[DummyEvent](key, discriminator, Catalog.Default))
                   events1 <- atomically(
                     persistence.readEvents[DummyEvent](
                       discriminator,
                       query = PersistenceQuery.child(parentId),
                       options = FetchOptions(),
+                      catalog = Catalog.Default,
                     ),
                   )
                   events2 <- atomically(
@@ -141,6 +147,7 @@ object PostgresCQRSPersistenceSpec extends PgSpec, TestSupport {
                       discriminator,
                       query = PersistenceQuery.child(Key(parentIdXXX)),
                       options = FetchOptions(),
+                      catalog = Catalog.Default,
                     ),
                   )
 
@@ -161,16 +168,17 @@ object PostgresCQRSPersistenceSpec extends PgSpec, TestSupport {
 
             event = Change(version = version, DummyEvent("test"))
 
-            saveResult <- atomically(persistence.saveEvent(key, discriminator, event))
+            saveResult <- atomically(persistence.saveEvent(key, discriminator, event, Catalog.Default))
 
             a = assert(saveResult)(equalTo(1L))
 
-            events0 <- atomically(persistence.readEvents[DummyEvent](key, discriminator))
+            events0 <- atomically(persistence.readEvents[DummyEvent](key, discriminator, Catalog.Default))
             events1 <- atomically(
               persistence.readEvents[DummyEvent](
                 discriminator,
                 query = PersistenceQuery.props(EventProperty("type", "DummyEvent")),
                 options = FetchOptions(),
+                catalog = Catalog.Default,
               ),
             )
             events2 <- atomically(
@@ -178,6 +186,7 @@ object PostgresCQRSPersistenceSpec extends PgSpec, TestSupport {
                 discriminator,
                 query = PersistenceQuery.props(EventProperty("type", "DummyEventXXX")),
                 options = FetchOptions(),
+                catalog = Catalog.Default,
               ),
             )
             b = assert(events0)(isNonEmpty) && assert(events1)(isNonEmpty) && assert(events2)(isEmpty)
@@ -192,11 +201,11 @@ object PostgresCQRSPersistenceSpec extends PgSpec, TestSupport {
 
             event = Change(version = version, DummyEvent("test"))
 
-            saveResult <- atomically(persistence.saveEvent(key, discriminator, event))
+            saveResult <- atomically(persistence.saveEvent(key, discriminator, event, Catalog.Default))
 
             a = assert(saveResult)(equalTo(1L))
 
-            events <- atomically(persistence.readEvents[DummyEvent](key, discriminator))
+            events <- atomically(persistence.readEvents[DummyEvent](key, discriminator, Catalog.Default))
             b = assert(events)(isNonEmpty) && assert(events)(equalTo(Chunk(event)))
 
           } yield a && b
@@ -209,7 +218,7 @@ object PostgresCQRSPersistenceSpec extends PgSpec, TestSupport {
 
             event = Change(version = version, DummyEvent("test"))
 
-            saveResult <- atomically(persistence.saveEvent(key, discriminator, event))
+            saveResult <- atomically(persistence.saveEvent(key, discriminator, event, Catalog.Default))
 
             a = assert(saveResult)(equalTo(1L))
 
@@ -219,6 +228,7 @@ object PostgresCQRSPersistenceSpec extends PgSpec, TestSupport {
                   discriminator,
                   query = PersistenceQuery.ns(Namespace(0)),
                   options = FetchOptions(),
+                  catalog = Catalog.Default,
                 ),
             )
             b = assert(events0)(isNonEmpty)
@@ -229,6 +239,7 @@ object PostgresCQRSPersistenceSpec extends PgSpec, TestSupport {
                   discriminator,
                   query = PersistenceQuery.ns(Namespace(1)),
                   options = FetchOptions(),
+                  catalog = Catalog.Default,
                 ),
             )
             c = assert(events1)(isEmpty)
@@ -247,11 +258,11 @@ object PostgresCQRSPersistenceSpec extends PgSpec, TestSupport {
 
             _ <- atomically {
               ZIO.foreachDiscard(events) { e =>
-                persistence.saveEvent(key, discriminator, e)
+                persistence.saveEvent(key, discriminator, e, Catalog.Default)
               }
             }
 
-            es <- atomically(persistence.readEvents[DummyEvent](key, discriminator))
+            es <- atomically(persistence.readEvents[DummyEvent](key, discriminator, Catalog.Default))
 
             a = assert(es)(isSorted) && assert(events)(isSorted) && assert(es)(equalTo(es.sorted)) && assert(es)(
               equalTo(events.sorted),
@@ -271,7 +282,7 @@ object PostgresCQRSPersistenceSpec extends PgSpec, TestSupport {
                   version <- Version.gen
                   ch = Change(version = version, payload = DummyEvent(s"${index + 1}"))
 
-                  _ <- persistence.saveEvent(key, discriminator, ch)
+                  _ <- persistence.saveEvent(key, discriminator, ch, Catalog.Default)
                 } yield ()
               }
             }
@@ -280,6 +291,7 @@ object PostgresCQRSPersistenceSpec extends PgSpec, TestSupport {
               discriminator,
               query = PersistenceQuery.condition(),
               FetchOptions(None, Some(l)),
+              catalog = Catalog.Default,
             ))
 
             a = assert(es.size)(equalTo(l))
@@ -300,6 +312,7 @@ object PostgresCQRSPersistenceSpec extends PgSpec, TestSupport {
               discriminator,
               query = query,
               options = options,
+              catalog = Catalog.Default,
             ))
 
           } yield assertCompletes
@@ -317,18 +330,18 @@ object PostgresCQRSPersistenceSpec extends PgSpec, TestSupport {
 
               _ <- atomically {
                 ZIO.foreachDiscard(events) { e =>
-                  persistence.saveEvent(key, discriminator, e)
+                  persistence.saveEvent(key, discriminator, e, Catalog.Default)
                 }
               }
 
-              es <- atomically(persistence.readEvents[DummyEvent](key, discriminator))
+              es <- atomically(persistence.readEvents[DummyEvent](key, discriminator, Catalog.Default))
 
               a = assert((es))(equalTo((events.sorted)))
 
               max = es.maxBy(_.version)
 
               es1 <- atomically(
-                persistence.readEvents[DummyEvent](key, discriminator, snapshotVersion = max.version),
+                persistence.readEvents[DummyEvent](key, discriminator, snapshotVersion = max.version, Catalog.Default),
               )
 
               b = assert(es1)(isEmpty)
@@ -339,19 +352,19 @@ object PostgresCQRSPersistenceSpec extends PgSpec, TestSupport {
 
               _ <- atomically {
                 ZIO.foreachDiscard(events1) { e =>
-                  persistence.saveEvent(key, discriminator, e)
+                  persistence.saveEvent(key, discriminator, e, Catalog.Default)
                 }
               }
 
               es2 <- atomically(
-                persistence.readEvents[DummyEvent](key, discriminator, snapshotVersion = max.version),
+                persistence.readEvents[DummyEvent](key, discriminator, snapshotVersion = max.version, Catalog.Default),
               )
 
               c = assert(es2)(equalTo(events1.sorted))
 
               max1 = es2.maxBy(_.version)
               es3 <- atomically(
-                persistence.readEvents[DummyEvent](key, discriminator, snapshotVersion = max1.version),
+                persistence.readEvents[DummyEvent](key, discriminator, snapshotVersion = max1.version, Catalog.Default),
               )
               d = assert(es3)(isEmpty)
             } yield a && b && c && d
@@ -389,7 +402,7 @@ object PostgresCQRSPersistenceSpec extends PgSpec, TestSupport {
       test("read all events is optimized") {
         check(keyGen, discriminatorGen) { (key, discriminator) =>
 
-          val query = PostgresCQRSPersistence.Queries.READ_EVENTS[DummyEvent](key, discriminator)
+          val query = PostgresCQRSPersistence.Queries.READ_EVENTS[DummyEvent](key, discriminator, Catalog.Default)
           for {
 
             executionTime <- atomically(query.selectAll).timed.map(_._1)
@@ -403,7 +416,7 @@ object PostgresCQRSPersistenceSpec extends PgSpec, TestSupport {
       },
       test("read snapshot events is optimized") {
         check(keyGen, versionGen, discriminatorGen) { case (key, version, discriminator) =>
-          val query = PostgresCQRSPersistence.Queries.READ_EVENTS[DummyEvent](key, discriminator, version)
+          val query = PostgresCQRSPersistence.Queries.READ_EVENTS[DummyEvent](key, discriminator, version, Catalog.Default)
           for {
 
             executionTime <- atomically(query.selectAll).timed.map(_._1)
@@ -428,6 +441,7 @@ object PostgresCQRSPersistenceSpec extends PgSpec, TestSupport {
                   discriminator,
                   query = q,
                   options = options,
+                  catalog = Catalog.Default,
                 )
             for {
 

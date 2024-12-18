@@ -18,10 +18,9 @@ import zio.telemetry.opentelemetry.tracing.Tracing
 import zio.telemetry.opentelemetry.common.*
 
 trait MailClient {
-  def loadLabels(accountKey: MailAccount.Id): RIO[Scope, Chunk[MailLabels.Label]]
+  def loadLabels(accountKey: MailAccount.Id): RIO[Scope, Chunk[MailLabels.LabelInfo]]
   def fetchMails(
-    accountKey: MailAccount.Id,
-    labels: MailLabels,
+    address: MailAddress,
     token: Option[MailToken],
   ): RIO[Scope, (Chunk[MailData.Id], Option[MailToken])]
   def loadMessage(accountKey: MailAccount.Id, id: MailData.Id): RIO[Scope, Option[MailData]]
@@ -58,7 +57,7 @@ object MailClient {
     }
 
   class MailClientLive(pool: ZKeyedPool[Throwable, MailAccount.Id, Gmail]) extends MailClient { self =>
-    def loadLabels(accountKey: MailAccount.Id): RIO[Scope, Chunk[MailLabels.Label]] =
+    def loadLabels(accountKey: MailAccount.Id): RIO[Scope, Chunk[MailLabels.LabelInfo]] =
       for {
         service <- pool.get(accountKey)
         response <- ZIO.attempt(service.users().labels().list("me").execute())
@@ -68,7 +67,7 @@ object MailClient {
           .asScala
           .toList
           .map(l =>
-            MailLabels.Label(
+            MailLabels.LabelInfo(
               MailLabels.LabelKey(l.getId()),
               MailLabels.Name(l.getName()),
               MailLabels.TotalMessages(l.getMessagesTotal()),
@@ -78,12 +77,11 @@ object MailClient {
       } yield Chunk(labels*)
 
     def fetchMails(
-      accountKey: MailAccount.Id,
-      labels: MailLabels,
+      address: MailAddress,
       token: Option[MailToken],
     ): RIO[Scope, (Chunk[MailData.Id], Option[MailToken])] =
       for {
-        service <- pool.get(accountKey)
+        service <- pool.get(address.accountKey)
         batchSize <- ZIO.config[BatchSize.Type]
 
         response <- ZIO.attempt {
@@ -92,7 +90,7 @@ object MailClient {
             .messages()
             .list("me")
             .setMaxResults(batchSize.value)
-            .setLabelIds(labels.value.map(_.value).asJava)
+            .setLabelIds(java.util.Collections.singletonList(address.label.value))
 
           val r = token.fold(builder)(l => builder.setPageToken(l.value))
 
@@ -115,6 +113,7 @@ object MailClient {
             .users()
             .messages()
             .get("me", id.value)
+            .setFormat("raw")
             .execute()
         }
 
@@ -138,19 +137,21 @@ object MailClient {
 
     def traced(tracing: Tracing): MailClient =
       new MailClient {
-        def loadLabels(accountKey: MailAccount.Id): RIO[Scope, Chunk[MailLabels.Label]] =
+        def loadLabels(accountKey: MailAccount.Id): RIO[Scope, Chunk[MailLabels.LabelInfo]] =
           self.loadLabels(accountKey) @@ tracing.aspects.span(
             "MailClient.loadLabels",
             attributes = Attributes(Attribute.long("accountId", accountKey.asKey.value)),
           )
         def fetchMails(
-          accountKey: MailAccount.Id,
-          labels: MailLabels,
+          address: MailAddress,
           token: Option[MailToken],
         ): RIO[Scope, (Chunk[MailData.Id], Option[MailToken])] =
-          self.fetchMails(accountKey, labels, token) @@ tracing.aspects.span(
+          self.fetchMails(address, token) @@ tracing.aspects.span(
             "MailClient.fetchMails",
-            attributes = Attributes(Attribute.long("accountId", accountKey.asKey.value)),
+            attributes = Attributes(
+              Attribute.long("accountId", address.accountKey.asKey.value),
+              Attribute.string("label", address.label.value),
+            ),
           )
         def loadMessage(accountKey: MailAccount.Id, id: MailData.Id): RIO[Scope, Option[MailData]] =
           self.loadMessage(accountKey, id) @@ tracing.aspects.span(

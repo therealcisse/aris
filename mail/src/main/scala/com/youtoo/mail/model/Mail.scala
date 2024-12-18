@@ -4,7 +4,6 @@ package model
 
 import zio.*
 
-import zio.prelude.*
 import zio.schema.*
 
 case class Mail(accountKey: MailAccount.Id, state: Mail.State)

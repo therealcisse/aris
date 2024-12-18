@@ -19,7 +19,7 @@ import com.youtoo.migration.model.*
 
 object MigrationEventStoreSpec extends MockSpecDefault {
 
-  def spec = suite("MigrationEventStore")(
+  def spec = suite("MigrationEventStoreSpec")(
     testReadEventsId,
     testReadEventsByIdAndVersion,
     testReadEventsQueryOptions,
@@ -33,7 +33,7 @@ object MigrationEventStoreSpec extends MockSpecDefault {
   val testReadEventsId = test("readEvents by Id") {
     check(keyGen, eventSequenceGen) { (id, events) =>
       val mockEnv = MockCQRSPersistence.ReadEvents.Full.of(
-        equalTo((id, discriminator)),
+        equalTo((id, discriminator, MigrationEventStore.Table)),
         value(events.toChunk),
       )
 
@@ -49,7 +49,7 @@ object MigrationEventStoreSpec extends MockSpecDefault {
   val testReadEventsByIdAndVersion = test("readEvents by Id and Version") {
     check(keyGen, versionGen, eventSequenceGen) { (id, version, events) =>
       val mockEnv = MockCQRSPersistence.ReadEvents.Snapshot.of(
-        equalTo((id, discriminator, version)),
+        equalTo((id, discriminator, version, MigrationEventStore.Table)),
         value(events.toChunk),
       )
 
@@ -68,7 +68,7 @@ object MigrationEventStoreSpec extends MockSpecDefault {
       val options = FetchOptions()
 
       val mockEnv = MockCQRSPersistence.ReadEvents.FullArgs.of(
-        equalTo((discriminator, query, options)),
+        equalTo((discriminator, query, options, MigrationEventStore.Table)),
         value(events.toChunk),
       )
 
@@ -86,8 +86,8 @@ object MigrationEventStoreSpec extends MockSpecDefault {
       val change = Change(version, event)
       val returnId = 1L
 
-      val mockEnv = MockCQRSPersistence.SaveEvent.of[(Key, Discriminator, Change[MigrationEvent]), Long](
-        equalTo((id, discriminator, change)),
+      val mockEnv = MockCQRSPersistence.SaveEvent.of[(Key, Discriminator, Change[MigrationEvent], Catalog), Long](
+        equalTo((id, discriminator, change, MigrationEventStore.Table)),
         value(returnId),
       )
 

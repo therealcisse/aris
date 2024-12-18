@@ -35,7 +35,7 @@ object FileEventStoreSpec extends MockSpecDefault {
   val testReadEventsId = test("readEvents by Id") {
     check(keyGen, fileEventSequenceGen) { (id, events) =>
       val mockEnv = MockCQRSPersistence.ReadEvents.Full.of(
-        equalTo((id, discriminator)),
+        equalTo((id, discriminator, FileEventStore.Table)),
         value(events.toChunk),
       )
 
@@ -51,7 +51,7 @@ object FileEventStoreSpec extends MockSpecDefault {
   val testReadEventsByIdAndVersion = test("readEvents by Id and Version") {
     check(keyGen, versionGen, fileEventSequenceGen) { (id, version, events) =>
       val mockEnv = MockCQRSPersistence.ReadEvents.Snapshot.of(
-        equalTo((id, discriminator, version)),
+        equalTo((id, discriminator, version, FileEventStore.Table)),
         value(events.toChunk),
       )
 
@@ -70,7 +70,7 @@ object FileEventStoreSpec extends MockSpecDefault {
       val options = FetchOptions()
 
       val mockEnv = MockCQRSPersistence.ReadEvents.FullArgs.of(
-        equalTo((discriminator, query, options)),
+        equalTo((discriminator, query, options, FileEventStore.Table)),
         value(events.toChunk),
       )
 
@@ -88,8 +88,8 @@ object FileEventStoreSpec extends MockSpecDefault {
       val change = Change(version, event)
       val returnId = 1L
 
-      val mockEnv = MockCQRSPersistence.SaveEvent.of[(Key, Discriminator, Change[FileEvent]), Long](
-        equalTo((id, discriminator, change)),
+      val mockEnv = MockCQRSPersistence.SaveEvent.of[(Key, Discriminator, Change[FileEvent], Catalog), Long](
+        equalTo((id, discriminator, change, FileEventStore.Table)),
         value(returnId),
       )
 

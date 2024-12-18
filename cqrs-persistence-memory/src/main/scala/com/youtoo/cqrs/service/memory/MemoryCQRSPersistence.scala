@@ -78,7 +78,8 @@ object MemoryCQRSPersistence {
   type State = State.Type
 
   object State extends Newtype[State.Info] {
-    case class Info(events: Map[Discriminator, MultiDict[Key, Change[?]]], snapshots: Map[Key, Version])
+    case class EntryKey(catalog: Catalog, discriminator: Discriminator)
+    case class Info(events: Map[EntryKey, MultiDict[Key, Change[?]]], snapshots: Map[Key, Version])
 
     def empty: State = State(Info(Map.empty, Map.empty))
 
@@ -94,10 +95,10 @@ object MemoryCQRSPersistence {
         State(p.copy(snapshots = p.snapshots + (id -> version)))
 
     extension (s: State)
-      def add[Event](id: Key, discriminator: Discriminator, event: Change[Event]): State =
+      def add[Event](id: Key, discriminator: Discriminator, event: Change[Event], catalog: Catalog): State =
         val p = State.unwrap(s)
 
-        val r = p.events.updatedWith(discriminator) {
+        val r = p.events.updatedWith(EntryKey(catalog, discriminator)) {
           case None => MultiDict(id -> event).some
           case Some(map) => (map + (id -> event)).some
 
@@ -106,10 +107,10 @@ object MemoryCQRSPersistence {
         State(p.copy(events = r))
 
     extension (s: State)
-      def fetch[Event](id: Key, discriminator: Discriminator): Chunk[Change[Event]] =
+      def fetch[Event](id: Key, discriminator: Discriminator, catalog: Catalog): Chunk[Change[Event]] =
         val p = State.unwrap(s)
 
-        p.events.get(discriminator) match {
+        p.events.get(EntryKey(catalog, discriminator)) match {
           case None => Chunk()
           case Some(map) => Chunk.fromIterable(map.get(id).asInstanceOf[Set[Change[Event]]]).sorted
         }
@@ -119,8 +120,9 @@ object MemoryCQRSPersistence {
         id: Key,
         discriminator: Discriminator,
         snapshotVersion: Version,
+        catalog: Catalog,
       ): Chunk[Change[Event]] =
-        val p = s.fetch[Event](id, discriminator)
+        val p = s.fetch[Event](id, discriminator, catalog)
         p.filter(_.version.value > snapshotVersion.value)
 
     extension (s: State)
@@ -128,10 +130,11 @@ object MemoryCQRSPersistence {
         discriminator: Discriminator,
         query: PersistenceQuery,
         options: FetchOptions,
+        catalog: Catalog,
       ): Chunk[Change[Event]] =
         val p = State.unwrap(s)
 
-        p.events.get(discriminator) match {
+        p.events.get(EntryKey(catalog, discriminator)) match {
           case None => Chunk()
           case Some(map) =>
             val all = map.sets.values.flatten.asInstanceOf[Iterable[Change[Event]]]
@@ -167,29 +170,33 @@ object MemoryCQRSPersistence {
     def readEvents[Event:{ BinaryCodec, Tag, MetaInfo}](
       id: Key,
       discriminator: Discriminator,
+      catalog: Catalog,
     ): RIO[ZConnection, Chunk[Change[Event]]] =
-      ref.get.map(_.fetch(id, discriminator))
+      ref.get.map(_.fetch(id, discriminator, catalog))
 
     def readEvents[Event:{ BinaryCodec, Tag, MetaInfo}](
       id: Key,
       discriminator: Discriminator,
       snapshotVersion: Version,
+      catalog: Catalog,
     ): RIO[ZConnection, Chunk[Change[Event]]] =
-      ref.get.map(_.fetch(id, discriminator, snapshotVersion))
+      ref.get.map(_.fetch(id, discriminator, snapshotVersion, catalog))
 
     def readEvents[Event:{ BinaryCodec, Tag, MetaInfo}](
       discriminator: Discriminator,
       query: PersistenceQuery,
       options: FetchOptions,
+      catalog: Catalog,
     ): RIO[ZConnection, Chunk[Change[Event]]] =
-      ref.get.map(_.fetch(discriminator, query, options))
+      ref.get.map(_.fetch(discriminator, query, options, catalog))
 
     def saveEvent[Event: {BinaryCodec, MetaInfo, Tag}](
       id: Key,
       discriminator: Discriminator,
       event: Change[Event],
+      catalog: Catalog,
     ): RIO[ZConnection, Long] =
-      ref.update(_.add(id, discriminator, event)) `as` 1L
+      ref.update(_.add(id, discriminator, event, catalog)) `as` 1L
 
     def readSnapshot(id: Key): RIO[ZConnection, Option[Version]] =
       ref.get.map(_.getSnapshot(id))
@@ -202,8 +209,9 @@ object MemoryCQRSPersistence {
         def readEvents[Event:{ BinaryCodec, Tag, MetaInfo}](
           id: Key,
           discriminator: Discriminator,
+          catalog: Catalog,
         ): RIO[ZConnection, Chunk[Change[Event]]] =
-          self.readEvents(id, discriminator) @@ tracing.aspects.span(
+          self.readEvents(id, discriminator, catalog) @@ tracing.aspects.span(
             "MemoryCQRSPersistence.readEvents",
             attributes = Attributes(
               Attribute.long("key", id.value),
@@ -215,8 +223,9 @@ object MemoryCQRSPersistence {
           id: Key,
           discriminator: Discriminator,
           snapshotVersion: Version,
+          catalog: Catalog,
         ): RIO[ZConnection, Chunk[Change[Event]]] =
-          self.readEvents(id, discriminator, snapshotVersion) @@ tracing.aspects.span(
+          self.readEvents(id, discriminator, snapshotVersion, catalog) @@ tracing.aspects.span(
             "MemoryCQRSPersistence.readEvents.fromSnapshot",
             attributes = Attributes(
               Attribute.long("key", id.value),
@@ -228,8 +237,9 @@ object MemoryCQRSPersistence {
           discriminator: Discriminator,
           query: PersistenceQuery,
           options: FetchOptions,
+          catalog: Catalog,
         ): RIO[ZConnection, Chunk[Change[Event]]] =
-          self.readEvents(discriminator, query, options) @@ tracing.aspects.span(
+          self.readEvents(discriminator, query, options, catalog) @@ tracing.aspects.span(
             "MemoryCQRSPersistence.readEvents.query",
             attributes = Attributes(
               Attribute.string("discriminator", discriminator.value),
@@ -240,8 +250,9 @@ object MemoryCQRSPersistence {
           id: Key,
           discriminator: Discriminator,
           event: Change[Event],
+          catalog: Catalog,
         ): RIO[ZConnection, Long] =
-          self.saveEvent(id, discriminator, event) @@ tracing.aspects.span(
+          self.saveEvent(id, discriminator, event, catalog) @@ tracing.aspects.span(
             "MemoryCQRSPersistence.saveEvent",
             attributes = Attributes(
               Attribute.long("key", id.value),

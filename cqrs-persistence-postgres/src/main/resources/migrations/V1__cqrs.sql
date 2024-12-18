@@ -8,6 +8,8 @@ CREATE TABLE IF NOT EXISTS snapshots (
   UNIQUE (aggregate_id, version)
 );
 
+--  Event log
+
 CREATE TABLE IF NOT EXISTS events (
   version BIGINT NOT NULL PRIMARY KEY,
   aggregate_id BIGINT NOT NULL,

@@ -19,12 +19,13 @@ import com.youtoo.cqrs.Codecs.*
 trait MailEventStore extends EventStore[MailEvent] {}
 
 object MailEventStore {
+  val Table = Catalog.named("mail_log")
 
   def live(): ZLayer[CQRSPersistence, Throwable, MailEventStore] =
     ZLayer.fromFunction { (persistence: CQRSPersistence) =>
       new MailEventStore {
         def readEvents(id: Key): RIO[ZConnection, Option[NonEmptyList[Change[MailEvent]]]] =
-          persistence.readEvents[MailEvent](id, MailEvent.discriminator).map { es =>
+          persistence.readEvents[MailEvent](id, MailEvent.discriminator, Table).map { es =>
             NonEmptyList.fromIterableOption(es)
           }
 
@@ -32,7 +33,7 @@ object MailEventStore {
           id: Key,
           snapshotVersion: Version,
         ): RIO[ZConnection, Option[NonEmptyList[Change[MailEvent]]]] =
-          persistence.readEvents[MailEvent](id, MailEvent.discriminator, snapshotVersion).map { es =>
+          persistence.readEvents[MailEvent](id, MailEvent.discriminator, snapshotVersion, Table).map { es =>
             NonEmptyList.fromIterableOption(es)
           }
 
@@ -40,12 +41,12 @@ object MailEventStore {
           query: PersistenceQuery,
           options: FetchOptions,
         ): RIO[ZConnection, Option[NonEmptyList[Change[MailEvent]]]] =
-          persistence.readEvents[MailEvent](MailEvent.discriminator, query, options).map { es =>
+          persistence.readEvents[MailEvent](MailEvent.discriminator, query, options, Table).map { es =>
             NonEmptyList.fromIterableOption(es)
           }
 
         def save(id: Key, event: Change[MailEvent]): RIO[ZConnection, Long] =
-          persistence.saveEvent(id, MailEvent.discriminator, event)
+          persistence.saveEvent(id, MailEvent.discriminator, event, Table)
 
       }
     }

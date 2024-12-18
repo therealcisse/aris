@@ -35,7 +35,7 @@ object IngestionEventStoreSpec extends MockSpecDefault {
   val testReadEventsId = test("readEvents by Id") {
     check(keyGen, validIngestionEventSequenceGen) { (id, events) =>
       val mockEnv = MockCQRSPersistence.ReadEvents.Full.of(
-        equalTo((id, discriminator)),
+        equalTo((id, discriminator, IngestionEventStore.Table)),
         value(events.toChunk),
       )
 
@@ -51,7 +51,7 @@ object IngestionEventStoreSpec extends MockSpecDefault {
   val testReadEventsTagVersion = test("readEvents by Id and Version") {
     check(keyGen, versionGen, validIngestionEventSequenceGen) { (id, version, events) =>
       val mockEnv = MockCQRSPersistence.ReadEvents.Snapshot.of[Chunk[Change[IngestionEvent]]](
-        equalTo((id, discriminator, version)),
+        equalTo((id, discriminator, version, IngestionEventStore.Table)),
         value(events.toChunk),
       )
 
@@ -71,7 +71,7 @@ object IngestionEventStoreSpec extends MockSpecDefault {
       val options = FetchOptions()
 
       val mockEnv = MockCQRSPersistence.ReadEvents.FullArgs.of(
-        equalTo((discriminator, query, options)),
+        equalTo((discriminator, query, options, IngestionEventStore.Table)),
         value(events.toChunk),
       )
 
@@ -90,8 +90,8 @@ object IngestionEventStoreSpec extends MockSpecDefault {
       val change = Change(version, event)
       val returnId = 1L
 
-      val mockEnv = MockCQRSPersistence.SaveEvent.of[(Key, Discriminator, Change[IngestionEvent]), Long](
-        equalTo((id, discriminator, change)),
+      val mockEnv = MockCQRSPersistence.SaveEvent.of[(Key, Discriminator, Change[IngestionEvent], Catalog), Long](
+        equalTo((id, discriminator, change, IngestionEventStore.Table)),
         value(returnId),
       )
 

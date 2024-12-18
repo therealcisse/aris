@@ -60,21 +60,22 @@ object MemoryCQRSPersistenceSpec extends ZIOSpecDefault {
 
               ch = Change(version = version, event)
 
-              saveResult <- atomically(persistence.saveEvent(key, discriminator, ch))
+              saveResult <- atomically(persistence.saveEvent(key, discriminator, ch, Catalog.Default))
 
               a = assert(saveResult)(equalTo(1L))
 
-              events0 <- atomically(persistence.readEvents[DummyEvent](key, discriminator))
+              events0 <- atomically(persistence.readEvents[DummyEvent](key, discriminator, Catalog.Default))
               b = assert(events0)(isNonEmpty)
 
               c <- (
                 for {
-                  events0 <- atomically(persistence.readEvents[DummyEvent](key, discriminator))
+                  events0 <- atomically(persistence.readEvents[DummyEvent](key, discriminator, Catalog.Default))
                   events1 <- atomically(
                     persistence.readEvents[DummyEvent](
                       discriminator,
                       query = PersistenceQuery.hierarchy(Hierarchy.Descendant(grandParentId, parentId)),
                       options = FetchOptions(),
+                      catalog = Catalog.Default,
                     ),
                   )
                   events2 <- atomically(
@@ -82,6 +83,7 @@ object MemoryCQRSPersistenceSpec extends ZIOSpecDefault {
                       discriminator,
                       query = PersistenceQuery.hierarchy(Hierarchy.Descendant(Key(grandParentIdXXX), parentId)),
                       options = FetchOptions(),
+                      catalog = Catalog.Default,
                     ),
                   )
                   events3 <- atomically(
@@ -89,6 +91,7 @@ object MemoryCQRSPersistenceSpec extends ZIOSpecDefault {
                       discriminator,
                       query = PersistenceQuery.hierarchy(Hierarchy.Descendant(grandParentId, Key(parentIdXXX))),
                       options = FetchOptions(),
+                      catalog = Catalog.Default,
                     ),
                   )
 
@@ -122,21 +125,22 @@ object MemoryCQRSPersistenceSpec extends ZIOSpecDefault {
 
               ch = Change(version = version, event)
 
-              saveResult <- atomically(persistence.saveEvent(key, discriminator, ch))
+              saveResult <- atomically(persistence.saveEvent(key, discriminator, ch, Catalog.Default))
 
               a = assert(saveResult)(equalTo(1L))
 
-              events0 <- atomically(persistence.readEvents[DummyEvent](key, discriminator))
+              events0 <- atomically(persistence.readEvents[DummyEvent](key, discriminator, Catalog.Default))
               b = assert(events0)(isNonEmpty)
 
               e <- (
                 for {
-                  events0 <- atomically(persistence.readEvents[DummyEvent](key, discriminator))
+                  events0 <- atomically(persistence.readEvents[DummyEvent](key, discriminator, Catalog.Default))
                   events1 <- atomically(
                     persistence.readEvents[DummyEvent](
                       discriminator,
                       query = PersistenceQuery.hierarchy(Hierarchy.Child(parentId)),
                       options = FetchOptions(),
+                      catalog = Catalog.Default,
                     ),
                   )
                   events2 <- atomically(
@@ -144,6 +148,7 @@ object MemoryCQRSPersistenceSpec extends ZIOSpecDefault {
                       discriminator,
                       query = PersistenceQuery.hierarchy(Hierarchy.Child(Key(parentIdXXX))),
                       options = FetchOptions(),
+                      catalog = Catalog.Default,
                     ),
                   )
 
@@ -175,21 +180,22 @@ object MemoryCQRSPersistenceSpec extends ZIOSpecDefault {
 
               ch = Change(version = version, event)
 
-              saveResult <- atomically(persistence.saveEvent(key, discriminator, ch))
+              saveResult <- atomically(persistence.saveEvent(key, discriminator, ch, Catalog.Default))
 
               a = assert(saveResult)(equalTo(1L))
 
-              events0 <- atomically(persistence.readEvents[DummyEvent](key, discriminator))
+              events0 <- atomically(persistence.readEvents[DummyEvent](key, discriminator, Catalog.Default))
               b = assert(events0)(isNonEmpty)
 
               d <- (
                 for {
-                  events0 <- atomically(persistence.readEvents[DummyEvent](key, discriminator))
+                  events0 <- atomically(persistence.readEvents[DummyEvent](key, discriminator, Catalog.Default))
                   events1 <- atomically(
                     persistence.readEvents[DummyEvent](
                       discriminator,
                       query = PersistenceQuery.hierarchy(Hierarchy.GrandChild(grandParentId)),
                       options = FetchOptions(),
+                      catalog = Catalog.Default,
                     ),
                   )
                   events2 <- atomically(
@@ -197,6 +203,7 @@ object MemoryCQRSPersistenceSpec extends ZIOSpecDefault {
                       discriminator,
                       query = PersistenceQuery.hierarchy(Hierarchy.GrandChild(Key(grandParentIdXXX))),
                       options = FetchOptions(),
+                      catalog = Catalog.Default,
                     ),
                   )
 
@@ -217,16 +224,17 @@ object MemoryCQRSPersistenceSpec extends ZIOSpecDefault {
 
             event = Change(version = version, DummyEvent("test"))
 
-            saveResult <- atomically(persistence.saveEvent(key, discriminator, event))
+            saveResult <- atomically(persistence.saveEvent(key, discriminator, event, Catalog.Default))
 
             a = assert(saveResult)(equalTo(1L))
 
-            events0 <- atomically(persistence.readEvents[DummyEvent](key, discriminator))
+            events0 <- atomically(persistence.readEvents[DummyEvent](key, discriminator, Catalog.Default))
             events1 <- atomically(
               persistence.readEvents[DummyEvent](
                 discriminator,
                 query = PersistenceQuery.props(EventProperty("type", "DummyEvent")),
                 options = FetchOptions(),
+                catalog = Catalog.Default,
               ),
             )
             events2 <- atomically(
@@ -234,6 +242,7 @@ object MemoryCQRSPersistenceSpec extends ZIOSpecDefault {
                 discriminator,
                 query = PersistenceQuery.props(EventProperty("type", "DummyEventXXX")),
                 options = FetchOptions(),
+                catalog = Catalog.Default,
               ),
             )
             b = assert(events0)(isNonEmpty) && assert(events1)(isNonEmpty) && assert(events2)(isEmpty)
@@ -248,11 +257,11 @@ object MemoryCQRSPersistenceSpec extends ZIOSpecDefault {
 
             event = Change(version = version, DummyEvent("test"))
 
-            saveResult <- atomically(persistence.saveEvent(key, discriminator, event))
+            saveResult <- atomically(persistence.saveEvent(key, discriminator, event, Catalog.Default))
 
             a = assert(saveResult)(equalTo(1L))
 
-            events <- atomically(persistence.readEvents[DummyEvent](key, discriminator))
+            events <- atomically(persistence.readEvents[DummyEvent](key, discriminator, Catalog.Default))
             b = assert(events)(isNonEmpty) && assert(events)(equalTo(Chunk(event)))
 
           } yield a && b
@@ -265,7 +274,7 @@ object MemoryCQRSPersistenceSpec extends ZIOSpecDefault {
 
             event = Change(version = version, DummyEvent("test"))
 
-            saveResult <- atomically(persistence.saveEvent(key, discriminator, event))
+            saveResult <- atomically(persistence.saveEvent(key, discriminator, event, Catalog.Default))
 
             a = assert(saveResult)(equalTo(1L))
 
@@ -275,6 +284,7 @@ object MemoryCQRSPersistenceSpec extends ZIOSpecDefault {
                   discriminator,
                   query = PersistenceQuery.ns(Namespace(0)),
                   options = FetchOptions(),
+                  catalog = Catalog.Default,
                 ),
             )
             b = assert(events0)(isNonEmpty)
@@ -285,6 +295,7 @@ object MemoryCQRSPersistenceSpec extends ZIOSpecDefault {
                   discriminator,
                   query = PersistenceQuery.ns(Namespace(1)),
                   options = FetchOptions(),
+                  catalog = Catalog.Default,
                 ),
             )
             c = assert(events1)(isEmpty)
@@ -303,11 +314,11 @@ object MemoryCQRSPersistenceSpec extends ZIOSpecDefault {
 
             _ <- atomically {
               ZIO.foreachDiscard(events) { e =>
-                persistence.saveEvent(key, discriminator, e)
+                persistence.saveEvent(key, discriminator, e, Catalog.Default)
               }
             }
 
-            es <- atomically(persistence.readEvents[DummyEvent](key, discriminator))
+            es <- atomically(persistence.readEvents[DummyEvent](key, discriminator, Catalog.Default))
 
             a = assert(es)(equalTo(es.sorted)) && assert(es)(equalTo(events.sorted))
 
@@ -326,18 +337,18 @@ object MemoryCQRSPersistenceSpec extends ZIOSpecDefault {
 
               _ <- atomically {
                 ZIO.foreachDiscard(events) { e =>
-                  persistence.saveEvent(key, discriminator, e)
+                  persistence.saveEvent(key, discriminator, e, Catalog.Default)
                 }
               }
 
-              es <- atomically(persistence.readEvents[DummyEvent](key, discriminator))
+              es <- atomically(persistence.readEvents[DummyEvent](key, discriminator, Catalog.Default))
 
               a = assert((es))(equalTo((events.sorted)))
 
               max = es.maxBy(_.version)
 
               es1 <- atomically(
-                persistence.readEvents[DummyEvent](key, discriminator, snapshotVersion = max.version),
+                persistence.readEvents[DummyEvent](key, discriminator, snapshotVersion = max.version, Catalog.Default),
               )
 
               b = assert(es1)(isEmpty)
@@ -348,19 +359,19 @@ object MemoryCQRSPersistenceSpec extends ZIOSpecDefault {
 
               _ <- atomically {
                 ZIO.foreachDiscard(events1) { e =>
-                  persistence.saveEvent(key, discriminator, e)
+                  persistence.saveEvent(key, discriminator, e, Catalog.Default)
                 }
               }
 
               es2 <- atomically(
-                persistence.readEvents[DummyEvent](key, discriminator, snapshotVersion = max.version),
+                persistence.readEvents[DummyEvent](key, discriminator, snapshotVersion = max.version, Catalog.Default),
               )
 
               c = assert(es2)(equalTo(events1.sorted))
 
               max1 = es2.maxBy(_.version)
               es3 <- atomically(
-                persistence.readEvents[DummyEvent](key, discriminator, snapshotVersion = max1.version),
+                persistence.readEvents[DummyEvent](key, discriminator, snapshotVersion = max1.version, Catalog.Default),
               )
               d = assert(es3)(isEmpty)
             } yield a && b && c && d
