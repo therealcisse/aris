@@ -30,32 +30,32 @@ trait MailService {
 }
 
 object MailService {
-  inline def startImport(accountKey: MailAccount.Id, labels: MailLabels, timestamp: Timestamp, jobId: Job.Id): RIO[MailService & ZConnection, Unit] =
-    ZIO.serviceWithZIO[MailService](_.startSync(accountKey, labels, timestamp, jobId))
+  inline def startImport(accountKey: MailAccount.Id, labels: MailLabels, timestamp: Timestamp, jobId: Job.Id): RIO[MailService, Unit] =
+    ZIO.serviceWithZIO(_.startSync(accountKey, labels, timestamp, jobId))
 
-  inline def recordImport(accountKey: MailAccount.Id, timestamp: Timestamp, mailKeys: List[MailData.Id], token: Option[MailToken], jobId: Job.Id): RIO[MailService & ZConnection, Unit] =
-    ZIO.serviceWithZIO[MailService](_.recordSynced(accountKey, timestamp, mailKeys, token, jobId))
+  inline def recordImport(accountKey: MailAccount.Id, timestamp: Timestamp, mailKeys: List[MailData.Id], token: Option[MailToken], jobId: Job.Id): RIO[MailService, Unit] =
+    ZIO.serviceWithZIO(_.recordSynced(accountKey, timestamp, mailKeys, token, jobId))
 
-  inline def completeImport(accountKey: MailAccount.Id, timestamp: Timestamp, jobId: Job.Id): RIO[MailService & ZConnection, Unit] =
-    ZIO.serviceWithZIO[MailService](_.completeSync(accountKey, timestamp, jobId))
+  inline def completeImport(accountKey: MailAccount.Id, timestamp: Timestamp, jobId: Job.Id): RIO[MailService, Unit] =
+    ZIO.serviceWithZIO(_.completeSync(accountKey, timestamp, jobId))
 
   inline def loadAccounts(options: FetchOptions): RIO[MailService, Chunk[MailAccount]] =
-    ZIO.serviceWithZIO[MailService](_.loadAccounts(options))
+    ZIO.serviceWithZIO(_.loadAccounts(options))
 
   inline def loadAccount(key: MailAccount.Id): RIO[MailService, Option[MailAccount]] =
-    ZIO.serviceWithZIO[MailService](_.loadAccount(key))
+    ZIO.serviceWithZIO(_.loadAccount(key))
 
-  inline def save(account: MailAccount): RIO[MailService & ZConnection, Long] =
-    ZIO.serviceWithZIO[MailService](_.save(account))
+  inline def save(account: MailAccount): RIO[MailService, Long] =
+    ZIO.serviceWithZIO(_.save(account))
 
   inline def loadMail(id: MailData.Id): RIO[MailService, Option[MailData]] =
-    ZIO.serviceWithZIO[MailService](_.loadMail(id))
+    ZIO.serviceWithZIO(_.loadMail(id))
 
   inline def loadMails(options: FetchOptions): RIO[MailService, Chunk[MailData]] =
-    ZIO.serviceWithZIO[MailService](_.loadMails(options))
+    ZIO.serviceWithZIO(_.loadMails(options))
 
-  inline def save(data: MailData): RIO[MailService & ZConnection, Long] =
-    ZIO.serviceWithZIO[MailService](_.save(data))
+  inline def save(data: MailData): RIO[MailService, Long] =
+    ZIO.serviceWithZIO(_.save(data))
 
 
   def live(): ZLayer[Tracing & ZConnectionPool & MailRepository & MailCQRS, Throwable, MailService] =

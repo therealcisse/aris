@@ -120,10 +120,12 @@ object IngestionApp extends ZIOApp {
 
     } yield id
 
+  val endpoint = RestEndpoint(RestEndpoint.Service("ingestion"))
+
   val routes: Routes[Environment, Response] = Routes(
     Method.GET / "health" -> handler(Response.json(ProjectInfo.toJson)),
     Method.POST / "dataload" / "ingestion" -> handler { (req: Request) =>
-      RestEndpoint.boundary("dataload_ingestions", req) {
+      endpoint.boundary("dataload_ingestions", req) {
 
         req.body.fromBody[List[Key]] flatMap (ids =>
           for {
@@ -145,7 +147,7 @@ object IngestionApp extends ZIOApp {
 
     },
     Method.GET / "ingestion" -> handler { (req: Request) =>
-      RestEndpoint.boundary("get_ingestions_keys", req) {
+      endpoint.boundary("get_ingestions_keys", req) {
         val offset = req.queryParamTo[Long]("offset").toOption
         val limit = req.queryParamToOrElse[Long]("limit", FetchSize)
 
@@ -170,7 +172,7 @@ object IngestionApp extends ZIOApp {
 
     },
     Method.GET / "ingestion" / long("id") -> handler { (id: Long, req: Request) =>
-      RestEndpoint.boundary("get_ingestion", req) {
+      endpoint.boundary("get_ingestion", req) {
         val key = Key(id)
 
         load(key) map {
@@ -189,7 +191,7 @@ object IngestionApp extends ZIOApp {
 
     },
     Method.PUT / "ingestion" / long("id") -> handler { (id: Long, req: Request) =>
-      RestEndpoint.boundary("add_ingestion_cmd", req) {
+      endpoint.boundary("add_ingestion_cmd", req) {
         val key = Key(id)
 
         for {
@@ -202,7 +204,7 @@ object IngestionApp extends ZIOApp {
 
     },
     Method.GET / "ingestion" / long("id") / "validate" -> handler { (id: Long, req: Request) =>
-      RestEndpoint.boundary("validate_ingestion", req) {
+      endpoint.boundary("validate_ingestion", req) {
         val numFiles = req.queryParamTo[Long]("numFiles")
         val status = req.queryParamToOrElse[String]("status", "initial")
 
@@ -221,7 +223,7 @@ object IngestionApp extends ZIOApp {
 
     },
     Method.POST / "ingestion" -> handler { (req: Request) =>
-      RestEndpoint.boundary("add_ingestion", req) {
+      endpoint.boundary("add_ingestion", req) {
         addIngestion() map (id => Response.json(s"""{"id":"$id"}"""))
 
       }
@@ -231,7 +233,7 @@ object IngestionApp extends ZIOApp {
 
   def run: RIO[Environment & Scope, Unit] =
     for {
-      _ <- RestEndpoint.Metrics.uptime
+      _ <- endpoint.uptime
 
       config <- ZIO.config[DatabaseConfig]
       _ <- FlywayMigration.run(config)

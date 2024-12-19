@@ -4,7 +4,7 @@ package model
 
 import zio.prelude.*
 
-case class SyncConfig(cronExpression: SyncConfig.CronExpression, autoSyncEnabled: Boolean)
+case class SyncConfig(autoSyncSchedule: SyncConfig.CronExpression, autoSyncEnabled: Boolean)
 
 object SyncConfig {
   import zio.schema.*
@@ -13,7 +13,7 @@ object SyncConfig {
 
   type CronExpression = CronExpression.Type
   object CronExpression extends Newtype[String] {
-    extension (a: CronExpression) def value: String = unwrap(a)
+    extension (a: Type) def value: String = unwrap(a)
     given Schema[CronExpression] = derive
   }
 }

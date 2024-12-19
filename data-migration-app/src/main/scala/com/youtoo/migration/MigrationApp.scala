@@ -95,9 +95,11 @@ object MigrationApp extends ZIOApp {
         )
         .orDie ++ Runtime.setConfigProvider(ConfigProvider.envProvider)
 
+  val endpoint = RestEndpoint(RestEndpoint.Service("migration"))
+
   val routes: Routes[Environment & Scope, Response] = Routes(
     Method.POST / "dataload" / "migration" -> handler { (req: Request) =>
-      RestEndpoint.boundary("dataload_migrations", req) {
+      endpoint.boundary("dataload_migrations", req) {
 
         req.body.fromBody[List[Key]] flatMap (ids =>
           for {
@@ -123,7 +125,7 @@ object MigrationApp extends ZIOApp {
 
     },
     Method.GET / "migration" -> handler { (req: Request) =>
-      RestEndpoint.boundary("get_migrations", req) {
+      endpoint.boundary("get_migrations", req) {
         val offset = req.queryParamTo[Long]("offset").toOption
         val limit = req.queryParamToOrElse[Long]("limit", FetchSize)
 
@@ -148,7 +150,7 @@ object MigrationApp extends ZIOApp {
 
     },
     Method.GET / "migration" / long("id") -> handler { (id: Long, req: Request) =>
-      RestEndpoint.boundary("get_migration", req) {
+      endpoint.boundary("get_migration", req) {
         val key = Key(id)
 
         MigrationService.load(Migration.Id(key)) map {
@@ -167,7 +169,7 @@ object MigrationApp extends ZIOApp {
 
     },
     Method.POST / "migration" -> handler { (req: Request) =>
-      RestEndpoint.boundary("add_migraion", req) {
+      endpoint.boundary("add_migraion", req) {
         for {
           id <- Key.gen
 
@@ -188,7 +190,7 @@ object MigrationApp extends ZIOApp {
       }
     },
     Method.POST / "migration" / long("id") / "run" -> handler { (id: Long, req: Request) =>
-      RestEndpoint.boundary("run_migration", req) {
+      endpoint.boundary("run_migration", req) {
         val numKeys = req.queryParamToOrElse[Long]("numKeys", 10L)
 
         val processor: ZLayer[Tracing, Nothing, DataMigration.Processor] = ZLayer.fromFunction { (tracing: Tracing) =>
@@ -210,7 +212,7 @@ object MigrationApp extends ZIOApp {
 
     },
     Method.DELETE / "migration" / long("id") / "stop" -> handler { (id: Long, req: Request) =>
-      RestEndpoint.boundary("stop_migration", req) {
+      endpoint.boundary("stop_migration", req) {
         Interrupter.interrupt(id = Key(id)) `as` Response.ok
       }
 
@@ -220,6 +222,8 @@ object MigrationApp extends ZIOApp {
   val run: URIO[Environment & Scope, ExitCode] =
     (
       for {
+      _ <- endpoint.uptime
+
         config <- ZIO.config[DatabaseConfig]
         _ <- FlywayMigration.run(config)
 

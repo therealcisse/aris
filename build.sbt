@@ -50,6 +50,7 @@ onLoad in Global := {
 }
 lazy val aggregatedProjects: Seq[ProjectReference] =
   Seq(
+    mailApp,
     mail,
     job,
     kernel,
@@ -57,7 +58,9 @@ lazy val aggregatedProjects: Seq[ProjectReference] =
     std,
     postgres,
     memory,
+    ingestionApp,
     ingestion,
+    dataMigrationApp,
     dataMigration,
     loadtests,
     benchmarks,
@@ -276,22 +279,8 @@ lazy val ingestion = (project in file("ingestion"))
     log % "compile->compile;test->compile",
     observability % "compile->compile",
   )
-  .enablePlugins(DockerPlugin, JavaAppPackaging)
-  .settings(
-    Docker / packageName := "youtoo-ingestion",
-    dockerBaseImage := "eclipse-temurin:17-jre",
-    dockerExposedPorts := Seq(8181),
-    dockerUpdateLatest := true,
-    dockerEnvVars ++= BuildHelper.getEnvVars(),
-    bashScriptExtraDefines += """addJava "-Dlogback.configurationFile=logback-production.xml"""",
-    mainClass := Some("com.youtoo.ingestion.IngestionApp"),
-  )
   .settings(stdSettings("ingestion"))
   .settings(
-    ThisBuild / javaOptions ++= Seq(
-      "-Dlogback.configurationFile=logback-local.xml"
-
-    ),
 
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
     libraryDependencies ++= Seq(
@@ -307,6 +296,37 @@ lazy val ingestion = (project in file("ingestion"))
     ),
   )
 
+lazy val ingestionApp = (project in file("ingestion-app"))
+  .dependsOn(
+    ingestion % "compile->compile;test->test",
+    memory % "compile->compile;test->test",
+    `cqrs-persistence-postgres` % "compile->compile;test->test",
+    core % "compile->compile;test->test",
+    log % "compile->compile;test->compile",
+    observability % "compile->compile",
+  )
+  .enablePlugins(DockerPlugin, JavaAppPackaging)
+  .settings(
+    Docker / packageName := "youtoo-ingestion",
+    dockerBaseImage := "eclipse-temurin:17-jre",
+    dockerExposedPorts := Seq(8181),
+    dockerUpdateLatest := true,
+    dockerEnvVars ++= BuildHelper.getEnvVars(),
+    bashScriptExtraDefines += """addJava "-Dlogback.configurationFile=logback-production.xml"""",
+    mainClass := Some("com.youtoo.ingestion.IngestionApp"),
+  )
+  .settings(stdSettings("ingestion-app"))
+  .settings(
+    ThisBuild / javaOptions ++= Seq(
+      "-Dlogback.configurationFile=logback-local.xml"
+
+    ),
+
+    testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
+    libraryDependencies ++= Seq(
+    ),
+  )
+
 lazy val dataMigration = (project in file("data-migration"))
   .dependsOn(
     std % "compile->compile;test->test",
@@ -318,6 +338,31 @@ lazy val dataMigration = (project in file("data-migration"))
     postgres % "compile->compile;test->test",
   )
   .settings(stdSettings("data-migration"))
+  .settings(
+    testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
+    libraryDependencies ++= Seq(
+      // `zio-config-typesafe`,
+      `zio-metrics-connectors-prometheus`,
+      `testcontainers-scala-postgresql`,
+      `zio-test`,
+      `zio-test-sbt`,
+      `zio-test-magnolia`,
+      `zio-mock`,
+    ),
+  )
+
+lazy val dataMigrationApp = (project in file("data-migration-app"))
+  .dependsOn(
+    dataMigration % "compile->compile;test->test",
+    std % "compile->compile;test->test",
+    memory % "compile->compile;test->test",
+    `cqrs-persistence-postgres` % "compile->compile;test->test",
+    core % "compile->compile;test->test",
+    log % "compile->compile;test->compile",
+    observability % "compile->compile",
+    postgres % "compile->compile;test->test",
+  )
+  .settings(stdSettings("data-migration-app"))
   .enablePlugins(DockerPlugin, JavaAppPackaging)
   .settings(
     Docker / packageName := "youtoo-migration",
@@ -336,13 +381,6 @@ lazy val dataMigration = (project in file("data-migration"))
 
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
     libraryDependencies ++= Seq(
-      // `zio-config-typesafe`,
-      `zio-metrics-connectors-prometheus`,
-      `testcontainers-scala-postgresql`,
-      `zio-test`,
-      `zio-test-sbt`,
-      `zio-test-magnolia`,
-      `zio-mock`,
     ),
   )
 
@@ -386,6 +424,7 @@ lazy val mail = (project in file("mail"))
     postgres % "compile->compile;test->compile;test->test",
     `cqrs-persistence-postgres` % "compile->compile;test->test",
     job % "compile->compile;test->test",
+    log % "compile->compile;test->compile",
   )
   .settings(
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
@@ -406,6 +445,28 @@ lazy val mail = (project in file("mail"))
       `zio-test-sbt`,
       `zio-test-magnolia`,
       `zio-mock`,
+    ),
+  )
+
+lazy val mailApp = (project in file("mail-app"))
+  .settings(stdSettings("mail-app"))
+  // .settings(publishSetting(false))
+  .enablePlugins(BuildInfoPlugin)
+  .settings(buildInfoSettings("com.youtoo"))
+  .dependsOn(
+    std % "compile->compile;test->test",
+    memory % "compile->compile;test->test",
+    core % "compile->compile;test->compile",
+    postgres % "compile->compile;test->compile;test->test",
+    `cqrs-persistence-postgres` % "compile->compile;test->test",
+    job % "compile->compile;test->test",
+    log % "compile->compile;test->compile",
+    observability % "compile->compile",
+    mail % "compile->compile;test->test",
+  )
+  .settings(
+    testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
+    libraryDependencies ++= Seq(
     ),
   )
 
