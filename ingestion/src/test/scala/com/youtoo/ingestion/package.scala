@@ -137,8 +137,7 @@ val validIngestionEventSequenceGen: Gen[Any, NonEmptyList[Change[IngestionEvent]
         ingestionFilesResolvedGen,
         ingestionFileProcessedGen,
         ingestionFileFailedGen,
-
-        )
+      ),
     )
     progressChanges <- Gen.fromZIO {
       ZIO.foreach(otherEvents) { event =>

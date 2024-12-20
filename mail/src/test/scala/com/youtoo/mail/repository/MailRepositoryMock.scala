@@ -11,7 +11,7 @@ import com.youtoo.cqrs.*
 
 object MailRepositoryMock extends Mock[MailRepository] {
 
-  object LoadMails extends Effect[FetchOptions, Throwable, Chunk[MailData]]
+  object LoadMails extends Effect[FetchOptions, Throwable, Chunk[MailData.Id]]
   object LoadAccounts extends Effect[FetchOptions, Throwable, Chunk[MailAccount]]
   object LoadAccount extends Effect[MailAccount.Id, Throwable, Option[MailAccount]]
   object SaveAccount extends Effect[MailAccount, Throwable, Long]
@@ -23,7 +23,7 @@ object MailRepositoryMock extends Mock[MailRepository] {
       for {
         proxy <- ZIO.service[Proxy]
       } yield new MailRepository {
-        def loadMails(options: FetchOptions): RIO[ZConnection, Chunk[MailData]] =
+        def loadMails(options: FetchOptions): RIO[ZConnection, Chunk[MailData.Id]] =
           proxy(LoadMails, options)
 
         def loadAccounts(options: FetchOptions): RIO[ZConnection, Chunk[MailAccount]] =

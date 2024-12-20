@@ -2,11 +2,15 @@ package com.youtoo
 package mail
 package service
 
+import cats.implicits.*
+
 import zio.*
 import zio.jdbc.*
+import zio.prelude.*
 
 import com.youtoo.mail.model.*
 import com.youtoo.job.model.*
+import com.youtoo.mail.store.*
 import com.youtoo.cqrs.*
 import com.youtoo.postgres.*
 
@@ -17,26 +21,45 @@ import zio.telemetry.opentelemetry.common.*
 
 trait MailService {
   def startSync(accountKey: MailAccount.Id, labels: MailLabels, timestamp: Timestamp, jobId: Job.Id): Task[Unit]
-  def recordSynced(accountKey: MailAccount.Id, timestamp: Timestamp, mailKeys: List[MailData.Id], token: Option[MailToken], jobId: Job.Id): Task[Unit]
+  def recordSynced(
+    accountKey: MailAccount.Id,
+    timestamp: Timestamp,
+    mailKeys: NonEmptyList[MailData.Id],
+    token: MailToken,
+    jobId: Job.Id,
+  ): Task[Unit]
   def completeSync(accountKey: MailAccount.Id, timestamp: Timestamp, jobId: Job.Id): Task[Unit]
 
   def loadAccounts(options: FetchOptions): Task[Chunk[MailAccount]]
   def loadAccount(key: MailAccount.Id): Task[Option[MailAccount]]
+  def loadState(accountKey: MailAccount.Id): Task[Option[Mail]]
   def save(account: MailAccount): Task[Long]
+
   def loadMail(id: MailData.Id): Task[Option[MailData]]
-  def loadMails(options: FetchOptions): Task[Chunk[MailData]]
+  def loadMails(options: FetchOptions): Task[Chunk[MailData.Id]]
   def save(data: MailData): Task[Long]
 
 }
 
 object MailService {
-  inline def startImport(accountKey: MailAccount.Id, labels: MailLabels, timestamp: Timestamp, jobId: Job.Id): RIO[MailService, Unit] =
+  inline def startSync(
+    accountKey: MailAccount.Id,
+    labels: MailLabels,
+    timestamp: Timestamp,
+    jobId: Job.Id,
+  ): RIO[MailService, Unit] =
     ZIO.serviceWithZIO(_.startSync(accountKey, labels, timestamp, jobId))
 
-  inline def recordImport(accountKey: MailAccount.Id, timestamp: Timestamp, mailKeys: List[MailData.Id], token: Option[MailToken], jobId: Job.Id): RIO[MailService, Unit] =
+  inline def recordSynced(
+    accountKey: MailAccount.Id,
+    timestamp: Timestamp,
+    mailKeys: NonEmptyList[MailData.Id],
+    token: MailToken,
+    jobId: Job.Id,
+  ): RIO[MailService, Unit] =
     ZIO.serviceWithZIO(_.recordSynced(accountKey, timestamp, mailKeys, token, jobId))
 
-  inline def completeImport(accountKey: MailAccount.Id, timestamp: Timestamp, jobId: Job.Id): RIO[MailService, Unit] =
+  inline def completeSync(accountKey: MailAccount.Id, timestamp: Timestamp, jobId: Job.Id): RIO[MailService, Unit] =
     ZIO.serviceWithZIO(_.completeSync(accountKey, timestamp, jobId))
 
   inline def loadAccounts(options: FetchOptions): RIO[MailService, Chunk[MailAccount]] =
@@ -51,30 +74,40 @@ object MailService {
   inline def loadMail(id: MailData.Id): RIO[MailService, Option[MailData]] =
     ZIO.serviceWithZIO(_.loadMail(id))
 
-  inline def loadMails(options: FetchOptions): RIO[MailService, Chunk[MailData]] =
+  inline def loadState(accountKey: MailAccount.Id): RIO[MailService, Option[Mail]] =
+    ZIO.serviceWithZIO(_.loadState(accountKey))
+
+  inline def loadMails(options: FetchOptions): RIO[MailService, Chunk[MailData.Id]] =
     ZIO.serviceWithZIO(_.loadMails(options))
 
   inline def save(data: MailData): RIO[MailService, Long] =
     ZIO.serviceWithZIO(_.save(data))
 
-
-  def live(): ZLayer[Tracing & ZConnectionPool & MailRepository & MailCQRS, Throwable, MailService] =
-    ZLayer.fromFunction { (
-      pool: ZConnectionPool,
-      repository: MailRepository,
-      cqrs: MailCQRS,
+  def live(): ZLayer[Tracing & ZConnectionPool & MailRepository & MailCQRS & MailEventStore, Throwable, MailService] =
+    ZLayer.fromFunction {
+      (
+        pool: ZConnectionPool,
+        repository: MailRepository,
+        cqrs: MailCQRS,
         tracing: Tracing,
-    ) =>
-
-      MailServiceLive(pool, repository, cqrs).traced(tracing)
+        eventStore: MailEventStore,
+      ) =>
+        MailServiceLive(pool, repository, cqrs, eventStore).traced(tracing)
     }
 
-  class MailServiceLive(pool: ZConnectionPool, repository: MailRepository, cqrs: MailCQRS) extends MailService { self =>
+  class MailServiceLive(pool: ZConnectionPool, repository: MailRepository, cqrs: MailCQRS, eventStore: MailEventStore)
+      extends MailService { self =>
     def startSync(accountKey: MailAccount.Id, labels: MailLabels, timestamp: Timestamp, jobId: Job.Id): Task[Unit] =
       val cmd = MailCommand.StartSync(labels, timestamp, jobId)
       cqrs.add(accountKey.asKey, cmd)
 
-    def recordSynced(accountKey: MailAccount.Id, timestamp: Timestamp, mailKeys: List[MailData.Id], token: Option[MailToken], jobId: Job.Id): Task[Unit] =
+    def recordSynced(
+      accountKey: MailAccount.Id,
+      timestamp: Timestamp,
+      mailKeys: NonEmptyList[MailData.Id],
+      token: MailToken,
+      jobId: Job.Id,
+    ): Task[Unit] =
       val cmd = MailCommand.RecordSync(timestamp, mailKeys, token, jobId)
       cqrs.add(accountKey.asKey, cmd)
 
@@ -94,7 +127,31 @@ object MailService {
     def loadMail(id: MailData.Id): Task[Option[MailData]] =
       repository.loadMail(id).atomically.provideEnvironment(ZEnvironment(pool))
 
-    def loadMails(options: FetchOptions): Task[Chunk[MailData]] =
+    def loadState(accountKey: MailAccount.Id): Task[Option[Mail]] =
+      (for {
+        acc <- repository.loadAccount(accountKey)
+
+        o <- acc match {
+          case Some(acc) =>
+            for {
+              events <- eventStore.readEvents(
+                id = acc.id.asKey,
+                query = PersistenceQuery.anyNamespace(Namespace(1), Namespace(2)),
+                options = FetchOptions(),
+              )
+
+              cursor = events.fold(None) { es =>
+                EventHandler.applyEvents(es)(using MailEvent.LoadCursor())
+              }
+            } yield Mail(accountKey, cursor).some
+
+          case None =>
+            ZIO.none
+        }
+
+      } yield o).atomically.provideEnvironment(ZEnvironment(pool))
+
+    def loadMails(options: FetchOptions): Task[Chunk[MailData.Id]] =
       repository.loadMails(options).atomically.provideEnvironment(ZEnvironment(pool))
 
     def save(data: MailData): Task[Long] =
@@ -104,17 +161,23 @@ object MailService {
       new MailService {
         def startSync(accountKey: MailAccount.Id, labels: MailLabels, timestamp: Timestamp, jobId: Job.Id): Task[Unit] =
           self.startSync(accountKey, labels, timestamp, jobId) @@ tracing.aspects.span(
-            "MailService.startImport",
+            "MailService.startSync",
             attributes = Attributes(Attribute.long("accountId", accountKey.asKey.value)),
           )
-        def recordSynced(accountKey: MailAccount.Id, timestamp: Timestamp, mailKeys: List[MailData.Id], token: Option[MailToken], jobId: Job.Id): Task[Unit] =
+        def recordSynced(
+          accountKey: MailAccount.Id,
+          timestamp: Timestamp,
+          mailKeys: NonEmptyList[MailData.Id],
+          token: MailToken,
+          jobId: Job.Id,
+        ): Task[Unit] =
           self.recordSynced(accountKey, timestamp, mailKeys, token, jobId) @@ tracing.aspects.span(
-            "MailService.recordImport",
+            "MailService.recordSynced",
             attributes = Attributes(Attribute.long("accountId", accountKey.asKey.value)),
           )
         def completeSync(accountKey: MailAccount.Id, timestamp: Timestamp, jobId: Job.Id): Task[Unit] =
           self.completeSync(accountKey, timestamp, jobId) @@ tracing.aspects.span(
-            "MailService.completeImport",
+            "MailService.completeSync",
             attributes = Attributes(Attribute.long("accountId", accountKey.asKey.value)),
           )
         def loadAccounts(options: FetchOptions): Task[Chunk[MailAccount]] =
@@ -134,7 +197,12 @@ object MailService {
             "MailService.loadMail",
             attributes = Attributes(Attribute.string("mailId", id.value)),
           )
-        def loadMails(options: FetchOptions): Task[Chunk[MailData]] =
+        def loadState(accountKey: MailAccount.Id): Task[Option[Mail]] =
+          self.loadState(accountKey) @@ tracing.aspects.span(
+            "MailService.loadState",
+            attributes = Attributes(Attribute.long("accountId", accountKey.asKey.value)),
+          )
+        def loadMails(options: FetchOptions): Task[Chunk[MailData.Id]] =
           self.loadMails(options) @@ tracing.aspects.span("MailService.loadMails")
         def save(data: MailData): Task[Long] =
           self.save(data) @@ tracing.aspects.span(
@@ -146,4 +214,3 @@ object MailService {
   }
 
 }
-

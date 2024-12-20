@@ -25,6 +25,7 @@ object MailEventStoreSpec extends MockSpecDefault {
     testReadEventsId,
     testReadEventsTagVersion,
     testReadEventsQueryOptions,
+    testReadEventsQueryOptionsAggregate,
     testSaveEvent,
   ).provideSomeLayerShared(
     ZConnectionMock.pool(),
@@ -33,7 +34,7 @@ object MailEventStoreSpec extends MockSpecDefault {
   val discriminator = MailEvent.discriminator
 
   val testReadEventsId = test("readEvents by Id") {
-    check(keyGen, validMailEventSequenceGen) { (id, events) =>
+    check(keyGen, validMailEventSequenceGen()) { (id, events) =>
       val mockEnv = MockCQRSPersistence.ReadEvents.Full.of(
         equalTo((id, discriminator, MailEventStore.Table)),
         value(events.toChunk),
@@ -49,7 +50,7 @@ object MailEventStoreSpec extends MockSpecDefault {
   }
 
   val testReadEventsTagVersion = test("readEvents by Id and Version") {
-    check(keyGen, versionGen, validMailEventSequenceGen) { (id, version, events) =>
+    check(keyGen, versionGen, validMailEventSequenceGen()) { (id, version, events) =>
       val mockEnv = MockCQRSPersistence.ReadEvents.Snapshot.of[Chunk[Change[MailEvent]]](
         equalTo((id, discriminator, version, MailEventStore.Table)),
         value(events.toChunk),
@@ -65,7 +66,7 @@ object MailEventStoreSpec extends MockSpecDefault {
   }
 
   val testReadEventsQueryOptions = test("readEvents by Query and Options") {
-    check(validMailEventSequenceGen) { events =>
+    check(validMailEventSequenceGen()) { events =>
 
       val query = PersistenceQuery.condition()
       val options = FetchOptions()
@@ -78,6 +79,26 @@ object MailEventStoreSpec extends MockSpecDefault {
       val effect = for {
         store <- ZIO.service[MailEventStore]
         result <- store.readEvents(query, options).atomically
+      } yield assert(result)(equalTo(events.some))
+
+      effect.provideSomeLayer[ZConnectionPool](mockEnv.toLayer >>> MailEventStore.live())
+    }
+  }
+
+  val testReadEventsQueryOptionsAggregate = test("readEvents by Query and Options aggregate") {
+    check(keyGen, validMailEventSequenceGen()) { (id, events) =>
+
+      val query = PersistenceQuery.condition()
+      val options = FetchOptions()
+
+      val mockEnv = MockCQRSPersistence.ReadEvents.FullArgsByAggregate.of(
+        equalTo((id, discriminator, query, options, MailEventStore.Table)),
+        value(events.toChunk),
+      )
+
+      val effect = for {
+        store <- ZIO.service[MailEventStore]
+        result <- store.readEvents(id, query, options).atomically
       } yield assert(result)(equalTo(events.some))
 
       effect.provideSomeLayer[ZConnectionPool](mockEnv.toLayer >>> MailEventStore.live())

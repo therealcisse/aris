@@ -9,7 +9,7 @@ import com.youtoo.job.model.*
 
 enum MailCommand {
   case StartSync(labels: MailLabels, timestamp: Timestamp, jobId: Job.Id)
-  case RecordSync(timestamp: Timestamp, keys: List[MailData.Id], token: Option[MailToken], jobId: Job.Id)
+  case RecordSync(timestamp: Timestamp, keys: NonEmptyList[MailData.Id], token: MailToken, jobId: Job.Id)
   case CompleteSync(timestamp: Timestamp, jobId: Job.Id)
 }
 

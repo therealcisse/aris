@@ -19,7 +19,7 @@ import zio.schema.codec.*
 import zio.jdbc.*
 
 trait MailRepository {
-  def loadMails(options: FetchOptions): RIO[ZConnection, Chunk[MailData]]
+  def loadMails(options: FetchOptions): RIO[ZConnection, Chunk[MailData.Id]]
   def loadAccounts(options: FetchOptions): RIO[ZConnection, Chunk[MailAccount]]
   def loadAccount(key: MailAccount.Id): RIO[ZConnection, Option[MailAccount]]
   def save(account: MailAccount): RIO[ZConnection, Long]
@@ -28,7 +28,7 @@ trait MailRepository {
 }
 
 object MailRepository {
-  inline def loadMails(options: FetchOptions): RIO[MailRepository & ZConnection, Chunk[MailData]] =
+  inline def loadMails(options: FetchOptions): RIO[MailRepository & ZConnection, Chunk[MailData.Id]] =
     ZIO.serviceWithZIO[MailRepository](_.loadMails(options))
 
   inline def loadAccounts(options: FetchOptions): RIO[MailRepository & ZConnection, Chunk[MailAccount]] =
@@ -46,12 +46,11 @@ object MailRepository {
   inline def save(data: MailData): RIO[MailRepository & ZConnection, Long] =
     ZIO.serviceWithZIO[MailRepository](_.save(data))
 
-
   def live(): ZLayer[Tracing, Throwable, MailRepository] =
     ZLayer.fromFunction(tracing => new MailRepositoryLive().traced(tracing))
 
   class MailRepositoryLive() extends MailRepository { self =>
-    def loadMails(options: FetchOptions): RIO[ZConnection, Chunk[MailData]] =
+    def loadMails(options: FetchOptions): RIO[ZConnection, Chunk[MailData.Id]] =
       Queries.LOAD_MAILS(options).selectAll
 
     def loadAccounts(options: FetchOptions): RIO[ZConnection, Chunk[MailAccount]] =
@@ -71,7 +70,7 @@ object MailRepository {
 
     def traced(tracing: Tracing): MailRepository =
       new MailRepository {
-        def loadMails(options: FetchOptions): RIO[ZConnection, Chunk[MailData]] =
+        def loadMails(options: FetchOptions): RIO[ZConnection, Chunk[MailData.Id]] =
           self.loadMails(options) @@ tracing.aspects.span("MailRepository.loadMails")
         def loadAccounts(options: FetchOptions): RIO[ZConnection, Chunk[MailAccount]] =
           self.loadAccounts(options) @@ tracing.aspects.span("MailRepository.loadAccounts")
@@ -121,25 +120,16 @@ object MailRepository {
 
     given jobIdDecoder: JdbcDecoder[Job.Id] = JdbcDecoder[Key].map(Job.Id.apply)
 
-    def LOAD_MAILS(options: FetchOptions): Query[MailData] =
+    def LOAD_MAILS(options: FetchOptions): Query[MailData.Id] =
       val (offsetQuery, limitQuery) = options.toSql
 
       (sql"""
-        SELECT id, raw_body, account_id, internal_date, timestamp
+        SELECT id
         FROM mail_data
-        """ ++ offsetQuery.fold(SqlFragment.empty)(ql => sql" WHERE " ++ ql) ++ sql" ORDER BY id DESC" ++ limitQuery.fold(
-        SqlFragment.empty,
-      )(ql => sql" " ++ ql)
-      ).query[
-          (
-            MailData.Id,
-            MailData.Body,
-            MailAccount.Id,
-            InternalDate,
-            Timestamp,
-          ),
-        ]
-        .map(MailData.apply)
+        """ ++ offsetQuery.fold(SqlFragment.empty)(ql => sql" WHERE " ++ ql) ++ sql" ORDER BY id DESC" ++ limitQuery
+        .fold(
+          SqlFragment.empty,
+        )(ql => sql" " ++ ql)).query[MailData.Id]
 
     def LOAD_ACCOUNTS(options: FetchOptions): Query[MailAccount] =
       val (offsetQuery, limitQuery) = options.toSql
@@ -147,10 +137,11 @@ object MailRepository {
       (sql"""
         SELECT key, name, email, settings, timestamp
         FROM mail_account
-        """ ++ offsetQuery.fold(SqlFragment.empty)(ql => sql" WHERE " ++ ql) ++ sql" ORDER BY key DESC" ++ limitQuery.fold(
-        SqlFragment.empty,
-      )(ql => sql" " ++ ql)
-      ).query[
+        """ ++ offsetQuery.fold(SqlFragment.empty)(ql => sql" WHERE " ++ ql) ++ sql" ORDER BY key DESC" ++ limitQuery
+        .fold(
+          SqlFragment.empty,
+        )(ql => sql" " ++ ql))
+        .query[
           (
             MailAccount.Id,
             MailAccount.Name,

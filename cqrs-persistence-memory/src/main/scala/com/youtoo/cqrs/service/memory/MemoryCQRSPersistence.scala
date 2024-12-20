@@ -127,6 +127,7 @@ object MemoryCQRSPersistence {
 
     extension (s: State)
       def fetch[Event: MetaInfo](
+        id: Option[Key],
         discriminator: Discriminator,
         query: PersistenceQuery,
         options: FetchOptions,
@@ -137,7 +138,10 @@ object MemoryCQRSPersistence {
         p.events.get(EntryKey(catalog, discriminator)) match {
           case None => Chunk()
           case Some(map) =>
-            val all = map.sets.values.flatten.asInstanceOf[Iterable[Change[Event]]]
+            val all = id match {
+              case None => map.sets.values.flatten.asInstanceOf[Iterable[Change[Event]]]
+              case Some(key) => map.get(key).asInstanceOf[Iterable[Change[Event]]]
+            }
 
             val matches = all.filter { ch =>
                 query.isMatch(ch)
@@ -188,7 +192,16 @@ object MemoryCQRSPersistence {
       options: FetchOptions,
       catalog: Catalog,
     ): RIO[ZConnection, Chunk[Change[Event]]] =
-      ref.get.map(_.fetch(discriminator, query, options, catalog))
+      ref.get.map(_.fetch(id = None, discriminator, query, options, catalog))
+
+    def readEvents[Event:{ BinaryCodec, Tag, MetaInfo}](
+      id: Key,
+      discriminator: Discriminator,
+      query: PersistenceQuery,
+      options: FetchOptions,
+      catalog: Catalog,
+    ): RIO[ZConnection, Chunk[Change[Event]]] =
+      ref.get.map(_.fetch(id = id.some, discriminator, query, options, catalog))
 
     def saveEvent[Event: {BinaryCodec, MetaInfo, Tag}](
       id: Key,
@@ -242,6 +255,21 @@ object MemoryCQRSPersistence {
           self.readEvents(discriminator, query, options, catalog) @@ tracing.aspects.span(
             "MemoryCQRSPersistence.readEvents.query",
             attributes = Attributes(
+              Attribute.string("discriminator", discriminator.value),
+            ),
+          )
+
+        def readEvents[Event:{ BinaryCodec, Tag, MetaInfo}](
+          id: Key,
+          discriminator: Discriminator,
+          query: PersistenceQuery,
+          options: FetchOptions,
+          catalog: Catalog,
+        ): RIO[ZConnection, Chunk[Change[Event]]] =
+          self.readEvents(id, discriminator, query, options, catalog) @@ tracing.aspects.span(
+            "MemoryCQRSPersistence.readEventsByAggregate.query",
+            attributes = Attributes(
+              Attribute.long("key", id.value),
               Attribute.string("discriminator", discriminator.value),
             ),
           )

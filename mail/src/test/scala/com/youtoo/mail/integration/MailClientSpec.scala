@@ -116,7 +116,9 @@ object MailClientTest extends ZIOSpecDefault, TestSupport {
         (for {
           client <- ZIO.service[MailClient]
           result <- client.fetchMails(address, None)
-        } yield assert(result._1)(hasSize(equalTo(1))) && assert(result._2)(isSome(equalTo(MailToken("token-1")))))
+        } yield assert(result)(isSome(anything)) && assert(result.get._1)(hasSize(equalTo(1))) && assert(result.get._2)(
+          equalTo(MailToken("token-1")),
+        ))
           .provideSomeLayer[Scope & Tracing](
             mockEnv.toLayer >>> MailClient.live(),
           )

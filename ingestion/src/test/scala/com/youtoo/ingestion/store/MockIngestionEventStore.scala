@@ -25,6 +25,19 @@ object MockIngestionEventStore extends Mock[IngestionEventStore] {
             NonEmptyList[Change[IngestionEvent]],
           ],
         ]
+
+    object FullArgsByAggregate
+        extends Effect[
+          (
+            Key,
+            PersistenceQuery,
+            FetchOptions,
+          ),
+          Throwable,
+          Option[
+            NonEmptyList[Change[IngestionEvent]],
+          ],
+        ]
   }
 
   object Save extends Effect[(Key, Change[IngestionEvent]), Throwable, Long]
@@ -45,6 +58,13 @@ object MockIngestionEventStore extends Mock[IngestionEventStore] {
           options: FetchOptions,
         ): Task[Option[NonEmptyList[Change[IngestionEvent]]]] =
           proxy(ReadEvents.FullArgs, (query, options))
+
+        def readEvents(
+          id: Key,
+          query: PersistenceQuery,
+          options: FetchOptions,
+        ): Task[Option[NonEmptyList[Change[IngestionEvent]]]] =
+          proxy(ReadEvents.FullArgsByAggregate, (id, query, options))
 
         def save(id: Key, event: Change[IngestionEvent]): Task[Long] =
           proxy(Save, (id, event))

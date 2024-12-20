@@ -22,16 +22,24 @@ val mailLabelKeyGen: Gen[Any, MailLabels.LabelKey] =
 val mailLabelsGen: Gen[Any, MailLabels] =
   Gen.oneOf(
     Gen.const(MailLabels.All()),
-    Gen.listOf(mailLabelKeyGen).map(MailLabels.Selection.apply),
+    (mailLabelKeyGen <*> Gen.listOf(mailLabelKeyGen)).map { case (key, keys) =>
+      MailLabels.Selection(NonEmptyList(key, keys*))
+    },
   )
 val mailDataIdGen: Gen[Any, MailData.Id] = Gen.alphaNumericStringBounded(4, 36).map(MailData.Id.apply)
 val mailTokenGen: Gen[Any, MailToken] = Gen.alphaNumericStringBounded(4, 36).map(MailToken.apply)
 val mailBodyGen: Gen[Any, MailData.Body] = Gen.alphaNumericStringBounded(10, 10000).map(MailData.Body.apply)
+val totalMessagesGen: Gen[Any, TotalMessages] = Gen.int(4, 16).map(TotalMessages.apply)
+val mailCursorGen: Gen[Any, Cursor] = (
+  timestampGen <*> mailTokenGen <*> totalMessagesGen <*> Gen.boolean
+).map(Cursor.apply)
 
 val internalDateGen: Gen[Any, InternalDate] = timestampGen.map(InternalDate.apply)
 val mailDataGen: Gen[Any, MailData] =
-  (mailDataIdGen <*> mailBodyGen <*> mailAccountIdGen <*> internalDateGen <*> timestampGen).map {
-    case (id, body, accountId, internalDate, timestamp) => MailData(id, body, accountId, internalDate, timestamp)
+  (
+    mailDataIdGen <*> mailBodyGen <*> mailAccountIdGen <*> internalDateGen <*> timestampGen
+  ).map { case (id, body, accountId, internalDate, timestamp) =>
+    MailData(id, body, accountId, internalDate, timestamp)
   }
 
 val mailAccountNameGen: Gen[Any, MailAccount.Name] = Gen.alphaNumericStringBounded(5, 50).map(MailAccount.Name(_))
@@ -58,15 +66,14 @@ val mailAccountGen: Gen[Any, MailAccount] =
   }
 
 val startSyncGen: Gen[Any, MailCommand.StartSync] =
-  (mailLabelsGen <*> timestampGen <*> jobIdGen) map {
-    case (labels, timestamp, jobId) =>
-      MailCommand.StartSync(labels, timestamp, jobId)
+  (mailLabelsGen <*> timestampGen <*> jobIdGen) map { case (labels, timestamp, jobId) =>
+    MailCommand.StartSync(labels, timestamp, jobId)
   }
 
 val recordSyncGen: Gen[Any, MailCommand.RecordSync] =
-  (timestampGen <*> Gen.listOf(mailDataIdGen) <*> Gen.option(mailTokenGen) <*> jobIdGen) map {
-    case (timestamp, keys, token, jobId) =>
-      MailCommand.RecordSync(timestamp, keys, token, jobId)
+  (timestampGen <*> mailDataIdGen <*> Gen.listOf(mailDataIdGen) <*> mailTokenGen <*> jobIdGen) map {
+    case (timestamp, key, keys, token, jobId) =>
+      MailCommand.RecordSync(timestamp, NonEmptyList(key, keys*), token, jobId)
   }
 
 val completeSyncGen: Gen[Any, MailCommand.CompleteSync] =
@@ -89,10 +96,11 @@ val syncStartedGen: Gen[Any, MailEvent] =
 val mailSyncedGen: Gen[Any, MailEvent] =
   for {
     timestamp <- timestampGen
+    key <- mailDataIdGen
     keys <- Gen.listOf(mailDataIdGen)
-    token <- Gen.option(mailTokenGen)
+    token <- mailTokenGen
     jobId <- jobIdGen
-  } yield MailEvent.MailSynced(timestamp = timestamp, mailKeys = keys, token = token, jobId = jobId)
+  } yield MailEvent.MailSynced(timestamp = timestamp, mailKeys = NonEmptyList(key, keys*), token = token, jobId = jobId)
 
 val syncCompletedGen: Gen[Any, MailEvent] =
   for {
@@ -110,7 +118,16 @@ val mailEventGen: Gen[Any, MailEvent] =
 val changeEventGen: Gen[Any, Change[MailEvent]] =
   (versionGen <*> mailEventGen).map(Change.apply)
 
-val validMailEventSequenceGen: Gen[Any, NonEmptyList[Change[MailEvent]]] =
+val syncStartedChangeGen: Gen[Any, Change[MailEvent]] =
+  (versionGen <*> syncStartedGen).map(Change.apply)
+
+val syncCompletedChangeGen: Gen[Any, Change[MailEvent]] =
+  (versionGen <*> syncCompletedGen).map(Change.apply)
+
+val mailSyncedChangeGen: Gen[Any, Change[MailEvent]] =
+  (versionGen <*> mailSyncedGen).map(Change.apply)
+
+def validMailEventSequenceGen(isCompleted: Boolean = true): Gen[Any, NonEmptyList[Change[MailEvent]]] =
   for {
     startEvent <- syncStartedGen
     version <- versionGen
@@ -125,5 +142,5 @@ val validMailEventSequenceGen: Gen[Any, NonEmptyList[Change[MailEvent]]] =
     }
     done <- syncCompletedGen
     version <- versionGen
-    changes = progressChanges ::: (Change(version, done) :: Nil)
+    changes = progressChanges ::: (if isCompleted then (Change(version, done) :: Nil) else Nil)
   } yield NonEmptyList(startChange, changes*)

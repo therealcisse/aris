@@ -158,7 +158,47 @@ object PostgresCQRSPersistenceSpec extends PgSpec, TestSupport {
                 )(hasSubset(events0))
               )
 
-            } yield a && b && c && d && e
+              f <- (
+                for {
+                  events0 <- atomically(persistence.readEvents[DummyEvent](key, discriminator, Catalog.Default))
+                  events1 <- atomically(
+                    persistence.readEvents[DummyEvent](
+                      id = key,
+                      discriminator,
+                      query = PersistenceQuery.descendant(grandParentId, parentId),
+                      options = FetchOptions(),
+                      catalog = Catalog.Default,
+                    ),
+                  )
+                  events2 <- atomically(
+                    persistence.readEvents[DummyEvent](
+                      id = key,
+                      discriminator,
+                      query = PersistenceQuery.descendant(Key(grandParentIdXXX), parentId),
+                      options = FetchOptions(),
+                      catalog = Catalog.Default,
+                    ),
+                  )
+                  events3 <- atomically(
+                    persistence.readEvents[DummyEvent](
+                      id = key,
+                      discriminator,
+                      query = PersistenceQuery.descendant(grandParentId, Key(parentIdXXX)),
+                      options = FetchOptions(),
+                      catalog = Catalog.Default,
+                    ),
+                  )
+
+                } yield assert(events0)(isNonEmpty) && assert(events1)(isNonEmpty) && assert(events2)(
+                  isEmpty,
+                ) && assert(
+                  events3,
+                )(isEmpty) && assert(
+                  events1,
+                )(hasSubset(events0))
+              )
+
+            } yield a && b && c && d && e && f
         }
       },
       test("should save and retrieve events correctly by props") {
@@ -318,6 +358,27 @@ object PostgresCQRSPersistenceSpec extends PgSpec, TestSupport {
           } yield assertCompletes
         }
       },
+      test("should retrieve events with query and fetch option for aggregate") {
+        check(
+          keyGen,
+          discriminatorGen,
+          genPersistenceQuery,
+          genFetchOptions,
+        ) { (id, discriminator, query, options) =>
+          for {
+            persistence <- ZIO.service[CQRSPersistence]
+
+            _ <- atomically(persistence.readEvents[DummyEvent](
+              id = id,
+              discriminator = discriminator,
+              query = query,
+              options = options,
+              catalog = Catalog.Default,
+            ))
+
+          } yield assertCompletes
+        }
+      },
       test("should retrieve events from given version") {
         check(keyGen, Gen.listOfN(100)(versionGen), Gen.listOfN(100)(versionGen), discriminatorGen) {
           (key, versions, moreVersions, discriminator) =>
@@ -438,6 +499,34 @@ object PostgresCQRSPersistenceSpec extends PgSpec, TestSupport {
             val query =
               PostgresCQRSPersistence.Queries
                 .READ_EVENTS[DummyEvent](
+                  discriminator,
+                  query = q,
+                  options = options,
+                  catalog = Catalog.Default,
+                )
+            for {
+
+              executionTime <- atomically(query.selectAll).timed.map(_._1)
+              timeAssertion = assert(executionTime.toMillis)(isLessThanEqualTo(100L))
+
+              executionPlan <- atomically(query.sql.getExecutionPlan)
+              planAssertion = assert(executionPlan)(containsString("Index Scan") || containsString("Index Only Scan"))
+
+            } yield planAssertion && timeAssertion
+        }
+      },
+      test("read all events by args for aggregate is optimized") {
+        check(
+          keyGen,
+          genPersistenceQuery,
+          genFetchOptions,
+          discriminatorGen
+        ) {
+          case (id, q, options, discriminator) =>
+            val query =
+              PostgresCQRSPersistence.Queries
+                .READ_EVENTS[DummyEvent](
+                  id,
                   discriminator,
                   query = q,
                   options = options,

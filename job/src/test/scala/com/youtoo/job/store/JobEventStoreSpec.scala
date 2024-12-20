@@ -2,6 +2,8 @@ package com.youtoo
 package job
 package store
 
+import cats.implicits.*
+
 import com.youtoo.cqrs.Codecs.given
 
 import zio.test.*
@@ -76,6 +78,26 @@ object JobEventStoreSpec extends MockSpecDefault {
         store <- ZIO.service[JobEventStore]
         result <- store.readEvents(query, options).atomically
       } yield assert(result)(equalTo(Option(events)))
+
+      effect.provideSomeLayer[ZConnectionPool](mockEnv.toLayer >>> JobEventStore.live())
+    }
+  }
+
+  val testReadEventsQueryOptionsAggregate = test("readEvents by Query and Options aggregate") {
+    check(keyGen, eventSequenceGen) { (id, events) =>
+
+      val query = PersistenceQuery.condition()
+      val options = FetchOptions()
+
+      val mockEnv = MockCQRSPersistence.ReadEvents.FullArgsByAggregate.of(
+        equalTo((id, discriminator, query, options, JobEventStore.Table)),
+        value(events.toChunk),
+      )
+
+      val effect = for {
+        store <- ZIO.service[JobEventStore]
+        result <- store.readEvents(id, query, options).atomically
+      } yield assert(result)(equalTo(events.some))
 
       effect.provideSomeLayer[ZConnectionPool](mockEnv.toLayer >>> JobEventStore.live())
     }

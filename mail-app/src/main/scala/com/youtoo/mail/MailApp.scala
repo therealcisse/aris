@@ -201,11 +201,11 @@ object MailApp extends ZIOApp, JsonSupport {
 
   } yield ()
 
-  def getAllMailData(): RIO[Environment, Chunk[MailData]] = MailService.loadMails(FetchOptions())
+  def getAllMailData(): RIO[Environment, Chunk[MailData.Id]] = MailService.loadMails(FetchOptions())
 
   def getMailData(id: MailData.Id): RIO[Environment, Option[MailData]] = MailService.loadMail(id)
 
-  def getMailState(id: MailAccount.Id): RIO[Environment, Option[Mail]] = ???
+  def getMailState(id: MailAccount.Id): RIO[Environment, Option[Mail]] = MailService.loadState(id)
 
   def triggerMailSync(id: MailAccount.Id): RIO[Environment, Unit] = ???
 

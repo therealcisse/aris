@@ -26,6 +26,13 @@ trait CQRSPersistence {
     options: FetchOptions,
     catalog: Catalog,
     ): RIO[ZConnection, Chunk[Change[Event]]]
+  def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
+    id: Key,
+    discriminator: Discriminator,
+    query: PersistenceQuery,
+    options: FetchOptions,
+    catalog: Catalog,
+    ): RIO[ZConnection, Chunk[Change[Event]]]
 
   def saveEvent[Event: {BinaryCodec, MetaInfo, Tag}](
     id: Key,

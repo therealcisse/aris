@@ -16,6 +16,8 @@ object JobEventStoreMock extends Mock[JobEventStore] {
   object ReadEventsByIdAndVersion extends Effect[(Key, Version), Throwable, Option[NonEmptyList[Change[JobEvent]]]]
   object ReadEventsByQuery
       extends Effect[(PersistenceQuery, FetchOptions), Throwable, Option[NonEmptyList[Change[JobEvent]]]]
+  object ReadEventsByQueryAggregate
+      extends Effect[(Key, PersistenceQuery, FetchOptions), Throwable, Option[NonEmptyList[Change[JobEvent]]]]
   object SaveEvent extends Effect[(Key, Change[JobEvent]), Throwable, Long]
 
   val compose: URLayer[Proxy, JobEventStore] =
@@ -34,6 +36,13 @@ object JobEventStoreMock extends Mock[JobEventStore] {
           options: FetchOptions,
         ): RIO[ZConnection, Option[NonEmptyList[Change[JobEvent]]]] =
           proxy(ReadEventsByQuery, (query, options))
+
+        def readEvents(
+          id: Key,
+          query: PersistenceQuery,
+          options: FetchOptions,
+        ): RIO[ZConnection, Option[NonEmptyList[Change[JobEvent]]]] =
+          proxy(ReadEventsByQueryAggregate, (id, query, options))
 
         def save(id: Key, event: Change[JobEvent]): RIO[ZConnection, Long] =
           proxy(SaveEvent, (id, event))

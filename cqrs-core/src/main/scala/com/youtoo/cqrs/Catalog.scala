@@ -19,4 +19,3 @@ object Catalog {
 
   extension (catalog: Catalog) def tableName: String = catalog.value
 }
-

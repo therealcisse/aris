@@ -5,6 +5,8 @@ package model
 import zio.test.*
 import zio.test.Assertion.*
 import zio.*
+import zio.prelude.*
+
 import com.youtoo.cqrs.*
 
 object MailEventMetaInfoSpec extends ZIOSpecDefault {
@@ -24,9 +26,9 @@ object MailEventMetaInfoSpec extends ZIOSpecDefault {
       }
     },
     test("MetaInfo[MailEvent] - MailSynced") {
-      check(timestampGen, Gen.listOf(mailDataIdGen), Gen.option(mailTokenGen), jobIdGen) {
-        (timestamp, mailKeys, token, jobId) =>
-          val event = MailEvent.MailSynced(timestamp, mailKeys, token, jobId)
+      check(timestampGen, mailDataIdGen, Gen.listOf(mailDataIdGen), mailTokenGen, jobIdGen) {
+        (timestamp, key, mailKeys, token, jobId) =>
+          val event = MailEvent.MailSynced(timestamp, NonEmptyList(key, mailKeys*), token, jobId)
           val expectedNamespace = Namespace(1)
           val expectedHierarchy = None
 

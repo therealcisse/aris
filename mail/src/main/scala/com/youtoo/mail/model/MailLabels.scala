@@ -2,14 +2,15 @@ package com.youtoo
 package mail
 package model
 
+import zio.prelude.*
+
 enum MailLabels {
   case All()
-  case Selection(ids: List[MailLabels.LabelKey])
+  case Selection(ids: NonEmptyList[MailLabels.LabelKey])
 }
 
 object MailLabels {
   import zio.schema.*
-  import zio.prelude.*
 
   case class LabelInfo(id: LabelKey, name: Name, total: TotalMessages)
 
@@ -20,19 +21,13 @@ object MailLabels {
   type LabelKey = LabelKey.Type
   object LabelKey extends Newtype[String] {
     extension (a: Type) def value: String = unwrap(a)
-    given Schema[LabelKey] = derive
+    given Schema[Type] = derive
 
   }
 
   type Name = Name.Type
   object Name extends Newtype[String] {
-    given Schema[Name] = derive
-
-  }
-
-  type TotalMessages = TotalMessages.Type
-  object TotalMessages extends Newtype[Int] {
-    given Schema[TotalMessages] = derive
+    given Schema[Type] = derive
 
   }
 
@@ -41,7 +36,7 @@ object MailLabels {
   extension (l: MailLabels)
     def value: List[LabelKey] = l match {
       case MailLabels.All() => Nil
-      case MailLabels.Selection(ids) => ids
+      case MailLabels.Selection(ids) => ids.toList
     }
 
 }

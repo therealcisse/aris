@@ -45,6 +45,15 @@ object IngestionEventStore {
             NonEmptyList.fromIterableOption(es)
           }
 
+        def readEvents(
+          id: Key,
+          query: PersistenceQuery,
+          options: FetchOptions,
+        ): RIO[ZConnection, Option[NonEmptyList[Change[IngestionEvent]]]] =
+          persistence.readEvents[IngestionEvent](id, IngestionEvent.discriminator, query, options, Table).map { es =>
+            NonEmptyList.fromIterableOption(es)
+          }
+
         def save(id: Key, event: Change[IngestionEvent]): RIO[ZConnection, Long] =
           persistence.saveEvent(id, IngestionEvent.discriminator, event, Table)
 

@@ -20,6 +20,17 @@ object MockCQRSPersistence extends Mock[CQRSPersistence] {
           (Discriminator, PersistenceQuery, FetchOptions, Catalog),
           Throwable,
         ]
+    object FullArgsByAggregate
+        extends Poly.Effect.Output[
+          (
+            Key,
+            Discriminator,
+            PersistenceQuery,
+            FetchOptions,
+            Catalog
+          ),
+          Throwable,
+        ]
     object SnapshotArgs
         extends Poly.Effect.Output[
           (
@@ -75,24 +86,6 @@ object MockCQRSPersistence extends Mock[CQRSPersistence] {
 
         def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
           discriminator: Discriminator,
-          snapshotVersion: Version,
-          query: PersistenceQuery,
-          options: FetchOptions,
-          catalog: Catalog,
-        ): ZIO[ZConnection, Throwable, Chunk[Change[Event]]] =
-          proxy(
-            ReadEvents.SnapshotArgs.of[Chunk[Change[Event]]],
-            (
-              discriminator,
-              snapshotVersion,
-              query,
-              options,
-              catalog,
-            ),
-          )
-
-        def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
-          discriminator: Discriminator,
           query: PersistenceQuery,
           options: FetchOptions,
           catalog: Catalog,
@@ -100,6 +93,24 @@ object MockCQRSPersistence extends Mock[CQRSPersistence] {
           proxy(
             ReadEvents.FullArgs.of[Chunk[Change[Event]]],
             (
+              discriminator,
+              query,
+              options,
+              catalog,
+            )
+          )
+
+        def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
+          id: Key,
+          discriminator: Discriminator,
+          query: PersistenceQuery,
+          options: FetchOptions,
+          catalog: Catalog,
+        ): ZIO[ZConnection, Throwable, Chunk[Change[Event]]] =
+          proxy(
+            ReadEvents.FullArgsByAggregate.of[Chunk[Change[Event]]],
+            (
+              id,
               discriminator,
               query,
               options,

@@ -3,4 +3,3 @@ package mail
 package model
 
 case class MailAddress(accountKey: MailAccount.Id, label: MailLabels.LabelKey)
-

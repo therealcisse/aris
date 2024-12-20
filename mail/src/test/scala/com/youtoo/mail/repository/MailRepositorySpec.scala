@@ -158,5 +158,5 @@ object MailRepositorySpec extends PgSpec, TestSupport {
 
       } yield ()
 
-    } @@ TestAspect.ignore
+    } @@ TestAspect.ignore @@ TestAspect.withLiveClock @@ TestAspect.samples(2) @@ TestAspect.timeout(60.seconds)
 }

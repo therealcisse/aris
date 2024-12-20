@@ -18,7 +18,7 @@ trait MailClient {
   def fetchMails(
     address: MailAddress,
     token: Option[MailToken],
-  ): RIO[Scope, (Chunk[MailData.Id], Option[MailToken])]
+  ): RIO[Scope, Option[(Chunk[MailData.Id], MailToken)]]
   def loadMessage(accountKey: MailAccount.Id, id: MailData.Id): RIO[Scope, Option[MailData]]
 }
 
@@ -53,7 +53,7 @@ object MailClient {
             MailLabels.LabelInfo(
               MailLabels.LabelKey(l.getId()),
               MailLabels.Name(l.getName()),
-              MailLabels.TotalMessages(l.getMessagesTotal()),
+              TotalMessages(l.getMessagesTotal()),
             ),
           )
 
@@ -62,7 +62,7 @@ object MailClient {
     def fetchMails(
       address: MailAddress,
       token: Option[MailToken],
-    ): RIO[Scope, (Chunk[MailData.Id], Option[MailToken])] =
+    ): RIO[Scope, Option[(Chunk[MailData.Id], MailToken)]] =
       for {
         service <- pool.get(address.accountKey)
         batchSize <- ZIO.config[BatchSize.Type]
@@ -80,12 +80,14 @@ object MailClient {
           r.execute()
         }
 
-        messages = response.getMessages().asScala.toList.map(m => MailData.Id(m.getId()))
+        result = Option(response.getNextPageToken()) match {
+          case None => None
+          case Some(token) =>
+            val messages = response.getMessages().asScala.toList.map(m => MailData.Id(m.getId()))
+            Some((Chunk(messages*), MailToken(token)))
+        }
 
-      } yield (
-        Chunk(messages*),
-        Option(response.getNextPageToken()).map(MailToken(_)),
-      )
+      } yield result
 
     def loadMessage(accountKey: MailAccount.Id, id: MailData.Id): RIO[Scope, Option[MailData]] =
       for {
@@ -128,7 +130,7 @@ object MailClient {
         def fetchMails(
           address: MailAddress,
           token: Option[MailToken],
-        ): RIO[Scope, (Chunk[MailData.Id], Option[MailToken])] =
+        ): RIO[Scope, Option[(Chunk[MailData.Id], MailToken)]] =
           self.fetchMails(address, token) @@ tracing.aspects.span(
             "MailClient.fetchMails",
             attributes = Attributes(

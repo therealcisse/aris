@@ -222,7 +222,7 @@ object MigrationApp extends ZIOApp {
   val run: URIO[Environment & Scope, ExitCode] =
     (
       for {
-      _ <- endpoint.uptime
+        _ <- endpoint.uptime
 
         config <- ZIO.config[DatabaseConfig]
         _ <- FlywayMigration.run(config)

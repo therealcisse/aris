@@ -110,8 +110,7 @@ object Dependencies {
   val gmail = Seq(
     "com.google.api-client" % "google-api-client-jackson2" % "2.7.1",
     "com.google.oauth-client" % "google-oauth-client" % "1.36.0",
-    "com.google.apis" % "google-api-services-gmail" % "v1-rev20240520-2.0.0"
+    "com.google.apis" % "google-api-services-gmail" % "v1-rev20240520-2.0.0",
   )
-
 
 }

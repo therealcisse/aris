@@ -44,6 +44,15 @@ object JobEventStore {
             NonEmptyList.fromIterableOption(es)
           }
 
+        def readEvents(
+          id: Key,
+          query: PersistenceQuery,
+          options: FetchOptions,
+        ): RIO[ZConnection, Option[NonEmptyList[Change[JobEvent]]]] =
+          persistence.readEvents[JobEvent](id, JobEvent.discriminator, query, options, Table).map { es =>
+            NonEmptyList.fromIterableOption(es)
+          }
+
         def save(id: Key, event: Change[JobEvent]): RIO[ZConnection, Long] =
           persistence.saveEvent(id, JobEvent.discriminator, event, Table)
       }

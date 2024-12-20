@@ -45,6 +45,15 @@ object MailEventStore {
             NonEmptyList.fromIterableOption(es)
           }
 
+        def readEvents(
+          id: Key,
+          query: PersistenceQuery,
+          options: FetchOptions,
+        ): RIO[ZConnection, Option[NonEmptyList[Change[MailEvent]]]] =
+          persistence.readEvents[MailEvent](id, MailEvent.discriminator, query, options, Table).map { es =>
+            NonEmptyList.fromIterableOption(es)
+          }
+
         def save(id: Key, event: Change[MailEvent]): RIO[ZConnection, Long] =
           persistence.saveEvent(id, MailEvent.discriminator, event, Table)
 
@@ -52,4 +61,3 @@ object MailEventStore {
     }
 
 }
-

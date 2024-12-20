@@ -21,18 +21,23 @@ object MailCommandHandlerSpec extends ZIOSpecDefault {
       }
     },
     test("RecordSync command produces MailSynced event") {
-      check(timestampGen, Gen.listOf(mailDataIdGen), Gen.option(mailTokenGen), jobIdGen) {
-        (timestamp, keys, token, jobId) =>
-          val command = MailCommand.RecordSync(timestamp, keys, token, jobId)
+      check(timestampGen, mailDataIdGen, Gen.listOf(mailDataIdGen), mailTokenGen, jobIdGen) {
+        (timestamp, key, keys, token, jobId) =>
+          val command = MailCommand.RecordSync(timestamp, NonEmptyList(key, keys*), token, jobId)
           val events = handler.applyCmd(command)
-          val expectedEvent = MailEvent.MailSynced(timestamp = timestamp, mailKeys = keys, token = token, jobId = jobId)
+          val expectedEvent = MailEvent.MailSynced(
+            timestamp = timestamp,
+            mailKeys = NonEmptyList(key, keys*),
+            token = token,
+            jobId = jobId,
+          )
           assert(events)(equalTo(NonEmptyList(expectedEvent)))
       }
     },
     test("Applying the same command multiple times produces the same event") {
-      check(timestampGen, Gen.listOf(mailDataIdGen), Gen.option(mailTokenGen), jobIdGen) {
-        (timestamp, keys, token, jobId) =>
-          val command = MailCommand.RecordSync(timestamp, keys, token, jobId)
+      check(timestampGen, mailDataIdGen, Gen.listOf(mailDataIdGen), mailTokenGen, jobIdGen) {
+        (timestamp, key, keys, token, jobId) =>
+          val command = MailCommand.RecordSync(timestamp, NonEmptyList(key, keys*), token, jobId)
           val events1 = handler.applyCmd(command)
           val events2 = handler.applyCmd(command)
           assert(events1)(equalTo(events2))

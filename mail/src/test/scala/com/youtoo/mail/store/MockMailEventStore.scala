@@ -25,6 +25,19 @@ object MockMailEventStore extends Mock[MailEventStore] {
             NonEmptyList[Change[MailEvent]],
           ],
         ]
+
+    object FullArgsByAggregate
+        extends Effect[
+          (
+            Key,
+            PersistenceQuery,
+            FetchOptions,
+          ),
+          Throwable,
+          Option[
+            NonEmptyList[Change[MailEvent]],
+          ],
+        ]
   }
 
   object Save extends Effect[(Key, Change[MailEvent]), Throwable, Long]
@@ -45,6 +58,13 @@ object MockMailEventStore extends Mock[MailEventStore] {
           options: FetchOptions,
         ): Task[Option[NonEmptyList[Change[MailEvent]]]] =
           proxy(ReadEvents.FullArgs, (query, options))
+
+        def readEvents(
+          id: Key,
+          query: PersistenceQuery,
+          options: FetchOptions,
+        ): Task[Option[NonEmptyList[Change[MailEvent]]]] =
+          proxy(ReadEvents.FullArgsByAggregate, (id, query, options))
 
         def save(id: Key, event: Change[MailEvent]): Task[Long] =
           proxy(Save, (id, event))

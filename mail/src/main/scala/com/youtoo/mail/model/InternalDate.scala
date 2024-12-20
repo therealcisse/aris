@@ -11,4 +11,3 @@ object InternalDate extends Newtype[Timestamp] {
   given Schema[InternalDate] = derive
 
 }
-

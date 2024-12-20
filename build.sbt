@@ -471,7 +471,7 @@ lazy val mailApp = (project in file("mail-app"))
   )
 
 lazy val loadtests = (project in file("loadtests"))
-  .dependsOn(ingestion % "compile->compile")
+  .dependsOn(ingestionApp % "compile->compile")
   .settings(stdSettings("loadtests"))
   .settings(Gatling / javaOptions := overrideDefaultJavaOptions("-Xms1G", "-Xmx4G"))
   .enablePlugins(GatlingPlugin)

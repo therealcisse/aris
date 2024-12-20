@@ -15,6 +15,11 @@ transparent trait EventStore[Event] {
     query: PersistenceQuery,
     options: FetchOptions,
   ): RIO[ZConnection, Option[NonEmptyList[Change[Event]]]]
+  def readEvents(
+    id: Key,
+    query: PersistenceQuery,
+    options: FetchOptions,
+  ): RIO[ZConnection, Option[NonEmptyList[Change[Event]]]]
 
   def save(id: Key, event: Change[Event]): RIO[ZConnection, Long]
 }

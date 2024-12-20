@@ -34,8 +34,6 @@ object CronSupportSpec extends ZIOSpecDefault {
         result <- ref.get
       } yield assert(result)(equalTo(42))
     },
-
   )
 
 }
-

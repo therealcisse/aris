@@ -46,6 +46,15 @@ object PostgresCQRSPersistence {
     ): RIO[ZConnection, Chunk[Change[Event]]] =
       Queries.READ_EVENTS(discriminator, query, options, catalog).selectAll
 
+    def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
+      id: Key,
+      discriminator: Discriminator,
+      query: PersistenceQuery,
+      options: FetchOptions,
+      catalog: Catalog,
+    ): RIO[ZConnection, Chunk[Change[Event]]] =
+      Queries.READ_EVENTS(id, discriminator, query, options, catalog).selectAll
+
     def saveEvent[Event: {BinaryCodec, MetaInfo, Tag}](
       id: Key,
       discriminator: Discriminator,
@@ -98,6 +107,21 @@ object PostgresCQRSPersistence {
           self.readEvents(discriminator, query, options, catalog) @@ tracing.aspects.span(
             "PostgresCQRSPersistence.readEvents.query",
             attributes = Attributes(Attribute.string("discriminator", discriminator.value)),
+          )
+
+        def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
+          id: Key,
+          discriminator: Discriminator,
+          query: PersistenceQuery,
+          options: FetchOptions,
+          catalog: Catalog,
+        ): RIO[ZConnection, Chunk[Change[Event]]] =
+          self.readEvents(id, discriminator, query, options, catalog) @@ tracing.aspects.span(
+            "PostgresCQRSPersistence.readEventsAggregate.query",
+            attributes = Attributes(
+              Attribute.long("key", id.value),
+              Attribute.string("discriminator", discriminator.value),
+            ),
           )
 
         def saveEvent[Event: {BinaryCodec, MetaInfo, Tag}](
@@ -177,6 +201,30 @@ object PostgresCQRSPersistence {
         .from(catalog.tableName)
         .where(
           sql"""discriminator = $discriminator""" ++ query.toSql.fold(SqlFragment.empty)(ql => sql" AND " ++ ql) ++ offsetQuery.fold(SqlFragment.empty)(ql => sql" AND " ++ ql) ++
+          sql""" ORDER BY version ASC""" ++ limitQuery.fold(SqlFragment.empty)(ql => sql" " ++ ql)
+        ).query[
+        (
+          Version,
+          Event,
+          )
+        ].map(Change.apply)
+
+    def READ_EVENTS[Event: BinaryCodec](
+      id: Key,
+      discriminator: Discriminator,
+      query: PersistenceQuery,
+      options: FetchOptions,
+      catalog: Catalog,
+    ): Query[Change[Event]] =
+      given JdbcDecoder[Event] = byteArrayDecoder[Event]
+
+      val (offsetQuery, limitQuery) = options.toSql
+
+      SqlFragment
+        .select("version", "payload")
+        .from(catalog.tableName)
+        .where(
+          sql"""aggregate_id = $id AND discriminator = $discriminator""" ++ query.toSql.fold(SqlFragment.empty)(ql => sql" AND " ++ ql) ++ offsetQuery.fold(SqlFragment.empty)(ql => sql" AND " ++ ql) ++
           sql""" ORDER BY version ASC""" ++ limitQuery.fold(SqlFragment.empty)(ql => sql" " ++ ql)
         ).query[
         (

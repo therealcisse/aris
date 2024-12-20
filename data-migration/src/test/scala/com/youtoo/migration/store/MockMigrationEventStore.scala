@@ -25,6 +25,19 @@ object MockMigrationEventStore extends Mock[MigrationEventStore] {
             NonEmptyList[Change[MigrationEvent]],
           ],
         ]
+
+    object FullArgsByAggregate
+        extends Effect[
+          (
+            Key,
+            PersistenceQuery,
+            FetchOptions,
+          ),
+          Throwable,
+          Option[
+            NonEmptyList[Change[MigrationEvent]],
+          ],
+        ]
   }
 
   object Save extends Effect[(Key, Change[MigrationEvent]), Throwable, Long]
@@ -45,6 +58,13 @@ object MockMigrationEventStore extends Mock[MigrationEventStore] {
           options: FetchOptions,
         ): Task[Option[NonEmptyList[Change[MigrationEvent]]]] =
           proxy(ReadEvents.FullArgs, (query, options))
+
+        def readEvents(
+          id: Key,
+          query: PersistenceQuery,
+          options: FetchOptions,
+        ): Task[Option[NonEmptyList[Change[MigrationEvent]]]] =
+          proxy(ReadEvents.FullArgsByAggregate, (id, query, options))
 
         def save(id: Key, event: Change[MigrationEvent]): Task[Long] =
           proxy(Save, (id, event))

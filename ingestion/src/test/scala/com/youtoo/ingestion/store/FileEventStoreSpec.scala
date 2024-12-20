@@ -25,6 +25,7 @@ object FileEventStoreSpec extends MockSpecDefault {
     testReadEventsId,
     testReadEventsByIdAndVersion,
     testReadEventsQueryOptions,
+    testReadEventsQueryOptionsAggregate,
     testSaveEvent,
   ).provideSomeLayerShared(
     ZConnectionMock.pool(),
@@ -77,6 +78,26 @@ object FileEventStoreSpec extends MockSpecDefault {
       val effect = for {
         store <- ZIO.service[FileEventStore]
         result <- store.readEvents(query, options).atomically
+      } yield assert(result)(equalTo(events.some))
+
+      effect.provideSomeLayer[ZConnectionPool](mockEnv.toLayer >>> FileEventStore.live())
+    }
+  }
+
+  val testReadEventsQueryOptionsAggregate = test("readEvents by Query and Options aggregate") {
+    check(keyGen, fileEventSequenceGen) { (id, events) =>
+
+      val query = PersistenceQuery.condition()
+      val options = FetchOptions()
+
+      val mockEnv = MockCQRSPersistence.ReadEvents.FullArgsByAggregate.of(
+        equalTo((id, discriminator, query, options, FileEventStore.Table)),
+        value(events.toChunk),
+      )
+
+      val effect = for {
+        store <- ZIO.service[FileEventStore]
+        result <- store.readEvents(id, query, options).atomically
       } yield assert(result)(equalTo(events.some))
 
       effect.provideSomeLayer[ZConnectionPool](mockEnv.toLayer >>> FileEventStore.live())

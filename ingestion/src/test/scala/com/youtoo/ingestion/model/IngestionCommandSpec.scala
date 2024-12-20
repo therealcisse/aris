@@ -42,7 +42,7 @@ object IngestionCommandHandlerSpec extends ZIOSpecDefault {
       }
     },
     test("FileProcessing command produces IngestionFileProcessing event") {
-       check(fileIdGen) { file =>
+      check(fileIdGen) { file =>
         val command = IngestionCommand.FileProcessing(file)
         val events = handler.applyCmd(command)
         val expectedEvent = IngestionEvent.IngestionFileProcessing(file)
@@ -50,7 +50,7 @@ object IngestionCommandHandlerSpec extends ZIOSpecDefault {
       }
     },
     test("FileFailed command produces IngestionFileFailed event") {
-       check(fileIdGen) { file =>
+      check(fileIdGen) { file =>
         val command = IngestionCommand.FileFailed(file)
         val events = handler.applyCmd(command)
         val expectedEvent = IngestionEvent.IngestionFileFailed(file)
@@ -67,4 +67,3 @@ object IngestionCommandHandlerSpec extends ZIOSpecDefault {
     },
   ) @@ TestAspect.withLiveClock
 }
-
