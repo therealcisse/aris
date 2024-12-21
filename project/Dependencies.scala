@@ -11,7 +11,6 @@ object Dependencies {
   val ZioConfigVersion = "4.0.2"
   val ZioInteropsCats = "23.0.0.2"
   val ZioPreludeVersion = "1.0.0-RC35"
-  val FlywayVersion = "9.8.1"
   val HikariCPVersion = "6.2.1"
   val CUIDVersion = "2.0.3"
   val ZioJsonVersion = "0.7.3"
