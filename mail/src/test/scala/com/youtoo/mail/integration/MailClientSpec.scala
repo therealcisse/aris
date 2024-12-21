@@ -106,7 +106,6 @@ object MailClientTest extends ZIOSpecDefault, TestSupport {
 
         val accountId = MailAccount.Id(1)
         val labelKey = MailLabels.LabelKey("label-1")
-        val address = MailAddress(accountId, labelKey)
 
         val mockEnv = GmailPoolMock.Get(
           equalTo(accountId),
@@ -115,7 +114,7 @@ object MailClientTest extends ZIOSpecDefault, TestSupport {
 
         (for {
           client <- ZIO.service[MailClient]
-          result <- client.fetchMails(address, None)
+          result <- client.fetchMails(accountId, None, Set(labelKey))
         } yield assert(result)(isSome(anything)) && assert(result.get._1)(hasSize(equalTo(1))) && assert(result.get._2)(
           equalTo(MailToken("token-1")),
         ))

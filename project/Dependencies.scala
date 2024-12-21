@@ -3,35 +3,40 @@ import sbt.*
 object Dependencies {
 
   val ZioJdbcVersion = "0.1.2"
-  val ZioVersion = "2.1.12"
+  val ZioVersion = "2.1.14"
   val ZioCliVersion = "0.5.0"
   val ZioParserVersion = "0.1.10"
   val ZioSchemaVersion = "1.5.0"
   val SttpVersion = "3.3.18"
   val ZioConfigVersion = "4.0.2"
   val ZioInteropsCats = "23.0.0.2"
-  val ZioPreludeVersion = "1.0.0-RC20"
+  val ZioPreludeVersion = "1.0.0-RC35"
   val FlywayVersion = "9.8.1"
-  val HikariCPVersion = "5.0.1"
+  val HikariCPVersion = "6.2.1"
   val CUIDVersion = "2.0.3"
   val ZioJsonVersion = "0.7.3"
-  val PostgresVersion = "42.5.0"
+  val PostgresVersion = "42.7.4"
   val ULIDVersion = "1.0"
   val SL4JVersion = "2.0.13"
-  val CatsVersion = "2.9.0"
+  val CatsVersion = "2.12.0"
   val CatsEffectKernelVersion = "3.5.4"
-  val GatlingVersion = "3.12.0"
+  val GatlingVersion = "3.13.1"
+  val OpenTelemetryVersion = "1.44.1"
+  val FlywayVersion = "11.1.0"
 
   val scalafmt = "org.scalameta" %% "scalafmt-dynamic" % "3.8.1"
 
-  val flyway = "org.flywaydb" % "flyway-core" % "9.8.1"
-  val hicariCP = "com.zaxxer" % "HikariCP" % HikariCPVersion
+  val db = Seq(
+    "org.flywaydb" % "flyway-core" % FlywayVersion,
+    "org.flywaydb" % "flyway-database-postgresql" % FlywayVersion,
+    "com.zaxxer" % "HikariCP" % HikariCPVersion,
+    "org.postgresql" % "postgresql" % PostgresVersion,
+    "com.dimafeng" %% "testcontainers-scala-postgresql" % "0.41.5" % Test,
+  )
 
   val `slf4j-api` = "org.slf4j" % "slf4j-api" % "2.0.16"
   val `slf4j-simple` = "org.slf4j" % "slf4j-simple" % "2.0.13"
   val `slf4j-log4j12` = "org.slf4j" % "slf4j-log4j12" % "2.0.16"
-
-  val `postgres-driver` = "org.postgresql" % "postgresql" % PostgresVersion
 
   val cats = "org.typelevel" %% "cats-core" % CatsVersion
   val `cats-effect-kernel` = "org.typelevel" %% "cats-effect" % CatsEffectKernelVersion
@@ -59,12 +64,11 @@ object Dependencies {
   val `zio-test-sbt` = "dev.zio" %% "zio-test-sbt" % ZioVersion % Test
   val `zio-mock` = "dev.zio" %% "zio-mock" % "1.0.0-RC12" % Test
   val `zio-test-magnolia` = "dev.zio" %% "zio-test-magnolia" % ZioVersion % Test
-  val `testcontainers-scala-postgresql` = "com.dimafeng" %% "testcontainers-scala-postgresql" % "0.41.4" % Test
-  val `zio-logging` = "dev.zio" %% "zio-logging" % "2.3.2"
-  val `zio-logging-slf4j` = "dev.zio" %% "zio-logging-slf4j" % "2.3.1"
-  val `zio-logging-slf4j2` = "dev.zio" %% "zio-logging-slf4j2" % "2.3.2"
-  val logback = "ch.qos.logback" % "logback-classic" % "1.5.12"
-  val `logback-core` = "ch.qos.logback" % "logback-core" % "1.5.12"
+  val `zio-logging` = "dev.zio" %% "zio-logging" % "2.4.0"
+  val `zio-logging-slf4j` = "dev.zio" %% "zio-logging-slf4j" % "2.4.0"
+  val `zio-logging-slf4j2` = "dev.zio" %% "zio-logging-slf4j2" % "2.4.0"
+  val logback = "ch.qos.logback" % "logback-classic" % "1.5.14"
+  val `logback-core` = "ch.qos.logback" % "logback-core" % "1.5.14"
 
   val `gatling-charts-highcharts` = "io.gatling.highcharts" % "gatling-charts-highcharts" % GatlingVersion % Test
   val `gatling-test-framework` = "io.gatling" % "gatling-test-framework" % GatlingVersion % Test
@@ -81,13 +85,13 @@ object Dependencies {
   val `hadoop-aws` = "org.apache.hadoop" % "hadoop-aws" % "3.4.1"
   val `hadoop-client` = "org.apache.hadoop" % "hadoop-client" % "3.4.1"
 
-  val netty = "io.netty" % "netty-all" % "4.1.114.Final"
+  val netty = "io.netty" % "netty-all" % "4.1.116.Final"
 
-  val jansi = "org.fusesource.jansi" % "jansi" % "2.4.0"
+  val jansi = "org.fusesource.jansi" % "jansi" % "2.4.1"
 
   val `logstash-logback-encoder` = "net.logstash.logback" % "logstash-logback-encoder" % "8.0"
 
-  val `zio-telemetry` = "dev.zio" %% "zio-opentelemetry" % "3.0.1"
+  val `zio-telemetry` = "dev.zio" %% "zio-opentelemetry" % "3.1.0"
 
   val `open-telemetry` = Seq(
     "dev.zio" %% "zio-http" % "3.0.1",
@@ -95,21 +99,21 @@ object Dependencies {
     // "io.zipkin.reporter2" % "zipkin-sender-okhttp3" % "2.16.3",
     "dev.zio" %% "zio-opentelemetry" % "3.0.1",
     // "dev.zio" %% "zio-opentelemetry-zio-logging" % "3.0.1",
-    "io.opentelemetry" % "opentelemetry-exporter-otlp" % "1.43.0",
-    "io.opentelemetry" % "opentelemetry-exporter-logging-otlp" % "1.43.0",
-    // "io.opentelemetry" % "opentelemetry-exporter-zipkin" % "1.43.0",
-    "io.opentelemetry" % "opentelemetry-sdk" % "1.43.0",
-    "io.opentelemetry" % "opentelemetry-sdk-trace" % "1.43.0",
-    "io.opentelemetry.semconv" % "opentelemetry-semconv" % "1.22.0-alpha",
-    "io.opentelemetry" % "opentelemetry-sdk-testing" % "1.43.0" % Test,
-    "io.grpc" % "grpc-netty-shaded" % "1.47.0",
+    "io.opentelemetry" % "opentelemetry-exporter-otlp" % OpenTelemetryVersion,
+    "io.opentelemetry" % "opentelemetry-exporter-logging-otlp" % OpenTelemetryVersion,
+    // "io.opentelemetry" % "opentelemetry-exporter-zipkin" % OpenTelemetryVersion,
+    "io.opentelemetry" % "opentelemetry-sdk" % OpenTelemetryVersion,
+    "io.opentelemetry" % "opentelemetry-sdk-trace" % OpenTelemetryVersion,
+    "io.opentelemetry.semconv" % "opentelemetry-semconv" % "1.22.0-alpha", // 1.29.0-alpha
+    "io.opentelemetry" % "opentelemetry-sdk-testing" % OpenTelemetryVersion % Test,
+    "io.grpc" % "grpc-netty-shaded" % "1.47.0", // 1.69.0
   )
 
   val cronUtils = "com.cronutils" % "cron-utils" % "9.2.1"
 
   val gmail = Seq(
     "com.google.api-client" % "google-api-client-jackson2" % "2.7.1",
-    "com.google.oauth-client" % "google-oauth-client" % "1.36.0",
+    "com.google.oauth-client" % "google-oauth-client" % "1.37.0",
     "com.google.apis" % "google-api-services-gmail" % "v1-rev20240520-2.0.0",
   )
 

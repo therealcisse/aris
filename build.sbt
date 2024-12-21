@@ -110,11 +110,8 @@ lazy val lock = (project in file("lock"))
   .settings(
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
     libraryDependencies ++= Dependencies.`open-telemetry`,
+    libraryDependencies ++= Dependencies.db,
     libraryDependencies ++= Seq(
-      flyway,
-      hicariCP,
-      `postgres-driver`,
-      `testcontainers-scala-postgresql`,
       `zio-jdbc`,
       zio,
       cats,
@@ -159,14 +156,11 @@ lazy val postgres = (project in file("postgres"))
   .settings(
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
     libraryDependencies ++= Dependencies.`open-telemetry`,
+    libraryDependencies ++= Dependencies.db,
     libraryDependencies ++= Seq(
       mockito,
       cats,
       `zio-jdbc`,
-      flyway,
-      hicariCP,
-      `postgres-driver`,
-      `testcontainers-scala-postgresql`,
       `zio-jdbc`,
       `zio-test`,
       `zio-test-sbt`,
@@ -262,8 +256,6 @@ lazy val memory = (project in file("cqrs-persistence-memory"))
     libraryDependencies ++= Dependencies.`open-telemetry`,
     libraryDependencies += `scala-collection-contrib`,
     libraryDependencies ++= Seq(
-      flyway,
-      hicariCP,
       `zio-jdbc`,
       `zio-test`,
       `zio-test-sbt`,
@@ -288,7 +280,6 @@ lazy val ingestion = (project in file("ingestion"))
       `hadoop-client`,
       `hadoop-aws`,
       `zio-metrics-connectors-prometheus`,
-      `testcontainers-scala-postgresql`,
       `zio-test`,
       `zio-test-sbt`,
       `zio-test-magnolia`,
@@ -343,7 +334,6 @@ lazy val dataMigration = (project in file("data-migration"))
     libraryDependencies ++= Seq(
       // `zio-config-typesafe`,
       `zio-metrics-connectors-prometheus`,
-      `testcontainers-scala-postgresql`,
       `zio-test`,
       `zio-test-sbt`,
       `zio-test-magnolia`,
@@ -397,11 +387,8 @@ lazy val job = (project in file("job"))
   .settings(
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
     libraryDependencies ++= Dependencies.`open-telemetry`,
+    libraryDependencies ++= Dependencies.db,
     libraryDependencies ++= Seq(
-      flyway,
-      hicariCP,
-      `postgres-driver`,
-      `testcontainers-scala-postgresql`,
       `zio-jdbc`,
       zio,
       cats,
@@ -425,17 +412,15 @@ lazy val mail = (project in file("mail"))
     `cqrs-persistence-postgres` % "compile->compile;test->test",
     job % "compile->compile;test->test",
     log % "compile->compile;test->compile",
+    lock % "compile->compile;test->test",
   )
   .settings(
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
     libraryDependencies ++= Dependencies.`open-telemetry`,
     libraryDependencies ++= Dependencies.gmail,
+    libraryDependencies ++= Dependencies.db,
     libraryDependencies ++= Seq(
       mockito,
-      flyway,
-      hicariCP,
-      `postgres-driver`,
-      `testcontainers-scala-postgresql`,
       `zio-jdbc`,
       zio,
       cats,
@@ -463,6 +448,17 @@ lazy val mailApp = (project in file("mail-app"))
     log % "compile->compile;test->compile",
     observability % "compile->compile",
     mail % "compile->compile;test->test",
+    lock % "compile->compile;test->test",
+  )
+  .enablePlugins(DockerPlugin, JavaAppPackaging)
+  .settings(
+    Docker / packageName := "youtoo-mail",
+    dockerBaseImage := "eclipse-temurin:17-jre",
+    dockerExposedPorts := Seq(8181),
+    dockerUpdateLatest := true,
+    dockerEnvVars ++= BuildHelper.getEnvVars(),
+    bashScriptExtraDefines += """addJava "-Dlogback.configurationFile=logback-production.xml"""",
+    mainClass := Some("com.youtoo.mail.MailApp"),
   )
   .settings(
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),

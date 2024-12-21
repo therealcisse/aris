@@ -16,8 +16,9 @@ import zio.telemetry.opentelemetry.common.*
 trait MailClient {
   def loadLabels(accountKey: MailAccount.Id): RIO[Scope, Chunk[MailLabels.LabelInfo]]
   def fetchMails(
-    address: MailAddress,
+    accountKey: MailAccount.Id,
     token: Option[MailToken],
+    labels: Set[MailLabels.LabelKey],
   ): RIO[Scope, Option[(Chunk[MailData.Id], MailToken)]]
   def loadMessage(accountKey: MailAccount.Id, id: MailData.Id): RIO[Scope, Option[MailData]]
 }
@@ -60,11 +61,12 @@ object MailClient {
       } yield Chunk(labels*)
 
     def fetchMails(
-      address: MailAddress,
+      accountKey: MailAccount.Id,
       token: Option[MailToken],
+      labels: Set[MailLabels.LabelKey],
     ): RIO[Scope, Option[(Chunk[MailData.Id], MailToken)]] =
       for {
-        service <- pool.get(address.accountKey)
+        service <- pool.get(accountKey)
         batchSize <- ZIO.config[BatchSize.Type]
 
         response <- ZIO.attempt {
@@ -73,7 +75,7 @@ object MailClient {
             .messages()
             .list("me")
             .setMaxResults(batchSize.value)
-            .setLabelIds(java.util.Collections.singletonList(address.label.value))
+            .setLabelIds(labels.map(_.value).toList.asJava)
 
           val r = token.fold(builder)(l => builder.setPageToken(l.value))
 
@@ -128,14 +130,15 @@ object MailClient {
             attributes = Attributes(Attribute.long("accountId", accountKey.asKey.value)),
           )
         def fetchMails(
-          address: MailAddress,
+          accountKey: MailAccount.Id,
           token: Option[MailToken],
+          labels: Set[MailLabels.LabelKey],
         ): RIO[Scope, Option[(Chunk[MailData.Id], MailToken)]] =
-          self.fetchMails(address, token) @@ tracing.aspects.span(
+          self.fetchMails(accountKey, token, labels) @@ tracing.aspects.span(
             "MailClient.fetchMails",
             attributes = Attributes(
-              Attribute.long("accountId", address.accountKey.asKey.value),
-              Attribute.string("label", address.label.value),
+              Attribute.long("accountId", accountKey.asKey.value),
+              Attribute.stringList("labels", labels.map(_.value).toList),
             ),
           )
         def loadMessage(accountKey: MailAccount.Id, id: MailData.Id): RIO[Scope, Option[MailData]] =

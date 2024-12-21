@@ -56,10 +56,8 @@ object JobRepository {
           self.loadMany(offset, limit) @@ tracing.aspects.span(
             "JobRepository.loadMany",
             attributes = Attributes(
-              List(
-                Attribute.long("offset", offset.map(_.value).getOrElse(0L)),
-                Attribute.long("limit", limit),
-              )*,
+              Attribute.long("offset", offset.map(_.value).getOrElse(0L)),
+              Attribute.long("limit", limit),
             ),
           )
         def save(job: Job): RIO[ZConnection, Long] =

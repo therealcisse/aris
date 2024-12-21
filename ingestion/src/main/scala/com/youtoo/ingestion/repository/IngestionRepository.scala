@@ -64,10 +64,8 @@ object IngestionRepository {
           self.loadMany(offset, limit) @@ tracing.aspects.span(
             "IngestionRepository.loadMany",
             attributes = Attributes(
-              List(
-                Attribute.long("offset", offset.map(_.value).getOrElse(0L)),
-                Attribute.long("limit", limit),
-              )*,
+              Attribute.long("offset", offset.map(_.value).getOrElse(0L)),
+              Attribute.long("limit", limit),
             ),
           )
         def save(o: Ingestion): ZIO[ZConnection, Throwable, Long] =

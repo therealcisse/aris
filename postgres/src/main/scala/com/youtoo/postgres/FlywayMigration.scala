@@ -37,6 +37,11 @@ object FlywayMigration {
       hikariConfig.setUsername(config.username)
       hikariConfig.setPassword(config.password)
 
+      val props = new java.util.Properties()
+      props.setProperty("tcpKeepAlive", "true")
+
+      hikariConfig.setDataSourceProperties(props)
+
       ZIO.acquireRelease(ZIO.attemptBlocking(HikariDataSource(hikariConfig)))(ds =>
         ZIO.attemptBlocking(ds.close()).ignoreLogged,
       ) flatMap { dataSource =>

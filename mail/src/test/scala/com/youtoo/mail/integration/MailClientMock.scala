@@ -11,7 +11,10 @@ import com.youtoo.mail.integration.*
 object MailClientMock extends Mock[MailClient] {
 
   object LoadLabels extends Effect[MailAccount.Id, Throwable, Chunk[MailLabels.LabelInfo]]
-  object FetchMails extends Effect[(MailAddress, Option[MailToken]), Throwable, Option[(Chunk[MailData.Id], MailToken)]]
+  object FetchMails
+      extends Effect[(MailAccount.Id, Option[MailToken], Set[MailLabels.LabelKey]), Throwable, Option[
+        (Chunk[MailData.Id], MailToken),
+      ]]
   object LoadMessage extends Effect[(MailAccount.Id, MailData.Id), Throwable, Option[MailData]]
 
   val compose: URLayer[Proxy, MailClient] =
@@ -23,10 +26,11 @@ object MailClientMock extends Mock[MailClient] {
           proxy(LoadLabels, accountKey)
 
         def fetchMails(
-          address: MailAddress,
+          accountKey: MailAccount.Id,
           token: Option[MailToken],
+          labels: Set[MailLabels.LabelKey],
         ): RIO[Scope, Option[(Chunk[MailData.Id], MailToken)]] =
-          proxy(FetchMails, (address, token))
+          proxy(FetchMails, (accountKey, token, labels))
 
         def loadMessage(accountKey: MailAccount.Id, id: MailData.Id): RIO[Scope, Option[MailData]] =
           proxy(LoadMessage, (accountKey, id))
