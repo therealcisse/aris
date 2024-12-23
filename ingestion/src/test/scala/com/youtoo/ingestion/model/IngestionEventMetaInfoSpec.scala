@@ -27,7 +27,7 @@ object IngestionEventMetaInfoSpec extends ZIOSpecDefault {
     test("MetaInfo[IngestionEvent] - IngestionFilesResolved") {
       check(fileIdGen) { file =>
         val event = IngestionEvent.IngestionFilesResolved(NonEmptySet(file))
-        val expectedNamespace = Namespace(1)
+        val expectedNamespace = Namespace(100)
         val expectedHierarchy = None
 
         val namespaceAssertion = assert(event.namespace)(equalTo(expectedNamespace))
@@ -40,7 +40,7 @@ object IngestionEventMetaInfoSpec extends ZIOSpecDefault {
     test("MetaInfo[IngestionEvent] - IngestionFileProcessing") {
       check(fileIdGen) { file =>
         val event = IngestionEvent.IngestionFileProcessing(file)
-        val expectedNamespace = Namespace(2)
+        val expectedNamespace = Namespace(200)
         val expectedHierarchy = None
 
         val namespaceAssertion = assert(event.namespace)(equalTo(expectedNamespace))
@@ -53,7 +53,7 @@ object IngestionEventMetaInfoSpec extends ZIOSpecDefault {
     test("MetaInfo[IngestionEvent] - IngestionFileProcessed") {
       check(fileIdGen) { file =>
         val event = IngestionEvent.IngestionFileProcessed(file)
-        val expectedNamespace = Namespace(3)
+        val expectedNamespace = Namespace(300)
         val expectedHierarchy = None
 
         val namespaceAssertion = assert(event.namespace)(equalTo(expectedNamespace))
@@ -66,7 +66,7 @@ object IngestionEventMetaInfoSpec extends ZIOSpecDefault {
     test("MetaInfo[IngestionEvent] - IngestionFileFailed") {
       check(fileIdGen) { file =>
         val event = IngestionEvent.IngestionFileFailed(file)
-        val expectedNamespace = Namespace(4)
+        val expectedNamespace = Namespace(400)
         val expectedHierarchy = None
 
         val namespaceAssertion = assert(event.namespace)(equalTo(expectedNamespace))
@@ -79,7 +79,7 @@ object IngestionEventMetaInfoSpec extends ZIOSpecDefault {
     test("MetaInfo[IngestionEvent] - IngestionCompleted") {
       check(timestampGen) { timestamp =>
         val event = IngestionEvent.IngestionCompleted(timestamp)
-        val expectedNamespace = Namespace(5)
+        val expectedNamespace = Namespace(500)
         val expectedHierarchy = None
 
         val namespaceAssertion = assert(event.namespace)(equalTo(expectedNamespace))

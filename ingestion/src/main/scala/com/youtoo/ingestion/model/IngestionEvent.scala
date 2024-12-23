@@ -27,17 +27,25 @@ object IngestionEvent {
 
   given Schema[IngestionEvent] = DeriveSchema.gen
 
+  object NS {
+    val IngestionStarted = Namespace(0)
+    val IngestionFilesResolved = Namespace(100)
+    val IngestionFileProcessing = Namespace(200)
+    val IngestionFileProcessed = Namespace(300)
+    val IngestionFileFailed = Namespace(400)
+    val IngestionCompleted = Namespace(500)
+  }
+
   given MetaInfo[IngestionEvent]  {
 
     extension (self: IngestionEvent)
       def namespace: Namespace = self match {
-        case IngestionEvent.IngestionStarted(_, _) => Namespace(0)
-        case IngestionEvent.IngestionFilesResolved(_) => Namespace(1)
-        case IngestionEvent.IngestionFileProcessing(_) => Namespace(2)
-        case IngestionEvent.IngestionFileProcessed(_) => Namespace(3)
-        case IngestionEvent.IngestionFileFailed(_) => Namespace(4)
-        case IngestionEvent.IngestionCompleted(_) => Namespace(5)
-
+        case IngestionEvent.IngestionStarted(_, _) => NS.IngestionStarted
+        case IngestionEvent.IngestionFilesResolved(_) => NS.IngestionFilesResolved
+        case IngestionEvent.IngestionFileProcessing(_) => NS.IngestionFileProcessing
+        case IngestionEvent.IngestionFileProcessed(_) => NS.IngestionFileProcessed
+        case IngestionEvent.IngestionFileFailed(_) => NS.IngestionFileFailed
+        case IngestionEvent.IngestionCompleted(_) => NS.IngestionCompleted
       }
 
     extension (self: IngestionEvent) def hierarchy: Option[Hierarchy] = None

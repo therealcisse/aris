@@ -27,7 +27,7 @@ object JobEventMetaInfoSpec extends ZIOSpecDefault {
     test("MetaInfo[JobEvent] - ProgressReported") {
       check(jobIdGen, timestampGen, progressGen) { (id, timestamp, progress) =>
         val event = JobEvent.ProgressReported(id, timestamp, progress)
-        val expectedNamespace = Namespace(1)
+        val expectedNamespace = Namespace(100)
         val expectedHierarchy = None
 
         val namespaceAssertion = assert(event.namespace)(equalTo(expectedNamespace))
@@ -41,7 +41,7 @@ object JobEventMetaInfoSpec extends ZIOSpecDefault {
     test("MetaInfo[JobEvent] - JobCompleted") {
       check(jobIdGen, timestampGen, jobCompletionReasonGen) { (id, timestamp, reason) =>
         val event = JobEvent.JobCompleted(id, timestamp, reason)
-        val expectedNamespace = Namespace(2)
+        val expectedNamespace = Namespace(200)
         val expectedHierarchy = None
 
         val namespaceAssertion = assert(event.namespace)(equalTo(expectedNamespace))

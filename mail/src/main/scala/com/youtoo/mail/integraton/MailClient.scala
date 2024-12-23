@@ -19,7 +19,7 @@ trait MailClient {
     accountKey: MailAccount.Id,
     token: Option[MailToken],
     labels: Set[MailLabels.LabelKey],
-  ): RIO[Scope, Option[(Chunk[MailData.Id], MailToken)]]
+  ): RIO[Scope, Option[(NonEmptyList[MailData.Id], MailToken)]]
   def loadMessage(accountKey: MailAccount.Id, id: MailData.Id): RIO[Scope, Option[MailData]]
 }
 
@@ -64,7 +64,7 @@ object MailClient {
       accountKey: MailAccount.Id,
       token: Option[MailToken],
       labels: Set[MailLabels.LabelKey],
-    ): RIO[Scope, Option[(Chunk[MailData.Id], MailToken)]] =
+    ): RIO[Scope, Option[(NonEmptyList[MailData.Id], MailToken)]] =
       for {
         service <- pool.get(accountKey)
         batchSize <- ZIO.config[BatchSize.Type]
@@ -82,11 +82,13 @@ object MailClient {
           r.execute()
         }
 
-        result = Option(response.getNextPageToken()) match {
-          case None => None
-          case Some(token) =>
-            val messages = response.getMessages().asScala.toList.map(m => MailData.Id(m.getId()))
-            Some((Chunk(messages*), MailToken(token)))
+        result = Option(response.getNextPageToken()) flatMap { token =>
+          val messages = response.getMessages().asScala.toList.map(m => MailData.Id(m.getId()))
+
+          NonEmptyList.fromIterableOption(messages).map { nel =>
+            (nel, MailToken(token))
+
+          }
         }
 
       } yield result
@@ -133,7 +135,7 @@ object MailClient {
           accountKey: MailAccount.Id,
           token: Option[MailToken],
           labels: Set[MailLabels.LabelKey],
-        ): RIO[Scope, Option[(Chunk[MailData.Id], MailToken)]] =
+        ): RIO[Scope, Option[(NonEmptyList[MailData.Id], MailToken)]] =
           self.fetchMails(accountKey, token, labels) @@ tracing.aspects.span(
             "MailClient.fetchMails",
             attributes = Attributes(

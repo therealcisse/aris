@@ -90,6 +90,12 @@ val reportProgressCommandGen: Gen[Any, JobCommand] =
     progress <- progressGen
   } yield JobCommand.ReportProgress(id, timestamp, progress)
 
+val cancelJobCommandGen: Gen[Any, JobCommand] =
+  for {
+    id <- jobIdGen
+    timestamp <- timestampGen
+  } yield JobCommand.CancelJob(id, timestamp)
+
 val doneCommandGen: Gen[Any, JobCommand.CompleteJob] =
   for {
     id <- jobIdGen
@@ -99,6 +105,7 @@ val doneCommandGen: Gen[Any, JobCommand.CompleteJob] =
 
 val jobCommandGen: Gen[Any, JobCommand] = Gen.oneOf(
   startJobCommandGen,
+  cancelJobCommandGen,
   reportProgressCommandGen,
   doneCommandGen,
 )
@@ -106,7 +113,10 @@ val jobCommandGen: Gen[Any, JobCommand] = Gen.oneOf(
 val validCommandSequenceGen: Gen[Any, NonEmptyList[JobCommand]] =
   for {
     startCmd <- startJobCommandGen
-    progressCmds <- Gen.listOf(reportProgressCommandGen)
+    progressCmds <- Gen.oneOf(
+      Gen.listOf(reportProgressCommandGen),
+      cancelJobCommandGen.map(List(_)),
+    )
     done <- doneCommandGen
     cmds = progressCmds ::: (done :: Nil)
   } yield NonEmptyList(startCmd, cmds*)
@@ -132,6 +142,14 @@ val jobCompletedEventGen: Gen[Any, JobEvent] =
     timestamp <- timestampGen
     reason <- jobCompletionReasonGen
   } yield JobEvent.JobCompleted(id, timestamp, reason)
+
+val jobCompletedEventChangeGen: Gen[Any, Change[JobEvent]] =
+  for {
+    version <- versionGen
+    id <- jobIdGen
+    timestamp <- timestampGen
+    reason <- jobCompletionReasonGen
+  } yield Change(version, JobEvent.JobCompleted(id, timestamp, reason))
 
 val jobEventGen: Gen[Any, JobEvent] = Gen.oneOf(
   jobStartedEventGen,

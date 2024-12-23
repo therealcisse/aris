@@ -4,6 +4,7 @@ package client
 
 import zio.*
 import zio.mock.*
+import zio.prelude.*
 
 import com.youtoo.mail.model.*
 import com.youtoo.mail.integration.*
@@ -13,7 +14,7 @@ object MailClientMock extends Mock[MailClient] {
   object LoadLabels extends Effect[MailAccount.Id, Throwable, Chunk[MailLabels.LabelInfo]]
   object FetchMails
       extends Effect[(MailAccount.Id, Option[MailToken], Set[MailLabels.LabelKey]), Throwable, Option[
-        (Chunk[MailData.Id], MailToken),
+        (NonEmptyList[MailData.Id], MailToken),
       ]]
   object LoadMessage extends Effect[(MailAccount.Id, MailData.Id), Throwable, Option[MailData]]
 
@@ -29,7 +30,7 @@ object MailClientMock extends Mock[MailClient] {
           accountKey: MailAccount.Id,
           token: Option[MailToken],
           labels: Set[MailLabels.LabelKey],
-        ): RIO[Scope, Option[(Chunk[MailData.Id], MailToken)]] =
+        ): RIO[Scope, Option[(NonEmptyList[MailData.Id], MailToken)]] =
           proxy(FetchMails, (accountKey, token, labels))
 
         def loadMessage(accountKey: MailAccount.Id, id: MailData.Id): RIO[Scope, Option[MailData]] =

@@ -19,29 +19,22 @@ trait MigrationCQRS extends CQRS[MigrationEvent, MigrationCommand] {}
 object MigrationCQRS {
 
   inline def add(id: Key, cmd: MigrationCommand): RIO[MigrationCQRS, Unit] =
-    ZIO.serviceWithZIO[MigrationCQRS](_.add(id, cmd))
+    ZIO.serviceWithZIO(_.add(id, cmd))
 
   def live(): ZLayer[
     ZConnectionPool & MigrationEventStore,
     Throwable,
     MigrationCQRS,
   ] =
-    ZLayer.fromFunction {
-      (
-        pool: ZConnectionPool,
-        eventStore: MigrationEventStore,
-      ) =>
-        new LiveMigrationCQRS(
-          pool,
-          eventStore,
-        )
+    ZLayer.fromFunction { (pool: ZConnectionPool, eventStore: MigrationEventStore) =>
+      new LiveMigrationCQRS(
+        pool,
+        eventStore,
+      )
 
     }
 
-  class LiveMigrationCQRS(
-    pool: ZConnectionPool,
-    eventStore: MigrationEventStore,
-  ) extends MigrationCQRS {
+  class LiveMigrationCQRS(pool: ZConnectionPool, eventStore: MigrationEventStore) extends MigrationCQRS {
 
     def add(id: Key, cmd: MigrationCommand): Task[Unit] =
       atomically {

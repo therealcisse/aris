@@ -32,11 +32,19 @@ object Job {
 
   enum CompletionReason {
     case Success()
+    case Cancellation()
     case Failure(message: String)
   }
 
   object CompletionReason {
     given Schema[CompletionReason] = DeriveSchema.gen
+
+    extension (reason: CompletionReason)
+      def isCancellation(): Boolean = reason match {
+        case CompletionReason.Cancellation() => true
+        case _ => false
+      }
+
   }
 
   extension (job: Job) {
@@ -50,4 +58,5 @@ object Job {
       case JobStatus.Completed(_, completed, _) => completed
     }
   }
+
 }

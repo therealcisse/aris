@@ -17,4 +17,10 @@ object JobStatus {
       case _: JobStatus.Completed => true
       case _ => false
     }
+
+  extension (status: JobStatus)
+    def isCancelled: Boolean = status match {
+      case s: JobStatus.Completed => s.reason.isCancellation()
+      case _ => false
+    }
 }

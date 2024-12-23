@@ -32,9 +32,8 @@ object FileEvent {
 
     extension (self: FileEvent)
       def namespace: Namespace = self match {
-        case FileEvent.FileAdded(_, _, _, _, _) => Namespace(0)
-        case FileEvent.ProviderAdded(_, _, _) => Namespace(1)
-
+        case FileEvent.FileAdded(_, _, _, _, _) => NS.FileAdded
+        case FileEvent.ProviderAdded(_, _, _) => NS.ProviderAdded
       }
 
     extension (self: FileEvent)
@@ -63,6 +62,11 @@ object FileEvent {
 
     extension (self: FileEvent) def reference: Option[Reference] = None
 
+  }
+
+  object NS {
+    val FileAdded = Namespace(0)
+    val ProviderAdded = Namespace(1)
   }
 
   open class LoadIngestionFileByName(arg: IngestionFile.Name) extends EventHandler[FileEvent, Option[IngestionFile]] {

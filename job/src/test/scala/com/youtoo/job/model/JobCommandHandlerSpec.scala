@@ -26,6 +26,14 @@ object JobCommandSpec extends ZIOSpecDefault {
         assert(events)(equalTo(NonEmptyList(expectedEvent)))
       }
     },
+    test("CancelJob command produces JobCompleted event with the cancellation reason") {
+      check(jobIdGen, timestampGen) { (id, timestamp) =>
+        val command = JobCommand.CancelJob(id, timestamp)
+        val events = handler.applyCmd(command)
+        val expectedEvent = JobEvent.JobCompleted(id, timestamp, Job.CompletionReason.Cancellation())
+        assert(events)(equalTo(NonEmptyList(expectedEvent)))
+      }
+    },
     test("CompleteJob command produces JobCompleted event") {
       check(jobIdGen, timestampGen, jobCompletionReasonGen) { (id, timestamp, reason) =>
         val command = JobCommand.CompleteJob(id, timestamp, reason)

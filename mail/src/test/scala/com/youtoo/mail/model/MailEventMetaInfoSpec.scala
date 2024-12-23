@@ -16,7 +16,7 @@ object MailEventMetaInfoSpec extends ZIOSpecDefault {
       check(mailLabelsGen, timestampGen, jobIdGen) { (labels, timestamp, jobId) =>
         val event = MailEvent.SyncStarted(labels, timestamp, jobId)
         val expectedNamespace = Namespace(0)
-        val expectedHierarchy = None
+        val expectedHierarchy = Some(Hierarchy.Child(jobId.asKey))
 
         val namespaceAssertion = assert(event.namespace)(equalTo(expectedNamespace))
         val hierarchyAssertion = assert(event.hierarchy)(equalTo(expectedHierarchy))
@@ -29,8 +29,8 @@ object MailEventMetaInfoSpec extends ZIOSpecDefault {
       check(timestampGen, mailDataIdGen, Gen.listOf(mailDataIdGen), mailTokenGen, jobIdGen) {
         (timestamp, key, mailKeys, token, jobId) =>
           val event = MailEvent.MailSynced(timestamp, NonEmptyList(key, mailKeys*), token, jobId)
-          val expectedNamespace = Namespace(1)
-          val expectedHierarchy = None
+          val expectedNamespace = Namespace(100)
+          val expectedHierarchy = Some(Hierarchy.Child(jobId.asKey))
 
           val namespaceAssertion = assert(event.namespace)(equalTo(expectedNamespace))
           val hierarchyAssertion = assert(event.hierarchy)(equalTo(expectedHierarchy))
@@ -42,8 +42,8 @@ object MailEventMetaInfoSpec extends ZIOSpecDefault {
     test("MetaInfo[MailEvent] - SyncCompleted") {
       check(timestampGen, jobIdGen) { (timestamp, jobId) =>
         val event = MailEvent.SyncCompleted(timestamp, jobId)
-        val expectedNamespace = Namespace(2)
-        val expectedHierarchy = None
+        val expectedNamespace = Namespace(200)
+        val expectedHierarchy = Some(Hierarchy.Child(jobId.asKey))
 
         val namespaceAssertion = assert(event.namespace)(equalTo(expectedNamespace))
         val hierarchyAssertion = assert(event.hierarchy)(equalTo(expectedHierarchy))

@@ -8,11 +8,13 @@ import zio.*
 
 object JobServiceMock extends Mock[JobService] {
 
+  object IsCancelled extends Effect[Job.Id, Throwable, Boolean]
   object Load extends Effect[Job.Id, Throwable, Option[Job]]
   object LoadMany extends Effect[(Option[Key], Long), Throwable, Chunk[Key]]
   object Save extends Effect[Job, Throwable, Long]
   object StartJob extends Effect[(Job.Id, Timestamp, JobMeasurement, Job.Tag), Throwable, Unit]
   object ReportProgress extends Effect[(Job.Id, Timestamp, Progress), Throwable, Unit]
+  object CancelJob extends Effect[(Job.Id, Timestamp), Throwable, Unit]
   object CompleteJob extends Effect[(Job.Id, Timestamp, Job.CompletionReason), Throwable, Unit]
 
   val compose: URLayer[Proxy, JobService] =
@@ -20,6 +22,9 @@ object JobServiceMock extends Mock[JobService] {
       for {
         proxy <- ZIO.service[Proxy]
       } yield new JobService {
+        def isCancelled(id: Job.Id): Task[Boolean] =
+          proxy(IsCancelled, id)
+
         def load(id: Job.Id): Task[Option[Job]] =
           proxy(Load, id)
 
@@ -37,6 +42,9 @@ object JobServiceMock extends Mock[JobService] {
 
         def completeJob(id: Job.Id, timestamp: Timestamp, reason: Job.CompletionReason): Task[Unit] =
           proxy(CompleteJob, (id, timestamp, reason))
+
+        def cancelJob(id: Job.Id, timestamp: Timestamp): Task[Unit] =
+          proxy(CancelJob, (id, timestamp))
       }
     }
 }

@@ -14,6 +14,7 @@ import zio.jdbc.*
 import com.youtoo.postgres.*
 import com.youtoo.cqrs.*
 import com.youtoo.cqrs.service.postgres.*
+import com.youtoo.cqrs.domain.*
 
 import com.youtoo.job.repository.*
 import com.youtoo.job.model.*
@@ -101,6 +102,36 @@ object JobServiceSpec extends MockSpecDefault, TestSupport {
           )
       }
     },
+    test("calling isCancelled returns expected result using JobEventStore") {
+      check(jobIdGen, Gen.option(jobCompletedEventChangeGen)) { case (id, event) =>
+        val expected = event match {
+          case None => false
+          case _ => true
+        }
+
+        val mockEnv = JobEventStoreMock.ReadEventsByQueryAggregate(
+          equalTo((id, PersistenceQuery.ns(JobEvent.NS.JobCompleted), FetchOptions.limit(1L))),
+          value(event.map(e => NonEmptyList(e))),
+        )
+
+        (for {
+          effect <- atomically(JobService.isCancelled(id))
+          testResult = assert(effect)(equalTo(expected))
+        } yield testResult).provideSomeLayer[ZConnectionPool & zio.telemetry.opentelemetry.tracing.Tracing](
+          mockEnv.toLayer >>> ZLayer.makeSome[
+            JobEventStore & ZConnectionPool & zio.telemetry.opentelemetry.tracing.Tracing,
+            JobService,
+          ](
+            JobCQRS.live(),
+            PostgresCQRSPersistence.live(),
+            JobRepository.live(),
+            SnapshotStore.live(),
+            SnapshotStrategy.live(),
+            JobService.live(),
+          ),
+        )
+      }
+    },
     test("save job returns expected result using JobRepository") {
       check(jobGen) { case job =>
         val expected = 1L
@@ -157,13 +188,15 @@ object JobServiceSpec extends MockSpecDefault, TestSupport {
     },
     test("should start a job using JobCQRS") {
       check(jobIdGen, timestampGen, jobMeasurementGen, jobTagGen) { (id, timestamp, total, tag) =>
+
         val mockEnv = MockJobCQRS.Add(
-          equalTo(
+          assertion = equalTo(
             (
               id,
               JobCommand.StartJob(id, timestamp, total, tag),
             ),
           ),
+          result = unit,
         )
 
         (for {
@@ -226,6 +259,36 @@ object JobServiceSpec extends MockSpecDefault, TestSupport {
 
         (for {
           _ <- JobService.completeJob(id, timestamp, reason)
+        } yield assertCompletes)
+          .provideSomeLayer[ZConnectionPool & zio.telemetry.opentelemetry.tracing.Tracing](
+            mockEnv.toLayer >>> ZLayer.makeSome[
+              JobCQRS & ZConnectionPool & zio.telemetry.opentelemetry.tracing.Tracing,
+              JobService,
+            ](
+              JobRepository.live(),
+              PostgresCQRSPersistence.live(),
+              JobEventStore.live(),
+              SnapshotStore.live(),
+              SnapshotStrategy.live(),
+              JobService.live(),
+            ),
+          )
+      }
+    },
+    test("should cancel a job using JobCQRS") {
+      check(jobIdGen, timestampGen) { (id, timestamp) =>
+        val mockEnv = MockJobCQRS.Add(
+          assertion = equalTo(
+            (
+              id,
+              JobCommand.CancelJob(id, timestamp),
+            ),
+          ),
+          result = unit,
+        )
+
+        (for {
+          _ <- JobService.cancelJob(id, timestamp)
         } yield assertCompletes)
           .provideSomeLayer[ZConnectionPool & zio.telemetry.opentelemetry.tracing.Tracing](
             mockEnv.toLayer >>> ZLayer.makeSome[

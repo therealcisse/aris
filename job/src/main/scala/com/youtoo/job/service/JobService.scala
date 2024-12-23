@@ -17,10 +17,13 @@ import zio.telemetry.opentelemetry.tracing.*
 import zio.telemetry.opentelemetry.common.*
 
 trait JobService {
+  def isCancelled(id: Job.Id): Task[Boolean]
+
   def load(id: Job.Id): Task[Option[Job]]
   def loadMany(offset: Option[Key], limit: Long): Task[Chunk[Key]]
   def save(job: Job): Task[Long]
 
+  def cancelJob(id: Job.Id, timestamp: Timestamp): Task[Unit]
   def startJob(id: Job.Id, timestamp: Timestamp, total: JobMeasurement, tag: Job.Tag): Task[Unit]
   def reportProgress(id: Job.Id, timestamp: Timestamp, progress: Progress): Task[Unit]
   def completeJob(id: Job.Id, timestamp: Timestamp, reason: Job.CompletionReason): Task[Unit]
@@ -29,22 +32,28 @@ trait JobService {
 object JobService {
 
   inline def loadMany(offset: Option[Key], limit: Long): RIO[JobService, Chunk[Key]] =
-    ZIO.serviceWithZIO[JobService](_.loadMany(offset, limit))
+    ZIO.serviceWithZIO(_.loadMany(offset, limit))
 
   inline def load(id: Job.Id): RIO[JobService, Option[Job]] =
-    ZIO.serviceWithZIO[JobService](_.load(id))
+    ZIO.serviceWithZIO(_.load(id))
 
-  inline def save(job: Job): RIO[JobService & ZConnection, Long] =
-    ZIO.serviceWithZIO[JobService](_.save(job))
+  inline def save(job: Job): RIO[JobService, Long] =
+    ZIO.serviceWithZIO(_.save(job))
 
   inline def startJob(id: Job.Id, timestamp: Timestamp, total: JobMeasurement, tag: Job.Tag): RIO[JobService, Unit] =
-    ZIO.serviceWithZIO[JobService](_.startJob(id, timestamp, total, tag))
+    ZIO.serviceWithZIO(_.startJob(id, timestamp, total, tag))
 
   inline def reportProgress(id: Job.Id, timestamp: Timestamp, progress: Progress): RIO[JobService, Unit] =
-    ZIO.serviceWithZIO[JobService](_.reportProgress(id, timestamp, progress))
+    ZIO.serviceWithZIO(_.reportProgress(id, timestamp, progress))
 
   inline def completeJob(id: Job.Id, timestamp: Timestamp, reason: Job.CompletionReason): RIO[JobService, Unit] =
-    ZIO.serviceWithZIO[JobService](_.completeJob(id, timestamp, reason))
+    ZIO.serviceWithZIO(_.completeJob(id, timestamp, reason))
+
+  inline def cancelJob(id: Job.Id, timestamp: Timestamp): RIO[JobService, Unit] =
+    ZIO.serviceWithZIO(_.cancelJob(id, timestamp))
+
+  inline def isCancelled(id: Job.Id): RIO[JobService, Boolean] =
+    ZIO.serviceWithZIO(_.isCancelled(id))
 
   def live(): ZLayer[
     ZConnectionPool & JobEventStore & JobRepository & SnapshotStore & SnapshotStrategy.Factory & Tracing & JobCQRS,
@@ -76,6 +85,22 @@ object JobService {
     strategy: SnapshotStrategy,
     jobCQRS: JobCQRS,
   ) extends JobService { self =>
+    def isCancelled(id: Job.Id): Task[Boolean] =
+      val key = id.asKey
+
+      atomically {
+        val events = eventStore.readEvents(
+          id = key,
+          PersistenceQuery.ns(JobEvent.NS.JobCompleted),
+          FetchOptions.limit(1L),
+        )
+
+        events map (_.fold(false) { es =>
+          val job = EventHandler.applyEvents(es)
+          job.status.isCancelled
+        })
+
+      }.provideEnvironment(ZEnvironment(pool))
 
     def load(id: Job.Id): Task[Option[Job]] =
       val key = id.asKey
@@ -130,17 +155,25 @@ object JobService {
       atomically(repository.save(job)).provideEnvironment(ZEnvironment(pool))
 
     def startJob(id: Job.Id, timestamp: Timestamp, total: JobMeasurement, tag: Job.Tag): Task[Unit] =
-      JobCQRS.add(id.asKey, JobCommand.StartJob(id, timestamp, total, tag)).provideEnvironment(ZEnvironment(jobCQRS))
+      jobCQRS.add(id.asKey, JobCommand.StartJob(id, timestamp, total, tag))
 
     def reportProgress(id: Job.Id, timestamp: Timestamp, progress: Progress): Task[Unit] =
-      JobCQRS
+      jobCQRS
         .add(id.asKey, JobCommand.ReportProgress(id, timestamp, progress))
-        .provideEnvironment(ZEnvironment(jobCQRS))
 
     def completeJob(id: Job.Id, timestamp: Timestamp, reason: Job.CompletionReason): Task[Unit] =
-      JobCQRS.add(id.asKey, JobCommand.CompleteJob(id, timestamp, reason)).provideEnvironment(ZEnvironment(jobCQRS))
+      jobCQRS.add(id.asKey, JobCommand.CompleteJob(id, timestamp, reason))
+
+    def cancelJob(id: Job.Id, timestamp: Timestamp): Task[Unit] =
+      jobCQRS.add(id.asKey, JobCommand.CancelJob(id, timestamp))
 
     def traced(tracing: Tracing): JobService = new JobService {
+      def isCancelled(id: Job.Id): Task[Boolean] =
+        self.isCancelled(id) @@ tracing.aspects.span(
+          "JobService.isCancelled",
+          attributes = Attributes(Attribute.long("jobId", id.asKey.value)),
+        )
+
       def load(id: Job.Id): Task[Option[Job]] =
         self.load(id) @@ tracing.aspects.span(
           "JobService.load",
@@ -156,7 +189,7 @@ object JobService {
       def startJob(id: Job.Id, timestamp: Timestamp, total: JobMeasurement, tag: Job.Tag): Task[Unit] =
         self.startJob(id, timestamp, total, tag) @@ tracing.aspects.span(
           "JobService.startJob",
-          attributes = Attributes(Attribute.long("jobId", id.asKey.value)),
+          attributes = Attributes(Attribute.string("tag", tag.value)),
         )
       def reportProgress(id: Job.Id, timestamp: Timestamp, progress: Progress): Task[Unit] =
         self.reportProgress(id, timestamp, progress) @@ tracing.aspects.span(
@@ -168,6 +201,13 @@ object JobService {
           "JobService.completeJob",
           attributes = Attributes(Attribute.long("jobId", id.asKey.value)),
         )
+
+      def cancelJob(id: Job.Id, timestamp: Timestamp): Task[Unit] =
+        self.cancelJob(id, timestamp) @@ tracing.aspects.span(
+          "JobService.cancelJob",
+          attributes = Attributes(Attribute.long("jobId", id.asKey.value)),
+        )
+
     }
   }
 }

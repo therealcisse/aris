@@ -33,14 +33,14 @@ object MigrationEvent {
   given MetaInfo[MigrationEvent]  {
     extension (self: MigrationEvent)
       def namespace: Namespace = self match {
-        case MigrationEvent.MigrationRegistered(_, _) => Namespace(0)
-        case MigrationEvent.ExecutionStarted(_, _) => Namespace(1)
-        case MigrationEvent.ProcessingStarted(_, _) => Namespace(2)
-        case MigrationEvent.KeyProcessed(_, _) => Namespace(3)
-        case MigrationEvent.ProcessingFailed(_, _) => Namespace(4)
-        case MigrationEvent.ExecutionStopped(_, _) => Namespace(5)
-        case MigrationEvent.ExecutionFinished(_, _) => Namespace(6)
-        case MigrationEvent.ExecutionFailed(_, _) => Namespace(7)
+        case MigrationEvent.MigrationRegistered(_, _) => NS.MigrationRegistered
+        case MigrationEvent.ExecutionStarted(_, _) => NS.ExecutionStarted
+        case MigrationEvent.ProcessingStarted(_, _) => NS.ProcessingStarted
+        case MigrationEvent.KeyProcessed(_, _) => NS.KeyProcessed
+        case MigrationEvent.ProcessingFailed(_, _) => NS.ProcessingFailed
+        case MigrationEvent.ExecutionStopped(_, _) => NS.ExecutionStopped
+        case MigrationEvent.ExecutionFinished(_, _) => NS.ExecutionFinished
+        case MigrationEvent.ExecutionFailed(_, _) => NS.ExecutionFailed
       }
 
     extension (self: MigrationEvent)
@@ -58,6 +58,17 @@ object MigrationEvent {
     extension (self: MigrationEvent) def props: Chunk[EventProperty] = Chunk.empty
     extension (self: MigrationEvent) def reference: Option[Reference] = None
 
+  }
+
+  object NS {
+    val MigrationRegistered = Namespace(0)
+    val ExecutionStarted = Namespace(100)
+    val ProcessingStarted = Namespace(200)
+    val KeyProcessed = Namespace(300)
+    val ProcessingFailed = Namespace(400)
+    val ExecutionStopped = Namespace(500)
+    val ExecutionFinished = Namespace(600)
+    val ExecutionFailed = Namespace(700)
   }
 
   given MigrationEventHandler  {

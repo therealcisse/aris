@@ -9,9 +9,24 @@ import com.youtoo.job.model.*
 object JobModelSpec extends ZIOSpecDefault {
 
   def spec = suite("Job Model Tests")(
+    testIsCancelled,
     testIsCompleted,
     testCreatedTimestamp,
     testLastModifiedTimestamp,
+  )
+
+  val testIsCancelled = suite("isCancelled()")(
+    test("should return true for JobStatus.Completed when reason is cancellation") {
+      val runningStatus: JobStatus.Running = JobStatus.Running(Timestamp(1L), Timestamp(2L), Progress(50))
+      val completedStatus = JobStatus.Completed(runningStatus, Timestamp(3L), Job.CompletionReason.Cancellation())
+
+      assert(completedStatus.isCancelled)(isTrue)
+    },
+    test("should return false for JobStatus.Running") {
+      val runningStatus = JobStatus.Running(Timestamp(1L), Timestamp(2L), Progress(50))
+
+      assert(runningStatus.isCancelled)(isFalse)
+    },
   )
 
   val testIsCompleted = suite("isCompleted()")(

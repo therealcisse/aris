@@ -25,14 +25,20 @@ object JobEvent {
   given MetaInfo[JobEvent] {
     extension (self: JobEvent)
       def namespace: Namespace = self match {
-        case JobEvent.JobStarted(_, _, _, _) => Namespace(0)
-        case JobEvent.ProgressReported(_, _, _) => Namespace(1)
-        case JobEvent.JobCompleted(_, _, _) => Namespace(2)
+        case JobEvent.JobStarted(_, _, _, _)    => NS.JobStarted
+        case JobEvent.ProgressReported(_, _, _) => NS.ProgressReported
+        case JobEvent.JobCompleted(_, _, _)     => NS.JobCompleted
       }
 
     extension (self: JobEvent) def hierarchy = None
     extension (self: JobEvent) def props = Chunk.empty
     extension (self: JobEvent) def reference = None
+  }
+
+  object NS {
+    val JobStarted = Namespace(0)
+    val ProgressReported = Namespace(100)
+    val JobCompleted = Namespace(300)
   }
 
   given JobEventHandler {
