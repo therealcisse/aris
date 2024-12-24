@@ -34,7 +34,7 @@ object SyncOptionsSpec extends ZIOSpecDefault {
       test("no options") {
         val options = SyncOptions(None, None, SyncOptions.Retry(None, None))
         var counter = 0
-        val effect = options.retry(ZIO.attempt { counter += 1; ZIO.fail("error") })
+        val effect = options.retry(ZIO.suspendSucceed { counter += 1; ZIO.fail("error") })
         assertZIO(effect.either)(isLeft(equalTo("error"))) *> assert(counter)(equalTo(1))
       },
       test("times set") {
