@@ -35,7 +35,7 @@ object JobRepositorySpec extends PgSpec, TestSupport {
             } yield assert(result)(isSome(equalTo(job)))
           }
         }
-      } @@ TestAspect.samples(1),
+      },
       test("should load multiple jobs with loadMany") {
         check(jobGen, jobGen) { case (job1, job2) =>
           atomically {
@@ -43,10 +43,10 @@ object JobRepositorySpec extends PgSpec, TestSupport {
               _ <- JobRepository.save(job1)
               _ <- JobRepository.save(job2)
               keys <- JobRepository.loadMany(None, 10)
-            } yield assert(keys)(contains(job1.id.asKey) && contains(job2.id.asKey))
+            } yield assert(keys)(contains(job1) && contains(job2))
           }
         }
-      } @@ TestAspect.samples(1),
+      },
       test("should update an existing job") {
         check(jobGen, jobStatusGen) { (job, status) =>
           atomically {
@@ -58,7 +58,7 @@ object JobRepositorySpec extends PgSpec, TestSupport {
             } yield assert(result)(isSome(equalTo(updatedJob)))
           }
         }
-      } @@ TestAspect.samples(1),
+      },
       test("load should return None for non-existent job") {
         atomically {
           for {
@@ -66,7 +66,7 @@ object JobRepositorySpec extends PgSpec, TestSupport {
             result <- JobRepository.load(id)
           } yield assert(result)(isNone)
         }
-      } @@ TestAspect.samples(1),
+      },
     ).provideSomeLayerShared(
       ZLayer.make[JobRepository](
         JobRepository.live(),

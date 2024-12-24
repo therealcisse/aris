@@ -105,8 +105,8 @@ object JobServiceSpec extends MockSpecDefault, TestSupport {
     test("calling isCancelled returns expected result using JobEventStore") {
       check(jobIdGen, Gen.option(jobCompletedEventChangeGen)) { case (id, event) =>
         val expected = event match {
-          case None => false
-          case _ => true
+          case Some(Change(_, JobEvent.JobCompleted(_, _, Job.CompletionReason.Cancellation()))) => true
+          case _ => false
         }
 
         val mockEnv = JobEventStoreMock.ReadEventsByQueryAggregate(

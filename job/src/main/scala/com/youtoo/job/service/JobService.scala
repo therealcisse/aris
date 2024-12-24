@@ -96,8 +96,7 @@ object JobService {
         )
 
         events map (_.fold(false) { es =>
-          val job = EventHandler.applyEvents(es)
-          job.status.isCancelled
+          EventHandler.applyEvents(es)(using JobEvent.LoadIsCancelled())
         })
 
       }.provideEnvironment(ZEnvironment(pool))

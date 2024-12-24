@@ -38,7 +38,7 @@ object JobEvent {
   object NS {
     val JobStarted = Namespace(0)
     val ProgressReported = Namespace(100)
-    val JobCompleted = Namespace(300)
+    val JobCompleted = Namespace(200)
   }
 
   given JobEventHandler {
@@ -99,6 +99,33 @@ object JobEvent {
         }
       }
     }
+  }
+
+  class LoadIsCancelled() extends EventHandler[JobEvent, Boolean] {
+    def applyEvents(events: NonEmptyList[Change[JobEvent]]): Boolean = {
+      events match {
+        case NonEmptyList.Single(ch) =>
+          ch.payload match {
+            case JobEvent.JobCompleted(_, _, Job.CompletionReason.Cancellation()) => true
+            case _ => false
+          }
+
+        case NonEmptyList.Cons(ch, ls) =>
+          ch.payload match {
+            case JobEvent.JobCompleted(_, _, Job.CompletionReason.Cancellation()) =>
+              true
+
+            case _ =>
+              applyEvents(ls)
+
+
+          }
+      }
+    }
+
+    def applyEvents(zero: Boolean, events: NonEmptyList[Change[JobEvent]]): Boolean =
+      applyEvents(events)
+
   }
 }
 
