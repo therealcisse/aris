@@ -12,10 +12,10 @@ import com.youtoo.postgres.*
 
 import zio.telemetry.opentelemetry.tracing.*
 
-object LockRepositorySpec extends PgSpec, TestSupport {
+object PostgresLockRepositorySpec extends PgSpec, TestSupport {
   val lockGen: Gen[Any, Lock] = Gen.uuid.map(i => Lock(i.toString))
 
-  def spec = suite("LockRepositorySpec")(
+  def spec = suite("PostgreLockRepositorySpec")(
     acquireLockTest,
     releaseLockTest,
     listLocksTest,
@@ -75,7 +75,7 @@ object LockRepositorySpec extends PgSpec, TestSupport {
           .flatMap { acquired =>
             for {
               locks <- repository.locks
-            } yield assert(locks)(contains(lock))
+            } yield assert(locks.map(_.lock))(contains(lock))
           }
           .atomically
 

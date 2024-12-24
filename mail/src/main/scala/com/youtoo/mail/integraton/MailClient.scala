@@ -106,7 +106,7 @@ object MailClient {
             .execute()
         }
 
-        timestamp <- Timestamp.now
+        timestamp <- Timestamp.gen
 
         mail = (
           Option(response.getId()),

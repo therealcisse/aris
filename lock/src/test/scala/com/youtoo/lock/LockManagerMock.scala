@@ -9,7 +9,7 @@ import zio.telemetry.opentelemetry.tracing.Tracing
 object LockManagerMock extends Mock[LockManager] {
 
   object AcquireScoped extends Effect[Lock, Throwable, Boolean]
-  object Locks extends Effect[Unit, Throwable, Chunk[Lock]]
+  object Locks extends Effect[Unit, Throwable, Chunk[Lock.Info]]
 
   val compose: URLayer[Proxy, LockManager] =
     ZLayer.fromFunction { (proxy: Proxy) =>
@@ -17,7 +17,7 @@ object LockManagerMock extends Mock[LockManager] {
         def aquireScoped(lock: Lock): ZIO[Scope & Tracing, Throwable, Boolean] =
           proxy(AcquireScoped, lock)
 
-        def locks: Task[Chunk[Lock]] =
+        def locks: Task[Chunk[Lock.Info]] =
           proxy(Locks)
       }
     }

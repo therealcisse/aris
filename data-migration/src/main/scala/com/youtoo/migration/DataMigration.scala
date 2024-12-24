@@ -86,7 +86,7 @@ object DataMigration {
 
                 _ <- healthcheck.start(migrationKey, Schedule.spaced(5.seconds))
 
-                executionId <- ((Execution.Id.gen <&> Timestamp.now) flatMap ((executionId, timestamp) =>
+                executionId <- ((Execution.Id.gen <&> Timestamp.gen) flatMap ((executionId, timestamp) =>
                   MigrationCQRS.add(
                     id = migrationKey,
                     cmd = MigrationCommand.StartExecution(id = executionId, timestamp),
@@ -126,7 +126,7 @@ object DataMigration {
                   }
                   .runDrain
 
-                timestamp <- Timestamp.now
+                timestamp <- Timestamp.gen
 
                 cmd <- op foldZIO (
                   success = _ =>

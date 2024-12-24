@@ -24,7 +24,7 @@ given keyGen: Gen[Any, Key] = Gen.fromZIO(Key.gen.orDie)
 given jobIdGen: Gen[Any, Job.Id] = Gen.fromZIO(Job.Id.gen.orDie)
 
 // Assuming you have timestampGen as it was showcased earlier:
-given timestampGen: Gen[Any, Timestamp] = Gen.fromZIO(Timestamp.now)
+given timestampGen: Gen[Any, Timestamp] = Gen.fromZIO(Timestamp.gen)
 
 // For progress, we assume it holds a long value. Let's limit between 0 and a reasonable upper bound.
 given progressGen: Gen[Any, Progress] = Gen.long(0L, 1000L).map(Progress.apply)

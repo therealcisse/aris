@@ -16,7 +16,7 @@ import com.youtoo.cqrs.Codecs.given
 val migrationIdGen: Gen[Any, Migration.Id] = Gen.fromZIO(Migration.Id.gen.orDie)
 val executionIdGen: Gen[Any, Execution.Id] = Gen.fromZIO(Execution.Id.gen.orDie)
 val keyGen: Gen[Any, Key] = Gen.fromZIO(Key.gen.orDie)
-val timestampGen: Gen[Any, Timestamp] = Gen.fromZIO(Timestamp.now)
+val timestampGen: Gen[Any, Timestamp] = Gen.fromZIO(Timestamp.gen)
 val versionGen: Gen[Any, Version] = Gen.fromZIO(Version.gen.orDie)
 
 val validExecutionEventSequence: Gen[Any, List[Change[MigrationEvent]]] =

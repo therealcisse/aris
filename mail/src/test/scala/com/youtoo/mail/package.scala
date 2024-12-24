@@ -13,7 +13,7 @@ import com.youtoo.cqrs.Codecs.given
 
 val keyGen: Gen[Any, Key] = Gen.fromZIO(Key.gen.orDie)
 val versionGen: Gen[Any, Version] = Gen.fromZIO(Version.gen.orDie)
-val timestampGen: Gen[Any, Timestamp] = Gen.fromZIO(Timestamp.now)
+val timestampGen: Gen[Any, Timestamp] = Gen.fromZIO(Timestamp.gen)
 val jobIdGen: Gen[Any, Job.Id] = Gen.fromZIO(Job.Id.gen.orDie)
 
 val mailAccountIdGen: Gen[Any, MailAccount.Id] = Gen.fromZIO(MailAccount.Id.gen.orDie)

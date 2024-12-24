@@ -39,7 +39,7 @@ object Healthcheck {
     def start(id: Key, interval: Schedule[Any, Any, Any]): RIO[Tracing & Scope, Unit] =
 
       def update(id: Key): URIO[Tracing & Scope, Fiber[Nothing, Any]] =
-        (Timestamp.now flatMap { case (t) =>
+        (Timestamp.gen flatMap { case (t) =>
           ZIO.uninterruptible {
             ref.update { s =>
               s.get(id) match {
@@ -67,7 +67,7 @@ object Healthcheck {
         (ref.updateZIO { s =>
           s.get(id) match {
             case None =>
-              (Timestamp.now <&> update(id)) map { case (t, fiber) =>
+              (Timestamp.gen <&> update(id)) map { case (t, fiber) =>
                 (
                   (s + (id -> (t -> fiber)))
                 )

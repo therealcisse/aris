@@ -16,4 +16,10 @@ object Lock extends Newtype[String] {
   given Schema[Lock] = derive
 
   given Order[Lock] = Order.by(_.value)
+
+  case class Info(lock: Lock, timestamp: Timestamp)
+
+  object Info {
+    given Schema[Lock.Info] = DeriveSchema.gen
+  }
 }

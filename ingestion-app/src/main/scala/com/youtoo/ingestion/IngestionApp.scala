@@ -110,7 +110,7 @@ object IngestionApp extends ZIOApp, JsonSupport {
     for {
       id <- Ingestion.Id.gen
 
-      timestamp <- Timestamp.now
+      timestamp <- Timestamp.gen
 
       _ <- IngestionCQRS.add(id.asKey, IngestionCommand.StartIngestion(id, timestamp))
 

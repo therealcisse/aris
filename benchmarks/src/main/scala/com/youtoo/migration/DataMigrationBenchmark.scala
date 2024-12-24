@@ -126,7 +126,7 @@ object DataMigrationBenchmark {
 
       tableName <- Key.gen
 
-      timestamp <- Timestamp.now
+      timestamp <- Timestamp.gen
 
       cmd =
         MigrationCommand.RegisterMigration(id = Migration.Id(id), timestamp = timestamp)
@@ -180,7 +180,7 @@ object DataMigrationBenchmark {
         def load(): ZStream[Any, Throwable, Key] = ZStream.fromIterable((1L to rows).map(a => Key(a)))
 
         def process(key: Key): Task[Unit] =
-          (Timestamp.now <&> zio.Random.nextString(length = 256)) flatMap { case (timestamp, body) =>
+          (Timestamp.gen <&> zio.Random.nextString(length = 256)) flatMap { case (timestamp, body) =>
             (atomically {
 
               transaction {
@@ -210,7 +210,7 @@ object DataMigrationBenchmark {
   class MockHealthcheck() extends Healthcheck {
     def start(id: Key, interval: Schedule[Any, Any, Any]): RIO[Scope, Unit] =
       ZIO.unit
-    def getHeartbeat(id: Key): UIO[Option[Timestamp]] = Timestamp.now.map(_.some)
+    def getHeartbeat(id: Key): UIO[Option[Timestamp]] = Timestamp.gen.map(_.some)
     def isRunning(id: Key): UIO[Boolean] = ZIO.succeed(true)
   }
 

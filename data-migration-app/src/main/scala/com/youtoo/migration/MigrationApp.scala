@@ -173,7 +173,7 @@ object MigrationApp extends ZIOApp {
         for {
           id <- Key.gen
 
-          timestamp <- Timestamp.now
+          timestamp <- Timestamp.gen
 
           _ <- MigrationCQRS.add(id, MigrationCommand.RegisterMigration(Migration.Id(id), timestamp))
 

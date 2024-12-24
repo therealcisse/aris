@@ -19,6 +19,12 @@ import com.youtoo.mail.repository.*
 import com.youtoo.cqrs.service.memory.*
 import com.youtoo.mail.store.*
 import com.youtoo.postgres.config.*
+import com.youtoo.job.service.*
+import com.youtoo.job.store.*
+import com.youtoo.job.repository.*
+import com.youtoo.job.*
+import com.youtoo.lock.*
+import com.youtoo.lock.repository.*
 
 import zio.json.*
 
@@ -42,7 +48,7 @@ object MailApp extends ZIOApp, JsonSupport {
   inline val FetchSize = 1_000L
 
   type Environment =
-    FlywayMigration & ZConnectionPool & CQRSPersistence & SnapshotStore & MailEventStore & MailCQRS & Server & Server.Config & NettyConfig & MailService & MailClient & GmailPool & MailRepository & SnapshotStrategy.Factory & Tracing & Baggage & Meter
+    FlywayMigration & ZConnectionPool & CQRSPersistence & SnapshotStore & MailEventStore & MailCQRS & Server & Server.Config & NettyConfig & MailService & SyncService & MailClient & GmailPool & MailRepository & JobService & JobRepository & JobEventStore & JobCQRS & LockManager & LockRepository & SnapshotStrategy.Factory & Tracing & Baggage & Meter
 
   given environmentTag: EnvironmentTag[Environment] = EnvironmentTag[Environment]
 
@@ -58,7 +64,7 @@ object MailApp extends ZIOApp, JsonSupport {
   private val instrumentationScopeName = "com.youtoo.mail.MailApp"
   private val resourceName = "mail"
 
-  override val bootstrap: ZLayer[Any, Nothing, Environment] =
+  val bootstrap: ZLayer[Any, Nothing, Environment] =
     Scope.default ++ Log.layer >>> Runtime.disableFlags(
       RuntimeFlag.FiberRoots,
     ) ++ Runtime.enableRuntimeMetrics ++ Runtime.enableAutoBlockingExecutor ++ Runtime.enableFlags(
@@ -74,6 +80,13 @@ object MailApp extends ZIOApp, JsonSupport {
           SnapshotStore.live(),
           MailEventStore.live(),
           MailService.live(),
+          SyncService.live(),
+          JobService.live(),
+          JobRepository.live(),
+          JobEventStore.live(),
+          JobCQRS.live(),
+          LockManager.live(),
+          LockRepository.memory(),
           MailRepository.live(),
           MailCQRS.live(),
           configLayer,
@@ -94,7 +107,7 @@ object MailApp extends ZIOApp, JsonSupport {
 
   val endpoint = RestEndpoint(RestEndpoint.Service("mail"))
 
-  val routes: Routes[Environment, Response] = Routes(
+  val routes: Routes[Scope & Environment, Response] = Routes(
     Method.GET / "mail" / "health" -> handler(Response.json(ProjectInfo.toJson)),
     Method.POST / "mail-accounts" -> handler { (req: Request) =>
       endpoint.boundary("add_mail_account", req) {
@@ -159,7 +172,7 @@ object MailApp extends ZIOApp, JsonSupport {
   def addMailAccount(request: CreateMailAccountRequest): RIO[Environment, Long] =
     for {
       id <- MailAccount.Id.gen
-      timestamp <- Timestamp.now
+      timestamp <- Timestamp.gen
 
       account = MailAccount(
         id = id,
@@ -208,7 +221,8 @@ object MailApp extends ZIOApp, JsonSupport {
 
   def getMailState(id: MailAccount.Id): RIO[Environment, Option[Mail]] = MailService.loadState(id)
 
-  def triggerMailSync(id: MailAccount.Id): RIO[Environment, Unit] = ???
+  def triggerMailSync(id: MailAccount.Id): RIO[Scope & Environment, ?] =
+    SyncService.sync(id).forkScoped
 
   def run: RIO[Environment & Scope, Unit] =
     for {

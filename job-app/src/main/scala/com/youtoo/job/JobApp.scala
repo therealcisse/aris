@@ -139,7 +139,7 @@ object JobApp extends ZIOApp, JsonSupport {
         val key = Key(id)
 
         for {
-          timestamp <- Timestamp.now
+          timestamp <- Timestamp.gen
           _ <- JobService.cancelJob(Job.Id(key), timestamp)
         } yield Response.ok
       }

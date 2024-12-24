@@ -11,7 +11,7 @@ object LockRepositoryMock extends Mock[LockRepository] {
   // Define mock effects for LockRepository methods
   object Acquire extends Effect[Lock, Throwable, Boolean]
   object Release extends Effect[Lock, Throwable, Boolean]
-  object Locks extends Effect[Unit, Throwable, Chunk[Lock]]
+  object Locks extends Effect[Unit, Throwable, Chunk[Lock.Info]]
 
   // Construct the mock layer using ZLayer.fromFunction
   val compose: URLayer[Proxy, LockRepository] =
@@ -23,7 +23,7 @@ object LockRepositoryMock extends Mock[LockRepository] {
         def release(lock: Lock): RIO[ZConnection, Boolean] =
           proxy(Release, lock)
 
-        def locks: RIO[ZConnection, Chunk[Lock]] =
+        def locks: RIO[ZConnection, Chunk[Lock.Info]] =
           proxy(Locks)
       }
     }

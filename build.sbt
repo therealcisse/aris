@@ -69,6 +69,7 @@ lazy val aggregatedProjects: Seq[ProjectReference] =
     lock,
     `cqrs-persistence-postgres`,
     jobApp,
+    lockApp,
   )
 
 inThisBuild(replSettings)
@@ -501,6 +502,36 @@ lazy val jobApp = (project in file("job-app"))
      libraryDependencies ++= Seq(
      ),
    )
+
+lazy val lockApp = (project in file("lock-app"))
+  .settings(stdSettings("lock-app"))
+  // .settings(publishSetting(false))
+  .enablePlugins(BuildInfoPlugin)
+  .settings(buildInfoSettings("com.youtoo"))
+  .dependsOn(
+    std % "compile->compile;test->test",
+    log % "compile->compile;test->compile",
+    observability % "compile->compile",
+    lock % "compile->compile;test->test",
+  )
+  .enablePlugins(DockerPlugin, JavaAppPackaging)
+  .settings(
+    Docker / packageName := "youtoo-lock",
+    dockerBaseImage := "eclipse-temurin:17-jre",
+    dockerExposedPorts := Seq(8182),
+    dockerUpdateLatest := true,
+    dockerEnvVars ++= BuildHelper.getEnvVars(),
+    bashScriptExtraDefines += """addJava "-Dlogback.configurationFile=logback-production.xml"""",
+    mainClass := Some("com.youtoo.lock.LockApp"),
+  )
+  .settings(
+    ThisBuild / javaOptions ++= Seq(
+      "-Dlogback.configurationFile=logback-local.xml"
+    ),
+    testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
+    libraryDependencies ++= Seq(
+    ),
+  )
 
 lazy val loadtests = (project in file("loadtests"))
   .dependsOn(ingestionApp % "compile->compile")

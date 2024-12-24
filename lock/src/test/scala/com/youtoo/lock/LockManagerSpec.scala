@@ -16,6 +16,7 @@ import zio.telemetry.opentelemetry.tracing.*
 
 object LockManagerSpec extends ZIOSpecDefault, TestSupport {
   val lockGen: Gen[Any, Lock] = Gen.uuid.map(i => Lock(i.toString))
+  val timestampGen: Gen[Any, Timestamp] = Gen.fromZIO(Timestamp.gen)
 
   def spec = suite("LockManagerSpec")(
     test("aquireScoped should acquire and release lock successfully") {
@@ -40,9 +41,9 @@ object LockManagerSpec extends ZIOSpecDefault, TestSupport {
       }
     },
     test("locks should return current locks") {
-      check(lockGen) { lock =>
+      check(lockGen, timestampGen) { (lock, timestamp) =>
 
-        val locksExpectation = LockRepositoryMock.Locks(returns = value(Chunk(lock)))
+        val locksExpectation = LockRepositoryMock.Locks(returns = value(Chunk(Lock.Info(lock, timestamp))))
 
         val env = ZLayer.make[LockManager](
           LockManager.live(),
@@ -54,7 +55,7 @@ object LockManagerSpec extends ZIOSpecDefault, TestSupport {
 
         val effect = ZIO.serviceWithZIO[LockManager](_.locks)
 
-        assertZIO(effect.provideLayer(env))(equalTo(Chunk(lock)))
+        assertZIO(effect.provideLayer(env))(equalTo(Chunk(Lock.Info(lock, timestamp))))
       }
     },
   )

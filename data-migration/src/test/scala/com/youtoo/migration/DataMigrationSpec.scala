@@ -55,7 +55,7 @@ object DataMigrationSpec extends MockSpecDefault {
 
       interrupterRef <- Ref.Synchronized.make(Map.empty[Key, Promise[Throwable, Unit]])
       interrupter = new Interrupter.InterrupterLive(interrupterRef)
-      timestamp <- Timestamp.now
+      timestamp <- Timestamp.gen
       migration = Migration(migrationId, Migration.State(Map.empty), timestamp)
 
       migrationCQRS = ZLayer.succeed {
@@ -94,13 +94,13 @@ object DataMigrationSpec extends MockSpecDefault {
   }
 
   val testExecutionRecordsCreation = test("Execution Records Creation") {
-    check(migrationIdGen, timestampGen, Gen.int(100, 1000)) { case (migrationId, now, n) =>
+    check(migrationIdGen, timestampGen, Gen.int(100, 1000)) { case (migrationId, ts, n) =>
       val keys = NonEmptyChunk(Key(1L), (2L to n).map(i => Key(i)).toList*)
 
       val initialMigration = Migration(
         id = migrationId,
         state = Migration.State(Map.empty),
-        timestamp = now,
+        timestamp = ts,
       )
 
       val processor = MockProcessor(keys)
@@ -122,7 +122,7 @@ object DataMigrationSpec extends MockSpecDefault {
   }
 
   val testIncompleteMigrationResumption = test("Incomplete Migration Resumption") {
-    check(migrationIdGen, timestampGen, Gen.int(100, 1000)) { case (migrationId, now, n) =>
+    check(migrationIdGen, timestampGen, Gen.int(100, 1000)) { case (migrationId, ts, n) =>
       val allKeys = NonEmptyChunk(Key(1L), (2L to n).map(i => Key(i)).toList*)
 
       val (processedKeys, remainingKeys) = allKeys.splitAt(n / 2)
@@ -134,13 +134,13 @@ object DataMigrationSpec extends MockSpecDefault {
       )
 
       val previousExecution = Execution.Stopped(
-        processing = Execution.Processing(Execution.Id(Key(1L)), initialStats, Timestamp(now.value - (3600L * 1000L))),
-        timestamp = Timestamp(now.value - (1800L * 1000L)),
+        processing = Execution.Processing(Execution.Id(Key(1L)), initialStats, Timestamp(ts.value - (3600L * 1000L))),
+        timestamp = Timestamp(ts.value - (1800L * 1000L)),
       )
       val initialMigration = Migration(
         id = migrationId,
         state = Migration.State(Map(Execution.Id(Key(1L)) -> previousExecution)),
-        timestamp = Timestamp(now.value - (3600L * 1000L)),
+        timestamp = Timestamp(ts.value - (3600L * 1000L)),
       )
 
       val processor = MockProcessor(remainingKeys)

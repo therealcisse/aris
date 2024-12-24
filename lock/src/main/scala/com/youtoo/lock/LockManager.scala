@@ -13,11 +13,16 @@ import zio.telemetry.opentelemetry.common.*
 
 trait LockManager {
   def aquireScoped(lock: Lock): ZIO[Scope & Tracing, Throwable, Boolean]
-  def locks: Task[Chunk[Lock]]
+  def locks: Task[Chunk[Lock.Info]]
 
 }
 
 object LockManager {
+  def aquireScoped(lock: Lock): ZIO[LockManager & Scope & Tracing, Throwable, Boolean] =
+    ZIO.serviceWithZIO[LockManager](_.aquireScoped(lock))
+
+  def locks: ZIO[LockManager, Throwable, Chunk[Lock.Info]] =
+    ZIO.serviceWithZIO[LockManager](_.locks)
 
   def live(): ZLayer[LockRepository & ZConnectionPool & Tracing, Throwable, LockManager] =
     ZLayer.fromFunction { (repository: LockRepository, pool: ZConnectionPool, tracing: Tracing) =>
@@ -49,7 +54,7 @@ object LockManager {
 
       }.provideSomeEnvironment[Scope & Tracing](_.add[ZConnectionPool](pool))
 
-    def locks: Task[Chunk[Lock]] =
+    def locks: Task[Chunk[Lock.Info]] =
       atomically {
         repository.locks
 
@@ -62,7 +67,7 @@ object LockManager {
           attributes = Attributes(Attribute.string("lock", lock.value)),
         )
 
-      def locks: Task[Chunk[Lock]] = self.locks @@ tracing.aspects.span(
+      def locks: Task[Chunk[Lock.Info]] = self.locks @@ tracing.aspects.span(
         "LockManager.locks",
       )
 

@@ -98,7 +98,7 @@ object SyncService {
     private def withLock(account: MailAccount)(
       action: => ZIO[Scope & Tracing, Throwable, Unit],
     ): ZIO[Scope & Tracing, Throwable, Unit] =
-      val lock = lockManager.aquireScoped(Lock(account.email.value))
+      val lock = lockManager.aquireScoped(account.lock)
       ZIO.ifZIO(lock)(
         onTrue = action,
         onFalse = Log.info(s"Sync already in progress for account"),
@@ -111,7 +111,7 @@ object SyncService {
     ): ZIO[Scope & Tracing, Throwable, Unit] =
       ZIO.uninterruptibleMask { restore =>
         for {
-          timestamp <- Timestamp.now
+          timestamp <- Timestamp.gen
           jobId <- Job.Id.gen
           _ <- jobService.startJob(id = jobId, timestamp, total = JobMeasurement.Variable(), tag = MailSync)
           _ <- mailService.startSync(accountKey = account.id, labels = MailLabels.All(), timestamp, jobId)
@@ -120,7 +120,7 @@ object SyncService {
               cancelled => if cancelled then Job.CompletionReason.Cancellation() else Job.CompletionReason.Success(),
             failure = e => Job.CompletionReason.Failure(e.getMessage),
           )
-          endTimestamp <- Timestamp.now
+          endTimestamp <- Timestamp.gen
           _ <- mailService.completeSync(accountKey = account.id, endTimestamp, jobId)
           _ <- jobService.completeJob(id = jobId, timestamp = endTimestamp, reason = reason)
           _ <- reason match {
@@ -139,7 +139,7 @@ object SyncService {
       restore: ZIO.InterruptibilityRestorer,
     ): ZIO[Scope & Tracing, Throwable, Boolean] =
       (
-        Ref.make(false) <&> Timestamp.now
+        Ref.make(false) <&> Timestamp.gen
       ) flatMap { case (cancelledRef, timestamp) =>
         val state = SyncState(started = timestamp, token = token, iterations = 0)
 
@@ -154,7 +154,7 @@ object SyncService {
               case Some((mailKeys, nextToken)) =>
                 for {
                   _ <- Log.debug(s"Fetched ${mailKeys.size} mails for account")
-                  timestamp <- Timestamp.now
+                  timestamp <- Timestamp.gen
                   _ <- mailService.recordSynced(accountKey = account.id, timestamp, mailKeys, nextToken, jobId)
                   expired = state.isExpired(options, timestamp)
                   cancelled <- if !expired then jobService.isCancelled(jobId) else ZIO.succeed(false)

@@ -44,7 +44,7 @@ object SyncServiceSpec extends MockSpecDefault, TestSupport {
           assertion = Assertion.equalTo(account.id),
           result = Expectation.value(Some(account)),
         ) ++ LockManagerMock.AcquireScoped(
-          assertion = Assertion.equalTo(Lock(account.email.value)),
+          assertion = Assertion.equalTo(account.lock),
           result = Expectation.value(true),
         ) ++ MailServiceMock.LoadState(
           assertion = Assertion.equalTo(account.id),
@@ -70,7 +70,7 @@ object SyncServiceSpec extends MockSpecDefault, TestSupport {
           result = Expectation.value(Some(account)),
         ) ++
           LockManagerMock.AcquireScoped(
-            assertion = Assertion.equalTo(Lock(account.email.value)),
+            assertion = Assertion.equalTo(account.lock),
             result = Expectation.value(true),
           ) ++
           MailServiceMock.LoadState(
@@ -127,7 +127,7 @@ object SyncServiceSpec extends MockSpecDefault, TestSupport {
           result = Expectation.value(Some(account)),
         ) ++
           LockManagerMock.AcquireScoped(
-            assertion = Assertion.equalTo(Lock(account.email.value)),
+            assertion = Assertion.equalTo(account.lock),
             result = Expectation.value(true),
           ) ++
           MailServiceMock.LoadState(
@@ -174,7 +174,7 @@ object SyncServiceSpec extends MockSpecDefault, TestSupport {
           result = Expectation.value(Some(account)),
         ) ++
           LockRepositoryMock.Acquire(
-            assertion = Assertion.equalTo(Lock(account.email.value)),
+            assertion = Assertion.equalTo(account.lock),
             result = Expectation.value(true),
           ) ++
           MailServiceMock.LoadState(
@@ -213,7 +213,7 @@ object SyncServiceSpec extends MockSpecDefault, TestSupport {
             result = Expectation.unit,
           ) ++
           LockRepositoryMock.Release(
-            assertion = Assertion.equalTo(Lock(account.email.value)),
+            assertion = Assertion.equalTo(account.lock),
             result = Expectation.value(true),
           )
 
@@ -242,7 +242,7 @@ object SyncServiceSpec extends MockSpecDefault, TestSupport {
           result = Expectation.value(Some(account)),
         ) ++
           LockRepositoryMock.Acquire(
-            assertion = Assertion.equalTo(Lock(account.email.value)),
+            assertion = Assertion.equalTo(account.lock),
             result = Expectation.value(true),
           ) ++
           MailServiceMock.LoadState(
@@ -281,7 +281,7 @@ object SyncServiceSpec extends MockSpecDefault, TestSupport {
             result = Expectation.unit,
           ) ++
           LockRepositoryMock.Release(
-            assertion = Assertion.equalTo(Lock(account.email.value)),
+            assertion = Assertion.equalTo(account.lock),
             result = Expectation.value(true),
           )
 
@@ -310,7 +310,7 @@ object SyncServiceSpec extends MockSpecDefault, TestSupport {
           result = Expectation.value(Some(account)),
         ) ++
           LockRepositoryMock.Acquire(
-            assertion = Assertion.equalTo(Lock(account.email.value)),
+            assertion = Assertion.equalTo(account.lock),
             result = Expectation.value(true),
           ) ++
           MailServiceMock.LoadState(
@@ -346,7 +346,7 @@ object SyncServiceSpec extends MockSpecDefault, TestSupport {
             result = Expectation.unit,
           ) ++
           LockRepositoryMock.Release(
-            assertion = Assertion.equalTo(Lock(account.email.value)),
+            assertion = Assertion.equalTo(account.lock),
             result = Expectation.value(true),
           )
 
@@ -373,7 +373,7 @@ object SyncServiceSpec extends MockSpecDefault, TestSupport {
           .toLayer ++
           LockManagerMock
             .AcquireScoped(
-              assertion = Assertion.equalTo(Lock(account.email.value)),
+              assertion = Assertion.equalTo(account.lock),
               result = Expectation.value(false),
             )
             .toLayer ++

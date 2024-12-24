@@ -7,13 +7,18 @@ import zio.*
 import zio.prelude.*
 import zio.schema.*
 
+import com.youtoo.lock.*
+
 case class MailAccount(
   id: MailAccount.Id,
   name: MailAccount.Name,
   email: MailAccount.Email,
   settings: MailSettings,
   timestamp: Timestamp,
-)
+) {
+
+  inline def lock: Lock = Lock(String.valueOf(id.asKey.value))
+}
 
 object MailAccount {
   type Id = Id.Type
