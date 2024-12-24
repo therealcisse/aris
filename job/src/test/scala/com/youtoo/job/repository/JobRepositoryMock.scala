@@ -11,7 +11,7 @@ import zio.jdbc.*
 object JobRepositoryMock extends Mock[JobRepository] {
 
   object Load extends Effect[Job.Id, Throwable, Option[Job]]
-  object LoadMany extends Effect[(Option[Key], Long), Throwable, Chunk[Key]]
+  object LoadMany extends Effect[(Option[Key], Long), Throwable, Chunk[Job]]
   object Save extends Effect[Job, Throwable, Long]
 
   val compose: URLayer[Proxy, JobRepository] =
@@ -22,7 +22,7 @@ object JobRepositoryMock extends Mock[JobRepository] {
         def load(id: Job.Id): RIO[ZConnection, Option[Job]] =
           proxy(Load, id)
 
-        def loadMany(offset: Option[Key], limit: Long): ZIO[ZConnection, Throwable, Chunk[Key]] =
+        def loadMany(offset: Option[Key], limit: Long): ZIO[ZConnection, Throwable, Chunk[Job]] =
           proxy(LoadMany, (offset, limit))
 
         def save(job: Job): RIO[ZConnection, Long] =

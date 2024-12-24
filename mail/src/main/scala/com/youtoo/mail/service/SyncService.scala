@@ -90,10 +90,9 @@ object SyncService {
       ZIO.acquireRelease {
         ZIO.scoped(task).fork
       } { case (fiber) =>
-         fiber.join.ignoreLogged
-      }
-      .flatMap {
-        case fiber => fiber.join
+        fiber.join.ignoreLogged
+      }.flatMap { case fiber =>
+        fiber.join
       }
 
     private def withLock(account: MailAccount)(

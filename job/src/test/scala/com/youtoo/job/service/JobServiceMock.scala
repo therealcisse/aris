@@ -10,7 +10,7 @@ object JobServiceMock extends Mock[JobService] {
 
   object IsCancelled extends Effect[Job.Id, Throwable, Boolean]
   object Load extends Effect[Job.Id, Throwable, Option[Job]]
-  object LoadMany extends Effect[(Option[Key], Long), Throwable, Chunk[Key]]
+  object LoadMany extends Effect[(Option[Key], Long), Throwable, Chunk[Job]]
   object Save extends Effect[Job, Throwable, Long]
   object StartJob extends Effect[(Job.Id, Timestamp, JobMeasurement, Job.Tag), Throwable, Unit]
   object ReportProgress extends Effect[(Job.Id, Timestamp, Progress), Throwable, Unit]
@@ -28,7 +28,7 @@ object JobServiceMock extends Mock[JobService] {
         def load(id: Job.Id): Task[Option[Job]] =
           proxy(Load, id)
 
-        def loadMany(offset: Option[Key], limit: Long): Task[Chunk[Key]] =
+        def loadMany(offset: Option[Key], limit: Long): Task[Chunk[Job]] =
           proxy(LoadMany, (offset, limit))
 
         def save(job: Job): Task[Long] =

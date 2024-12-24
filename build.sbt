@@ -68,6 +68,7 @@ lazy val aggregatedProjects: Seq[ProjectReference] =
     observability,
     lock,
     `cqrs-persistence-postgres`,
+    jobApp,
   )
 
 inThisBuild(replSettings)
@@ -289,6 +290,7 @@ lazy val ingestion = (project in file("ingestion"))
 
 lazy val ingestionApp = (project in file("ingestion-app"))
   .dependsOn(
+    std % "compile->compile;test->test",
     ingestion % "compile->compile;test->test",
     memory % "compile->compile;test->test",
     `cqrs-persistence-postgres` % "compile->compile;test->test",
@@ -465,6 +467,40 @@ lazy val mailApp = (project in file("mail-app"))
     libraryDependencies ++= Seq(
     ),
   )
+
+lazy val jobApp = (project in file("job-app"))
+   .dependsOn(
+    std % "compile->compile;test->test",
+    memory % "compile->compile;test->test",
+    core % "compile->compile;test->compile",
+    postgres % "compile->compile;test->compile;test->test",
+    `cqrs-persistence-postgres` % "compile->compile;test->test",
+    job % "compile->compile;test->test",
+    log % "compile->compile;test->compile",
+    observability % "compile->compile",
+    mail % "compile->compile;test->test",
+    lock % "compile->compile;test->test",
+
+   )
+   .enablePlugins(DockerPlugin, JavaAppPackaging)
+   .settings(
+     Docker / packageName := "youtoo-job",
+     dockerBaseImage := "eclipse-temurin:17-jre",
+     dockerExposedPorts := Seq(8181),
+     dockerUpdateLatest := true,
+     dockerEnvVars ++= BuildHelper.getEnvVars(),
+     bashScriptExtraDefines += """addJava "-Dlogback.configurationFile=logback-production.xml"""",
+     mainClass := Some("com.youtoo.job.JobApp"),
+   )
+   .settings(stdSettings("job-app"))
+   .settings(
+     ThisBuild / javaOptions ++= Seq(
+       "-Dlogback.configurationFile=logback-local.xml"
+     ),
+     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
+     libraryDependencies ++= Seq(
+     ),
+   )
 
 lazy val loadtests = (project in file("loadtests"))
   .dependsOn(ingestionApp % "compile->compile")

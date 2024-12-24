@@ -160,8 +160,8 @@ object JobServiceSpec extends MockSpecDefault, TestSupport {
       }
     },
     test("load many jobs returns expected result using JobRepository") {
-      check(Gen.option(keyGen), Gen.long, keyGen) { case (key, limit, id) =>
-        val expected = Chunk(id)
+      check(Gen.option(keyGen), Gen.long, Gen.listOf(jobGen)) { case (key, limit, jobs) =>
+        val expected = Chunk(jobs*)
 
         val mockEnv = JobRepositoryMock.LoadMany(
           equalTo((key, limit)),

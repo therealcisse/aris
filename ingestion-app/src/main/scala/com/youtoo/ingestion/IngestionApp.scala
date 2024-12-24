@@ -34,7 +34,11 @@ import zio.telemetry.opentelemetry.OpenTelemetry
 import zio.telemetry.opentelemetry.tracing.Tracing
 import zio.telemetry.opentelemetry.baggage.Baggage
 
-object IngestionApp extends ZIOApp {
+import zio.json.*
+
+import com.youtoo.std.*
+
+object IngestionApp extends ZIOApp, JsonSupport {
   import com.youtoo.cqrs.Codecs.json.given
 
   inline val FetchSize = 1_000L
@@ -123,7 +127,7 @@ object IngestionApp extends ZIOApp {
   val endpoint = RestEndpoint(RestEndpoint.Service("ingestion"))
 
   val routes: Routes[Environment, Response] = Routes(
-    Method.GET / "health" -> handler(Response.json(ProjectInfo.toJson)),
+    Method.GET / "ingestion" / "health" -> handler(Response.json(ProjectInfo.toJson)),
     Method.POST / "dataload" / "ingestion" -> handler { (req: Request) =>
       endpoint.boundary("dataload_ingestions", req) {
 
@@ -154,15 +158,13 @@ object IngestionApp extends ZIOApp {
         atomically {
 
           loadAll(offset = offset.map(Key.apply), limit) map { ids =>
-            val bytes = String(summon[BinaryCodec[Chunk[Key]]].encode(ids).toArray, StandardCharsets.UTF_8.name)
-
             val nextOffset =
               (if ids.size < limit then None else ids.minOption).map(id => s""","nextOffset":"$id"""").getOrElse("")
 
             Response(
               Status.Ok,
               Headers(Header.ContentType(MediaType.application.json).untyped),
-              Body.fromCharSequence(s"""{"ids":$bytes$nextOffset}"""),
+              Body.fromCharSequence(s"""{"ids":${ids.toJson}$nextOffset}"""),
             )
 
           }

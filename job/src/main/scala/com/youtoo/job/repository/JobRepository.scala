@@ -16,7 +16,7 @@ import zio.schema.codec.*
 
 trait JobRepository {
   def load(id: Job.Id): RIO[ZConnection, Option[Job]]
-  def loadMany(offset: Option[Key], limit: Long): ZIO[ZConnection, Throwable, Chunk[Key]]
+  def loadMany(offset: Option[Key], limit: Long): ZIO[ZConnection, Throwable, Chunk[Job]]
   def save(job: Job): RIO[ZConnection, Long]
 }
 
@@ -24,7 +24,7 @@ object JobRepository {
   inline def load(id: Job.Id): RIO[JobRepository & ZConnection, Option[Job]] =
     ZIO.serviceWithZIO[JobRepository](_.load(id))
 
-  inline def loadMany(offset: Option[Key], limit: Long): RIO[JobRepository & ZConnection, Chunk[Key]] =
+  inline def loadMany(offset: Option[Key], limit: Long): RIO[JobRepository & ZConnection, Chunk[Job]] =
     ZIO.serviceWithZIO[JobRepository](_.loadMany(offset, limit))
 
   inline def save(job: Job): RIO[JobRepository & ZConnection, Long] =
@@ -40,7 +40,7 @@ object JobRepository {
     def save(job: Job): RIO[ZConnection, Long] =
       Queries.SAVE_JOB(job).insert
 
-    def loadMany(offset: Option[Key], limit: Long): ZIO[ZConnection, Throwable, Chunk[Key]] =
+    def loadMany(offset: Option[Key], limit: Long): ZIO[ZConnection, Throwable, Chunk[Job]] =
       Queries
         .READ_JOBS(offset, limit)
         .selectAll
@@ -52,7 +52,7 @@ object JobRepository {
             "JobRepository.load",
             attributes = Attributes(Attribute.long("jobId", id.asKey.value)),
           )
-        def loadMany(offset: Option[Key], limit: Long): RIO[ZConnection, Chunk[Key]] =
+        def loadMany(offset: Option[Key], limit: Long): RIO[ZConnection, Chunk[Job]] =
           self.loadMany(offset, limit) @@ tracing.aspects.span(
             "JobRepository.loadMany",
             attributes = Attributes(
@@ -106,24 +106,24 @@ object JobRepository {
       SET status = decode($status, 'base64')
       """
 
-    inline def READ_JOBS(offset: Option[Key], limit: Long): Query[Key] =
+    inline def READ_JOBS(offset: Option[Key], limit: Long): Query[Job] =
       offset match {
         case None =>
           sql"""
-          SELECT id
+          SELECT id, tag, total, status
           FROM jobs
           ORDER BY id DESC
           LIMIT $limit
-          """.query[Key]
+          """.query[(Job.Id, Job.Tag, JobMeasurement, JobStatus)].map(Job.apply)
 
         case Some(key) =>
           sql"""
-          SELECT id
+          SELECT id, tag, total, status
           FROM jobs
           WHERE id < $key
           ORDER BY id DESC
           LIMIT $limit
-          """.query[Key]
+          """.query[(Job.Id, Job.Tag, JobMeasurement, JobStatus)].map(Job.apply)
 
       }
   }

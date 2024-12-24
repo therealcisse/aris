@@ -6,6 +6,8 @@ import zio.*
 import zio.prelude.*
 import zio.schema.*
 
+import cats.Order
+
 case class Job(
   id: Job.Id,
   tag: Job.Tag,
@@ -59,4 +61,5 @@ object Job {
     }
   }
 
+  given Order[Job] = Order.by(_.id.asKey)
 }

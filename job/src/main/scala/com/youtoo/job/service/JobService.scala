@@ -20,7 +20,7 @@ trait JobService {
   def isCancelled(id: Job.Id): Task[Boolean]
 
   def load(id: Job.Id): Task[Option[Job]]
-  def loadMany(offset: Option[Key], limit: Long): Task[Chunk[Key]]
+  def loadMany(offset: Option[Key], limit: Long): Task[Chunk[Job]]
   def save(job: Job): Task[Long]
 
   def cancelJob(id: Job.Id, timestamp: Timestamp): Task[Unit]
@@ -31,7 +31,7 @@ trait JobService {
 
 object JobService {
 
-  inline def loadMany(offset: Option[Key], limit: Long): RIO[JobService, Chunk[Key]] =
+  inline def loadMany(offset: Option[Key], limit: Long): RIO[JobService, Chunk[Job]] =
     ZIO.serviceWithZIO(_.loadMany(offset, limit))
 
   inline def load(id: Job.Id): RIO[JobService, Option[Job]] =
@@ -148,7 +148,7 @@ object JobService {
 
       }.provideEnvironment(ZEnvironment(pool))
 
-    def loadMany(offset: Option[Key], limit: Long): Task[Chunk[Key]] =
+    def loadMany(offset: Option[Key], limit: Long): Task[Chunk[Job]] =
       atomically(repository.loadMany(offset, limit)).provideEnvironment(ZEnvironment(pool))
 
     def save(job: Job): Task[Long] =
@@ -179,7 +179,7 @@ object JobService {
           "JobService.load",
           attributes = Attributes(Attribute.long("jobId", id.asKey.value)),
         )
-      def loadMany(offset: Option[Key], limit: Long): Task[Chunk[Key]] =
+      def loadMany(offset: Option[Key], limit: Long): Task[Chunk[Job]] =
         self.loadMany(offset, limit) @@ tracing.aspects.span("JobService.loadMany")
       def save(job: Job): Task[Long] =
         self.save(job) @@ tracing.aspects.span(
