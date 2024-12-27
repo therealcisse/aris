@@ -272,21 +272,25 @@ object MailServiceSpec extends MockSpecDefault, TestSupport {
               mailAccount.id.asKey,
               PersistenceQuery.anyNamespace(
                 MailEvent.NS.AuthorizationGranted,
-                MailEvent.NS.AuthorizationRevoked
+                MailEvent.NS.AuthorizationRevoked,
               ),
               FetchOptions(),
             ),
           ),
           value {
             authorization match {
-              case Authorization.Granted(token, timestamp) => Some(NonEmptyList(Change(version, MailEvent.AuthorizationGranted(token, timestamp))))
-              case Authorization.Revoked(timestamp) => Some(NonEmptyList(Change(version, MailEvent.AuthorizationRevoked(timestamp))))
+              case Authorization.Granted(token, timestamp) =>
+                Some(NonEmptyList(Change(version, MailEvent.AuthorizationGranted(token, timestamp))))
+              case Authorization.Revoked(timestamp) =>
+                Some(NonEmptyList(Change(version, MailEvent.AuthorizationRevoked(timestamp))))
               case _ => None
             }
           },
         )
 
-        val layers = if hasAccount then (loadEnv ++ mockEnv ++ mockAuthorizationEnv).toLayer else loadEnv.toLayer ++ MockMailEventStore.empty
+        val layers =
+          if hasAccount then (loadEnv ++ mockEnv ++ mockAuthorizationEnv).toLayer
+          else loadEnv.toLayer ++ MockMailEventStore.empty
 
         (for {
           effect <- MailService.loadState(mailAccount.id)

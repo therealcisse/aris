@@ -62,10 +62,12 @@ object SyncOptions {
 
       (options.retry.times, options.retry.interval) match {
         case (None, None) => zo
-        case (Some(n), None) => zo.retry(Schedule.recurs(n) tapOutput(n => Log.debug(s"retrying sync options: $n")))
+        case (Some(n), None) => zo.retry(Schedule.recurs(n) tapOutput (n => Log.debug(s"retrying sync options: $n")))
         case (Some(n), Some(i)) =>
-          zo.retry((Schedule.fibonacci(i) && Schedule.recurs(n)) tapOutput(n => Log.debug(s"retrying sync options: $n")))
-        case (None, Some(i)) => zo.retry(Schedule.fibonacci(i) tapOutput(n => Log.debug(s"retrying sync options: $n")))
+          zo.retry(
+            (Schedule.fibonacci(i) && Schedule.recurs(n)) tapOutput (n => Log.debug(s"retrying sync options: $n")),
+          )
+        case (None, Some(i)) => zo.retry(Schedule.fibonacci(i) tapOutput (n => Log.debug(s"retrying sync options: $n")))
       }
 
 }

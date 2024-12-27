@@ -28,7 +28,7 @@ object GmailSupport {
     case _ => false
   }
 
-  def getToken(info: AuthConfig.ClientInfo, code: String): Task[TokenInfo] = ZIO.attempt {
+  def getToken(info: GoogleClientInfo, code: String): Task[TokenInfo] = ZIO.attempt {
     val httpTransport = GoogleNetHttpTransport.newTrustedTransport()
 
     val ts: GoogleTokenResponse = new GoogleAuthorizationCodeTokenRequest(
@@ -49,7 +49,7 @@ object GmailSupport {
     finally httpTransport.shutdown()
   }
 
-  def getClient(clientInfo: AuthConfig.ClientInfo, tokenInfo: TokenInfo): RIO[Scope, Gmail] = ZIO.acquireRelease {
+  def getClient(clientInfo: GoogleClientInfo, tokenInfo: TokenInfo): RIO[Scope, Gmail] = ZIO.acquireRelease {
     ZIO.attempt {
 
       val httpTransport = GoogleNetHttpTransport.newTrustedTransport()

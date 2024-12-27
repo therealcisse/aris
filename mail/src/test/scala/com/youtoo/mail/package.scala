@@ -45,13 +45,11 @@ val mailDataGen: Gen[Any, MailData] =
 val mailAccountNameGen: Gen[Any, MailAccount.Name] = Gen.alphaNumericStringBounded(5, 50).map(MailAccount.Name(_))
 val mailAccountEmailGen: Gen[Any, MailAccount.Email] = Gen.alphaNumericStringBounded(5, 50).map(MailAccount.Email(_))
 
-val authConfigGen: Gen[Any, AuthConfig] = for {
-  clientId <- Gen.alphaNumericStringBounded(5, 50).map(AuthConfig.ClientId.apply)
-  clientSecret <- Gen.alphaNumericStringBounded(5, 50).map(AuthConfig.ClientSecret.apply)
-  redirectUri <- Gen.alphaNumericStringBounded(5, 50).map(AuthConfig.RedirectUri.apply)
-} yield AuthConfig(
-  AuthConfig.ClientInfo(clientId, clientSecret, redirectUri),
-)
+val authConfigGen: Gen[Any, AuthConfig] =
+  Gen.const(
+    AuthConfig(
+    ),
+  )
 
 val tokenInfoGen: Gen[Any, TokenInfo] = for {
   refreshToken <- Gen.alphaNumericStringBounded(5, 50).map(TokenInfo.RefreshToken.apply)

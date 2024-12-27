@@ -197,20 +197,19 @@ trait MailApp(val port: Int) extends ZIOApp, JsonSupport {
         accountType = AccountType.Gmail,
         name = request.name,
         email = request.email,
-        settings = MailSettings(
-          authConfig = AuthConfig(clientInfo = request.clientInfo),
-          syncConfig = request.syncConfig,
-        ),
+        settings = MailSettings(authConfig = AuthConfig(), syncConfig = request.syncConfig),
         timestamp = timestamp,
       )
 
       _ <- MailService.save(account)
 
-      info <- GmailSupport.getToken(request.clientInfo, request.authorizationCode).either
+      clientInfo <- ZIO.config[GoogleClientInfo]
+
+      info <- GmailSupport.getToken(clientInfo, request.authorizationCode).either
 
       _ <- info match {
         case Left(e) =>
-          Log.error(s"Could not authenticate account ${account.id} : ${e.getMessage}", e) *> MailService
+          Log.error(s"Authentication failed for account ${account.id} : ${e.getMessage}", e) *> MailService
             .revokeAuthorization(account.id, timestamp)
         case Right(token) => MailService.grantAuthorization(account.id, token, timestamp)
       }
@@ -230,13 +229,15 @@ trait MailApp(val port: Int) extends ZIOApp, JsonSupport {
         acc.accountType match {
           case AccountType.Gmail =>
             for {
-              info <- GmailSupport.getToken(acc.settings.authConfig.clientInfo, authorizationCode).either
+              clientInfo <- ZIO.config[GoogleClientInfo]
+
+              info <- GmailSupport.getToken(clientInfo, authorizationCode).either
 
               timestamp <- Timestamp.gen
 
               _ <- info match {
                 case Left(e) =>
-                  Log.error(s"Could not authenticate account ${acc.id} : ${e.getMessage}", e) *> MailService
+                  Log.error(s"Authentication failed for account ${acc.id} : ${e.getMessage}", e) *> MailService
                     .revokeAuthorization(acc.id, timestamp)
                 case Right(token) => MailService.grantAuthorization(acc.id, token, timestamp)
               }

@@ -7,7 +7,6 @@ import com.youtoo.mail.model.*
 case class CreateGmailAccountRequest(
   name: MailAccount.Name,
   email: MailAccount.Email,
-  clientInfo: AuthConfig.ClientInfo,
   syncConfig: SyncConfig,
   authorizationCode: String,
 )

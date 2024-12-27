@@ -29,13 +29,13 @@ object GmailPool {
         pool <- ZKeyedPool.make(
           get = (id: MailAccount.Id) =>
             for {
-              info <- (
-                service.loadAccount(id) <&> service.loadState(id)
-              ).map(_.tupled)
+              state <- service.loadState(id)
 
-              gmail <- info.fold(ZIO.fail(IllegalArgumentException("Accounts state not found"))) {
-                case (account, Mail(_, _, Authorization.Granted(token, _))) =>
-                  GmailSupport.getClient(account.settings.authConfig.clientInfo, token)
+              clientInfo <- ZIO.config[GoogleClientInfo]
+
+              gmail <- state.fold(ZIO.fail(IllegalArgumentException("Accounts state not found"))) {
+                case Mail(_, _, Authorization.Granted(token, _)) =>
+                  GmailSupport.getClient(clientInfo, token)
                 case _ => ZIO.fail(IllegalArgumentException("Account not authorized"))
               }
 
