@@ -75,7 +75,7 @@ object ProviderServiceSpec extends MockSpecDefault, TestSupport {
         val eventStoreMock = MockFileEventStore.ReadEventsByFilters(
           equalTo(
             (
-              PersistenceQuery.ns(Namespace(1)),
+              PersistenceQuery.ns(FileEvent.NS.FileAdded),
               FetchOptions(),
             ),
           ),

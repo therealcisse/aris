@@ -13,6 +13,8 @@ import com.youtoo.job.model.*
 
 enum MailEvent {
   case SyncStarted(labels: MailLabels, timestamp: Timestamp, jobId: Job.Id)
+  case AuthorizationGranted(token: TokenInfo, timestamp: Timestamp)
+  case AuthorizationRevoked(timestamp: Timestamp)
   case MailSynced(
     timestamp: Timestamp,
     mailKeys: NonEmptyList[MailData.Id],
@@ -34,12 +36,17 @@ object MailEvent {
     extension (self: MailEvent)
       def namespace: Namespace = self match {
         case _: MailEvent.SyncStarted => NS.SyncStarted
+        case _: MailEvent.AuthorizationGranted => NS.AuthorizationGranted
+        case _: MailEvent.AuthorizationRevoked => NS.AuthorizationRevoked
+
         case _: MailEvent.MailSynced => NS.MailSynced
         case _: MailEvent.SyncCompleted => NS.SyncCompleted
       }
 
     extension (self: MailEvent) def hierarchy: Option[Hierarchy] = self match {
       case e: MailEvent.SyncStarted => Hierarchy.Child(e.jobId.asKey).some
+      case e: MailEvent.AuthorizationGranted => None
+      case e: MailEvent.AuthorizationRevoked => None
       case e: MailEvent.MailSynced => Hierarchy.Child(e.jobId.asKey).some
       case e: MailEvent.SyncCompleted => Hierarchy.Child(e.jobId.asKey).some
 
@@ -50,6 +57,8 @@ object MailEvent {
 
   object NS {
     val SyncStarted = Namespace(0)
+    val AuthorizationGranted = Namespace(50)
+    val AuthorizationRevoked = Namespace(75)
     val MailSynced = Namespace(100)
     val SyncCompleted = Namespace(200)
   }
@@ -114,6 +123,45 @@ object MailEvent {
         }
       }
 
+  }
+
+  class LoadAuthorization() extends EventHandler[MailEvent, Authorization] {
+    def applyEvents(events: NonEmptyList[Change[MailEvent]]): Authorization =
+      events match {
+        case NonEmptyList.Single(ch) =>
+          ch.payload match {
+            case MailEvent.AuthorizationGranted(token, timestamp) =>
+              Authorization.Granted(token, timestamp)
+
+            case MailEvent.AuthorizationRevoked(timestamp) =>
+              Authorization.Revoked(timestamp)
+
+            case _ => Authorization.Pending()
+          }
+
+        case NonEmptyList.Cons(ch, ls) =>
+          ch.payload match {
+            case MailEvent.AuthorizationGranted(token, timestamp) =>
+              applyEvents(Authorization.Granted(token, timestamp), ls)
+            case MailEvent.AuthorizationRevoked(timestamp) =>
+              applyEvents(Authorization.Revoked(timestamp), ls)
+          }
+
+      }
+
+    def applyEvents(
+        zero: Authorization,
+        events: NonEmptyList[Change[MailEvent]],
+    ): Authorization =
+      events.foldLeft(zero) { (_, event) =>
+        event.payload match {
+          case MailEvent.AuthorizationGranted(token, timestamp) =>
+            Authorization.Granted(token, timestamp)
+          case MailEvent.AuthorizationRevoked(timestamp) =>
+            Authorization.Revoked(timestamp)
+          case _ => zero // Ignore other event types
+        }
+      }
   }
 
 

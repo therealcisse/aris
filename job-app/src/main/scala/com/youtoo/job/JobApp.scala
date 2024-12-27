@@ -16,7 +16,6 @@ import com.youtoo.cqrs.service.*
 import com.youtoo.job.model.*
 import com.youtoo.job.service.*
 import com.youtoo.job.repository.*
-import com.youtoo.cqrs.service.memory.*
 import com.youtoo.job.store.*
 import com.youtoo.postgres.config.*
 
@@ -69,8 +68,8 @@ object JobApp extends ZIOApp, JsonSupport {
         .make[Environment](
           zio.metrics.jvm.DefaultJvmMetrics.live.unit,
           DatabaseConfig.pool,
-          // PostgresCQRSPersistence.live(),
-          MemoryCQRSPersistence.live(),
+          com.youtoo.cqrs.service.postgres.PostgresCQRSPersistence.live(),
+          // com.youtoo.cqrs.service.memory.MemoryCQRSPersistence.live(),
           FlywayMigration.live(),
           SnapshotStore.live(),
           JobEventStore.live(),

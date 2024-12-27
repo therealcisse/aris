@@ -17,6 +17,7 @@ object MailRepositoryMock extends Mock[MailRepository] {
   object SaveAccount extends Effect[MailAccount, Throwable, Long]
   object LoadMail extends Effect[MailData.Id, Throwable, Option[MailData]]
   object SaveMail extends Effect[MailData, Throwable, Long]
+  object UpdateMailSettings extends Effect[(MailAccount.Id, MailSettings), Throwable, Long]
 
   val compose: URLayer[Proxy, MailRepository] =
     ZLayer {
@@ -40,6 +41,9 @@ object MailRepositoryMock extends Mock[MailRepository] {
 
         def save(data: MailData): RIO[ZConnection, Long] =
           proxy(SaveMail, data)
+
+        def updateMailSettings(id: MailAccount.Id, settings: MailSettings): RIO[ZConnection, Long] =
+          proxy(UpdateMailSettings, (id, settings))
       }
     }
 }

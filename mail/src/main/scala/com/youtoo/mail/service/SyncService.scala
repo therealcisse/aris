@@ -16,6 +16,8 @@ import zio.telemetry.opentelemetry.common.*
 import zio.stream.*
 import com.youtoo.mail.integration.*
 
+import com.youtoo.mail.integration.internal.GmailSupport
+
 trait SyncService {
   def sync(id: MailAccount.Id, options: SyncOptions): ZIO[Scope & Tracing, Throwable, Unit]
 }
@@ -72,13 +74,13 @@ object SyncService {
       mailService.loadAccount(id).flatMap {
         case None => Log.error("Account not found")
         case Some(account) =>
-          scopedTask {
-
+          scopedTask { interruption =>
             withLock(account) {
               for {
                 state <- mailService.loadState(account.id)
                 _ <- state match {
-                  case Some(mail) => performSync(account, mail, options)
+                  case Some(mail) if !mail.authorization.isGranted() => Log.error("Mail account not authorized")
+                  case Some(mail) => performSync(account, mail, options, interruption)
                   case None => Log.error("Mail state not found")
                 }
               } yield ()
@@ -86,12 +88,16 @@ object SyncService {
           }
       }
 
-    def scopedTask[R, E, A](task: ZIO[R & Scope, E, A]): ZIO[R & Scope, E, A] =
+    def scopedTask[R, E, A](task: Ref[Boolean] => ZIO[R & Scope, E, A]): ZIO[R & Scope, E, A] =
       ZIO.acquireRelease {
-        ZIO.scoped(task).fork
-      } { case (fiber) =>
-        fiber.join.ignoreLogged
-      }.flatMap { case fiber =>
+        for {
+          interruption <- Ref.make(false)
+          fiber <- ZIO.scoped(task(interruption)).fork
+
+        } yield (interruption, fiber)
+      } { case (interruption, fiber) =>
+        interruption.set(true) *> fiber.join.ignoreLogged
+      }.flatMap { case (_, fiber) =>
         fiber.join
       }
 
@@ -108,6 +114,7 @@ object SyncService {
       account: MailAccount,
       mail: Mail,
       options: SyncOptions,
+      interruption: Ref[Boolean],
     ): ZIO[Scope & Tracing, Throwable, Unit] =
       ZIO.uninterruptibleMask { restore =>
         for {
@@ -115,18 +122,32 @@ object SyncService {
           jobId <- Job.Id.gen
           _ <- jobService.startJob(id = jobId, timestamp, total = JobMeasurement.Variable(), tag = MailSync)
           _ <- mailService.startSync(accountKey = account.id, labels = MailLabels.All(), timestamp, jobId)
-          reason <- fetchAndRecordMails(options, account, mail.cursor.map(_.token), jobId, restore).fold(
-            success =
-              cancelled => if cancelled then Job.CompletionReason.Cancellation() else Job.CompletionReason.Success(),
-            failure = e => Job.CompletionReason.Failure(e.getMessage),
-          )
+          reason <- fetchAndRecordMails(options, account, mail.cursor.map(_.token), jobId, restore, interruption)
+            .foldZIO(
+              success = cancelled =>
+                ZIO.succeed(if cancelled then Job.CompletionReason.Cancellation() else Job.CompletionReason.Success()),
+              failure = e =>
+                account.accountType match {
+                  case AccountType.Gmail =>
+                    val reason = Job.CompletionReason.Failure(Option(e.getMessage))
+
+                    if GmailSupport.isTokenRevoked(e) then
+                      for {
+                        _ <- Log.error(s"Mail account token revoked: ${account.id}")
+                        timestamp <- Timestamp.gen
+                        _ <- mailService.revokeAuthorization(account.id, timestamp)
+
+                      } yield reason
+                    else ZIO.succeed(reason)
+                },
+            )
           endTimestamp <- Timestamp.gen
           _ <- mailService.completeSync(accountKey = account.id, endTimestamp, jobId)
           _ <- jobService.completeJob(id = jobId, timestamp = endTimestamp, reason = reason)
           _ <- reason match {
             case Job.CompletionReason.Success() => Log.info("Sync complete")
             case Job.CompletionReason.Cancellation() => Log.info("Sync cancelled")
-            case Job.CompletionReason.Failure(m) => Log.error(s"Sync failed: $m")
+            case Job.CompletionReason.Failure(m) => Log.error(s"""Sync failed: ${m.getOrElse("<unknown>")}""")
           }
         } yield ()
       }
@@ -137,18 +158,19 @@ object SyncService {
       token: Option[MailToken],
       jobId: Job.Id,
       restore: ZIO.InterruptibilityRestorer,
+      interruption: Ref[Boolean],
     ): ZIO[Scope & Tracing, Throwable, Boolean] =
       (
         Ref.make(false) <&> Timestamp.gen
       ) flatMap { case (cancelledRef, timestamp) =>
-        val state = SyncState(started = timestamp, token = token, iterations = 0)
+        val init = SyncState(started = timestamp, token = token, iterations = 0)
 
         ZStream
-          .unfoldZIO(state) { state =>
+          .unfoldZIO(init) { state =>
             Log.debug(s"Begin fetch for account") *> restore(
-              options.retry(
-                mailClient.fetchMails(account.id, state.token, Set()),
-              ),
+              options.applyZIO {
+                mailClient.fetchMails(account.id, state.token, None)
+              },
             ).flatMap {
               case None => ZIO.none
               case Some((mailKeys, nextToken)) =>
@@ -156,14 +178,17 @@ object SyncService {
                   _ <- Log.debug(s"Fetched ${mailKeys.size} mails for account")
                   timestamp <- Timestamp.gen
                   _ <- mailService.recordSynced(accountKey = account.id, timestamp, mailKeys, nextToken, jobId)
-                  expired = state.isExpired(options, timestamp)
-                  cancelled <- if !expired then jobService.isCancelled(jobId) else ZIO.succeed(false)
+                  interrupted <- interruption.get
+                  nextState = state.next(nextToken)
+                  expired = nextState.isExpired(options, timestamp)
+                  cancelled <- if !expired && !interrupted then jobService.isCancelled(jobId) else ZIO.succeed(false)
+                  _ <- Log.info(s"Sync interrupted for account") when interrupted
                   _ <- Log.info(s"Sync cancelled for account") when cancelled
                   _ <- Log.info(s"Sync expired for account") when expired
                   _ <- cancelledRef.set(true) when cancelled
                 } yield
-                  if cancelled || expired then None
-                  else Some((), state.next(nextToken))
+                  if cancelled || expired || interrupted then None
+                  else Some((), nextState)
             }
           }
           .runDrain *> cancelledRef.get
@@ -196,7 +221,7 @@ object SyncService {
 
         val iterationsExpired = options.maxIterations match {
           case None => false
-          case Some(iterations) => iterations < s.iterations
+          case Some(iterations) => iterations <= s.iterations
         }
 
         durationExpired || iterationsExpired

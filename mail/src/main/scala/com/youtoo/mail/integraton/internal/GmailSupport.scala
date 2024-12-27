@@ -7,34 +7,69 @@ import zio.*
 
 import com.youtoo.mail.model.*
 
+import com.google.api.client.googleapis.auth.oauth2.*
+
 import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport
 import com.google.api.client.json.gson.GsonFactory
 import com.google.api.services.gmail.Gmail
-import com.google.api.services.gmail.GmailScopes
-import java.util.Collections
-import com.google.api.client.googleapis.auth.oauth2.GoogleCredential
+
+import com.google.auth.http.HttpCredentialsAdapter
+import com.google.auth.oauth2.UserCredentials
+
+import com.google.api.client.auth.oauth2.TokenResponseException
 
 object GmailSupport {
+  val jsonFactory = GsonFactory.getDefaultInstance
 
-  private val SCOPES = Collections.singletonList(GmailScopes.GMAIL_LABELS)
+  def isTokenRevoked: Throwable => Boolean = {
+    case e: TokenResponseException =>
+      Option(e.getDetails).fold(false)(_.getError == "invalid_grant")
 
-  def authenticate(config: AuthConfig): Task[Gmail] = ZIO.attempt {
-
-    val httpTransport = GoogleNetHttpTransport.newTrustedTransport()
-    val jsonFactory = GsonFactory.getDefaultInstance
-
-    val credential = new GoogleCredential.Builder()
-      .setTransport(httpTransport)
-      .setJsonFactory(jsonFactory)
-      .setClientSecrets(config.clientId.value, config.clientSecret.value)
-      .setServiceAccountScopes(SCOPES)
-      .build()
-
-    credential.refreshToken()
-
-    new Gmail.Builder(httpTransport, jsonFactory, credential)
-      .setApplicationName("YouToo App")
-      .build()
+    case _ => false
   }
+
+  def getToken(info: AuthConfig.ClientInfo, code: String): Task[TokenInfo] = ZIO.attempt {
+    val httpTransport = GoogleNetHttpTransport.newTrustedTransport()
+
+    val ts: GoogleTokenResponse = new GoogleAuthorizationCodeTokenRequest(
+      httpTransport,
+      jsonFactory,
+      "https://oauth2.googleapis.com/token",
+      info.clientId.value,
+      info.clientSecret.value,
+      code,
+      info.redirectUri.value,
+    ).setGrantType("authorization_code").execute()
+
+    try
+      TokenInfo(
+        refreshToken = TokenInfo.RefreshToken(ts.getRefreshToken()),
+        idToken = TokenInfo.IdToken(ts.getIdToken()),
+      )
+    finally httpTransport.shutdown()
+  }
+
+  def getClient(clientInfo: AuthConfig.ClientInfo, tokenInfo: TokenInfo): RIO[Scope, Gmail] = ZIO.acquireRelease {
+    ZIO.attempt {
+
+      val httpTransport = GoogleNetHttpTransport.newTrustedTransport()
+
+      val credentials = UserCredentials
+        .newBuilder()
+        .setClientId(clientInfo.clientId.value)
+        .setClientSecret(clientInfo.clientSecret.value)
+        .setRefreshToken(tokenInfo.refreshToken.value)
+        .build()
+
+      val requestInitializer = new HttpCredentialsAdapter(credentials)
+
+      httpTransport -> new Gmail.Builder(httpTransport, jsonFactory, requestInitializer)
+        .setApplicationName("YouToo Mail App")
+        .build()
+    }
+
+  } { case (transport, _) =>
+    ZIO.attemptBlocking(transport.shutdown()).ignoreLogged
+  }.map { case (_, gmail) => gmail }
 
 }

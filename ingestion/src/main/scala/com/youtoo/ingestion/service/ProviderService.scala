@@ -108,7 +108,7 @@ object ProviderService {
       atomically {
         for {
           events <- eventStore.readEvents(
-            query = PersistenceQuery.ns(Namespace(1)),
+            query = PersistenceQuery.ns(FileEvent.NS.ProviderAdded),
             options = FetchOptions(),
           )
           inn = events.fold(Nil) { es =>
@@ -128,7 +128,7 @@ object ProviderService {
         for {
           events <- eventStore.readEvents(
             query = PersistenceQuery.condition(
-              namespace = Namespace(0).some,
+              namespace = FileEvent.NS.FileAdded.some,
               hierarchy = Hierarchy.Child(parentId = provider.asKey).some,
             ),
             options = FetchOptions(),

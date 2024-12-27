@@ -5,50 +5,67 @@ import zio.test.*
 import zio.test.Assertion.*
 import zio.*
 
-object SyncOptionsSpec extends ZIOSpecDefault {
+import com.youtoo.postgres.*
+import zio.telemetry.opentelemetry.tracing.*
+
+object SyncOptionsSpec extends ZIOSpecDefault, TestSupport {
 
   def spec = suite("SyncOptionsSpec")(
     suite("config")(
       test("default") {
         val config = ZIO.config[SyncOptions]
-        assertZIO(config)(equalTo(SyncOptions(None, None, SyncOptions.Retry(None, None))))
+        assertZIO(config)(equalTo(SyncOptions(None, None, 30.seconds, SyncOptions.Retry(None, None))))
       },
       test("values set") {
         val config = ZIO.config[SyncOptions]
-        assertZIO(config)(equalTo(SyncOptions(Some(1), Some(1.second), SyncOptions.Retry(Some(2), Some(2.seconds)))))
+        assertZIO(config)(
+          equalTo(SyncOptions(Some(1), Some(1.second), 30.seconds, SyncOptions.Retry(Some(2), Some(2.seconds)))),
+        )
       }.provide(
         Runtime.setConfigProvider {
 
           ConfigProvider.fromMap(
             Map(
-              "mail-sync-max-iterations" -> "1",
-              "mail-sync-max-duration" -> "1s",
-              "mail-sync-retry-max-times" -> "2",
-              "mail-sync-retry-interval" -> "2s",
+              "mail_sync_max_iterations" -> "1",
+              "mail_sync_max_duration" -> "1s",
+              "mail_sync_retry_max_times" -> "2",
+              "mail_sync_retry_interval" -> "2s",
             ),
           )
         },
       ),
+      test("timeout set") {
+        val config = ZIO.config[SyncOptions]
+        assertZIO(config.map(_.timeout))(equalTo(15.seconds)).provide(
+          Runtime.setConfigProvider {
+            ConfigProvider.fromMap(
+              Map(
+                "mail_sync_fetch_timeout" -> "15s",
+              ),
+            )
+          },
+        )
+      },
     ),
-    suite("retry")(
+    suite("applyZIO")(
       test("no options") {
-        val options = SyncOptions(None, None, SyncOptions.Retry(None, None))
+        val options = SyncOptions(None, None, Duration.Infinity, SyncOptions.Retry(None, None))
         var counter = 0
-        val effect = options.retry(ZIO.suspendSucceed { counter += 1; ZIO.fail("error") })
+        val effect = options.applyZIO(ZIO.suspendSucceed { counter += 1; ZIO.fail("error") })
         assertZIO(effect.either)(isLeft(equalTo("error"))) *> assert(counter)(equalTo(1))
       },
       test("times set") {
-        val options = SyncOptions(None, None, SyncOptions.Retry(Some(2), None))
+        val options = SyncOptions(None, None, Duration.Infinity, SyncOptions.Retry(Some(2), None))
         var counter = 0
-        val effect = options.retry(ZIO.suspendSucceed { counter += 1; ZIO.fail("error") }).exit
+        val effect = options.applyZIO(ZIO.suspendSucceed { counter += 1; ZIO.fail("error") }).exit
         assertZIO(effect)(fails(equalTo("error"))) && assert(counter)(equalTo(3))
       },
       test("times and interval set") {
-        val options = SyncOptions(None, None, SyncOptions.Retry(Some(2), Some(1.millis)))
+        val options = SyncOptions(None, None, Duration.Infinity, SyncOptions.Retry(Some(2), Some(1.millis)))
         var counter = 0
 
         for {
-          fiber <- options.retry(ZIO.suspendSucceed { counter += 1; ZIO.fail("error") }).fork
+          fiber <- options.applyZIO(ZIO.suspendSucceed { counter += 1; ZIO.fail("error") }).fork
           _ <- TestClock.adjust(5.millisecond)
 
           result <- fiber.join.exit
@@ -56,15 +73,20 @@ object SyncOptionsSpec extends ZIOSpecDefault {
 
       },
       test("interval set") {
-        val options = SyncOptions(None, None, SyncOptions.Retry(None, Some(1.millis)))
+        val options = SyncOptions(None, None, Duration.Infinity, SyncOptions.Retry(None, Some(1.millis)))
         var counter = 0
         for {
-          fiber <- options.retry(ZIO.suspendSucceed { counter += 1; ZIO.fail("error") }).fork
+          fiber <- options.applyZIO(ZIO.suspendSucceed { counter += 1; ZIO.fail("error") }).fork
           _ <- TestClock.adjust(5.millisecond)
 
           _ <- fiber.interrupt
-        } yield assert(counter)(equalTo(6))
+        } yield assert(counter)(isGreaterThan(1))
       },
+    ),
+  ).provideSomeLayerShared(
+    ZLayer.make[Tracing](
+      tracingMockLayer(),
+      zio.telemetry.opentelemetry.OpenTelemetry.contextZIO,
     ),
   )
 

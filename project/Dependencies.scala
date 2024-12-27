@@ -111,8 +111,7 @@ object Dependencies {
   val cronUtils = "com.cronutils" % "cron-utils" % "9.2.1"
 
   val gmail = Seq(
-    "com.google.api-client" % "google-api-client-jackson2" % "2.7.1",
-    "com.google.oauth-client" % "google-oauth-client" % "1.37.0",
+    "com.google.auth" % "google-auth-library-oauth2-http" % "1.19.0",
     "com.google.apis" % "google-api-services-gmail" % "v1-rev20240520-2.0.0",
   )
 

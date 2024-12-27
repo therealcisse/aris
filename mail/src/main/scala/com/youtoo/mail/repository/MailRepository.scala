@@ -25,6 +25,7 @@ trait MailRepository {
   def save(account: MailAccount): RIO[ZConnection, Long]
   def loadMail(id: MailData.Id): RIO[ZConnection, Option[MailData]]
   def save(data: MailData): RIO[ZConnection, Long]
+  def updateMailSettings(id: MailAccount.Id, settings: MailSettings): RIO[ZConnection, Long]
 }
 
 object MailRepository {
@@ -45,6 +46,9 @@ object MailRepository {
 
   inline def save(data: MailData): RIO[MailRepository & ZConnection, Long] =
     ZIO.serviceWithZIO[MailRepository](_.save(data))
+
+  inline def updateMailSettings(id: MailAccount.Id, settings: MailSettings): RIO[MailRepository & ZConnection, Long] =
+    ZIO.serviceWithZIO[MailRepository](_.updateMailSettings(id, settings))
 
   def live(): ZLayer[Tracing, Throwable, MailRepository] =
     ZLayer.fromFunction(tracing => new MailRepositoryLive().traced(tracing))
@@ -67,6 +71,9 @@ object MailRepository {
 
     def save(data: MailData): RIO[ZConnection, Long] =
       Queries.SAVE_MAIL(data).insert
+
+    def updateMailSettings(id: MailAccount.Id, settings: MailSettings): RIO[ZConnection, Long] =
+      Queries.UPDATE_MAIL_SETTINGS(id, settings).update
 
     def traced(tracing: Tracing): MailRepository =
       new MailRepository {
@@ -94,6 +101,12 @@ object MailRepository {
             "MailRepository.save",
             attributes = Attributes(Attribute.string("mailId", data.id.value)),
           )
+
+        def updateMailSettings(id: MailAccount.Id, settings: MailSettings): RIO[ZConnection, Long] =
+          self.updateMailSettings(id, settings) @@ tracing.aspects.span(
+            "MailRepository.updateMailSettings",
+            attributes = Attributes(Attribute.long("accountId", id.asKey.value)),
+          )
       }
   }
 
@@ -109,6 +122,7 @@ object MailRepository {
     given jobIdSetter: SqlFragment.Setter[Job.Id] = SqlFragment.Setter[Key].contramap(_.asKey)
     given bodySetter: SqlFragment.Setter[MailData.Body] = SqlFragment.Setter[String].contramap(_.value)
     given internalDateSetter: SqlFragment.Setter[InternalDate] = SqlFragment.Setter[Timestamp].contramap(_.value)
+    given accountTypeSetter: SqlFragment.Setter[AccountType] = SqlFragment.Setter[String].contramap(_.name)
 
     given mailDataIdDecoder: JdbcDecoder[MailData.Id] = JdbcDecoder[String].map(MailData.Id.apply)
     given bodyDecoder: JdbcDecoder[MailData.Body] = JdbcDecoder[String].map(MailData.Body.apply)
@@ -117,6 +131,7 @@ object MailRepository {
     given mailAccountIdDecoder: JdbcDecoder[MailAccount.Id] = JdbcDecoder[Long].map(MailAccount.Id.apply)
     given nameDecoder: JdbcDecoder[MailAccount.Name] = JdbcDecoder[String].map(MailAccount.Name.apply)
     given emailDecoder: JdbcDecoder[MailAccount.Email] = JdbcDecoder[String].map(MailAccount.Email.apply)
+    given accountTypeDecoder: JdbcDecoder[AccountType] = JdbcDecoder[String].map(AccountType.valueOf)
 
     given jobIdDecoder: JdbcDecoder[Job.Id] = JdbcDecoder[Key].map(Job.Id.apply)
 
@@ -135,7 +150,7 @@ object MailRepository {
       val (offsetQuery, limitQuery) = options.toSql
 
       (sql"""
-        SELECT key, name, email, settings, timestamp
+        SELECT key, type, name, email, settings, timestamp
         FROM mail_account
         """ ++ offsetQuery.fold(SqlFragment.empty)(ql => sql" WHERE " ++ ql) ++ sql" ORDER BY key DESC" ++ limitQuery
         .fold(
@@ -144,6 +159,7 @@ object MailRepository {
         .query[
           (
             MailAccount.Id,
+            AccountType,
             MailAccount.Name,
             MailAccount.Email,
             MailSettings,
@@ -154,12 +170,13 @@ object MailRepository {
 
     def LOAD_ACCOUNT(key: MailAccount.Id): Query[MailAccount] =
       sql"""
-    SELECT key, name, email, settings, timestamp
+    SELECT key, type, name, email, settings, timestamp
     FROM mail_account
     WHERE key = $key
     """.query[
         (
           MailAccount.Id,
+          AccountType,
           MailAccount.Name,
           MailAccount.Email,
           MailSettings,
@@ -168,12 +185,14 @@ object MailRepository {
       ].map(MailAccount.apply)
 
     def SAVE_ACCOUNT(account: MailAccount): SqlFragment =
-      val payload = java.util.Base64.getEncoder.encodeToString(summon[BinaryCodec[MailAccount]].encode(account).toArray)
+      val payload =
+        java.util.Base64.getEncoder.encodeToString(summon[BinaryCodec[MailSettings]].encode(account.settings).toArray)
 
       sql"""
     INSERT INTO mail_account (key, email, name, settings, timestamp)
     VALUES (
       ${account.id},
+      ${account.accountType},
       ${account.email},
       ${account.name},
       decode(${payload}, 'base64'),
@@ -207,6 +226,16 @@ object MailRepository {
       ${mail.timestamp}
     )
     """
+
+    def UPDATE_MAIL_SETTINGS(id: MailAccount.Id, settings: MailSettings): SqlFragment =
+      val payload =
+        java.util.Base64.getEncoder.encodeToString(summon[BinaryCodec[MailSettings]].encode(settings).toArray)
+
+      sql"""
+        UPDATE mail_account
+        SET settings = decode(${payload}, 'base64')
+        WHERE key = $id
+      """
 
   }
 

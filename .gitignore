@@ -1,6 +1,8 @@
 # macOS
 .DS_Store
 
+scripts
+
 local.sbt
 
 # sbt specific

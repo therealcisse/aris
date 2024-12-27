@@ -9,11 +9,13 @@ import zio.prelude.*
 import com.youtoo.mail.model.*
 import com.youtoo.mail.integration.*
 
+import zio.telemetry.opentelemetry.tracing.Tracing
+
 object MailClientMock extends Mock[MailClient] {
 
   object LoadLabels extends Effect[MailAccount.Id, Throwable, Chunk[MailLabels.LabelInfo]]
   object FetchMails
-      extends Effect[(MailAccount.Id, Option[MailToken], Set[MailLabels.LabelKey]), Throwable, Option[
+      extends Effect[(MailAccount.Id, Option[MailToken], Option[NonEmptySet[MailLabels.LabelKey]]), Throwable, Option[
         (NonEmptyList[MailData.Id], MailToken),
       ]]
   object LoadMessage extends Effect[(MailAccount.Id, MailData.Id), Throwable, Option[MailData]]
@@ -29,8 +31,8 @@ object MailClientMock extends Mock[MailClient] {
         def fetchMails(
           accountKey: MailAccount.Id,
           token: Option[MailToken],
-          labels: Set[MailLabels.LabelKey],
-        ): RIO[Scope, Option[(NonEmptyList[MailData.Id], MailToken)]] =
+          labels: Option[NonEmptySet[MailLabels.LabelKey]],
+        ): RIO[Scope & Tracing, Option[(NonEmptyList[MailData.Id], MailToken)]] =
           proxy(FetchMails, (accountKey, token, labels))
 
         def loadMessage(accountKey: MailAccount.Id, id: MailData.Id): RIO[Scope, Option[MailData]] =

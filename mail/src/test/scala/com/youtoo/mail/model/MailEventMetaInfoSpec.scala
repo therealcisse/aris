@@ -25,6 +25,32 @@ object MailEventMetaInfoSpec extends ZIOSpecDefault {
         namespaceAssertion && hierarchyAssertion && propsAssertion
       }
     },
+    test("MetaInfo[MailEvent] - AuthorizationGranted") {
+      check(tokenInfoGen, timestampGen) { (token, timestamp) =>
+        val event = MailEvent.AuthorizationGranted(token, timestamp)
+        val expectedNamespace = Namespace(50)
+        val expectedHierarchy = None
+
+        val namespaceAssertion = assert(event.namespace)(equalTo(expectedNamespace))
+        val hierarchyAssertion = assert(event.hierarchy)(equalTo(expectedHierarchy))
+        val propsAssertion = assert(event.props)(isEmpty)
+
+        namespaceAssertion && hierarchyAssertion && propsAssertion
+      }
+    },
+    test("MetaInfo[MailEvent] - AuthorizationRevoked") {
+      check(timestampGen) { (timestamp) =>
+        val event = MailEvent.AuthorizationRevoked(timestamp)
+        val expectedNamespace = Namespace(75)
+        val expectedHierarchy = None
+
+        val namespaceAssertion = assert(event.namespace)(equalTo(expectedNamespace))
+        val hierarchyAssertion = assert(event.hierarchy)(equalTo(expectedHierarchy))
+        val propsAssertion = assert(event.props)(isEmpty)
+
+        namespaceAssertion && hierarchyAssertion && propsAssertion
+      }
+    },
     test("MetaInfo[MailEvent] - MailSynced") {
       check(timestampGen, mailDataIdGen, Gen.listOf(mailDataIdGen), mailTokenGen, jobIdGen) {
         (timestamp, key, mailKeys, token, jobId) =>

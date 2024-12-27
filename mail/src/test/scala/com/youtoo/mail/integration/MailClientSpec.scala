@@ -2,10 +2,13 @@ package com.youtoo
 package mail
 package integration
 
+import cats.implicits.*
+
 import com.youtoo.mail.model.*
 
 import zio.*
 import zio.test.*
+import zio.prelude.*
 import zio.test.Assertion.*
 import zio.mock.Expectation.*
 
@@ -114,7 +117,7 @@ object MailClientTest extends ZIOSpecDefault, TestSupport {
 
         (for {
           client <- ZIO.service[MailClient]
-          result <- client.fetchMails(accountId, None, Set(labelKey))
+          result <- client.fetchMails(accountId, None, NonEmptySet(labelKey).some)
         } yield assert(result)(isSome(anything)) && assert(result.get._1.toList)(hasSize(equalTo(1))) && assert(
           result.get._2,
         )(

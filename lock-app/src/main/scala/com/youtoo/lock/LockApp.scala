@@ -53,7 +53,8 @@ object LockApp extends ZIOApp with JsonSupport {
       ZLayer
         .make[Environment](
           DatabaseConfig.pool,
-          LockRepository.memory(),
+          // LockRepository.memory(),
+          LockRepository.postgres(),
           LockManager.live(),
           configLayer,
           nettyConfigLayer,

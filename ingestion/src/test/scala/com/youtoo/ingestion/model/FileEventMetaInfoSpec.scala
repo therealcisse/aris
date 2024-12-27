@@ -53,7 +53,7 @@ object FileEventMetaInfoSpec extends ZIOSpecDefault {
           // Handle other location types if applicable
         }
 
-        val namespaceAssertion = assert(event.namespace)(equalTo(Namespace(1)))
+        val namespaceAssertion = assert(event.namespace)(equalTo(Namespace(100)))
         val hierarchyAssertion = assert(event.hierarchy)(equalTo(expectedHierarchy))
         val propsAssertion = assert(event.props)(equalTo(expectedProps))
 

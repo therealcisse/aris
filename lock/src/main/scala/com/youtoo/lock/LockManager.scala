@@ -35,11 +35,13 @@ object LockManager {
       atomically {
 
         for {
-          _ <- Log.info(s"Acquire lock: $lock")
+          _ <- Log.info(s"Acquiring lock: $lock")
 
           a <- repository.acquire(lock).tapError { e =>
             Log.error(s"Failed to aquire lock: $lock", e)
           }
+
+          _ <- Log.info(s"Lock $lock acquired: $a")
 
           _ <- ZIO.addFinalizer {
             for {

@@ -4,7 +4,7 @@ package model
 
 import zio.prelude.*
 
-case class AuthConfig(clientId: AuthConfig.ClientId, clientSecret: AuthConfig.ClientSecret)
+case class AuthConfig(clientInfo: AuthConfig.ClientInfo)
 
 object AuthConfig {
   import zio.schema.*
@@ -13,13 +13,26 @@ object AuthConfig {
 
   type ClientId = ClientId.Type
   object ClientId extends Newtype[String] {
-    extension (a: ClientId) def value: String = unwrap(a)
-    given Schema[ClientId] = derive
+    extension (a: Type) def value: String = unwrap(a)
+    given Schema[Type] = derive
   }
 
   type ClientSecret = ClientSecret.Type
   object ClientSecret extends Newtype[String] {
-    extension (a: ClientSecret) def value: String = unwrap(a)
-    given Schema[ClientSecret] = derive
+    extension (a: Type) def value: String = unwrap(a)
+    given Schema[Type] = derive
   }
+
+  type RedirectUri = RedirectUri.Type
+  object RedirectUri extends Newtype[String] {
+    extension (a: Type) def value: String = unwrap(a)
+    given Schema[Type] = derive
+  }
+
+  case class ClientInfo(clientId: AuthConfig.ClientId, clientSecret: AuthConfig.ClientSecret, redirectUri: RedirectUri)
+
+  object ClientInfo {
+    given Schema[ClientInfo] = DeriveSchema.gen
+  }
+
 }

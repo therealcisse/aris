@@ -58,6 +58,17 @@ object MailRepositorySpec extends PgSpec, TestSupport {
           } yield planAssertion && timeAssertion
         }
       },
+      test("should update mail settings for an existing account") {
+        check(mailAccountGen, mailSettingsGen) { case (account, newSettings) =>
+          atomically {
+            for {
+              _ <- MailRepository.save(account)
+              _ <- MailRepository.updateMailSettings(account.id, newSettings)
+              result <- MailRepository.loadAccount(account.id)
+            } yield assert(result.map(_.settings))(isSome(equalTo(newSettings)))
+          }
+        }
+      },
       test("should save and load a mail") {
         check(mailDataGen) { mail =>
           atomically {

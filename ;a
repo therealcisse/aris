@@ -78,9 +78,9 @@ val mailSettingsGen: Gen[Any, MailSettings] =
   (authConfigGen <*> syncConfigGen).map(MailSettings.apply)
 
 val mailAccountGen: Gen[Any, MailAccount] =
-  (mailAccountIdGen <*> accountTypeGen <*> mailAccountNameGen <*> mailAccountEmailGen <*> mailSettingsGen <*> timestampGen) map {
-    case (id, accountType, name, email, settings, timestamp) =>
-      MailAccount(id, accountType, name, email, settings, timestamp)
+  (mailAccountIdGen <*> mailAccountNameGen <*> mailAccountEmailGen <*> mailSettingsGen <*> timestampGen) map {
+    case (id, name, email, settings, timestamp) =>
+      MailAccount(id, name, email, settings, timestamp)
   }
 
 val startSyncGen: Gen[Any, MailCommand.StartSync] =
@@ -127,12 +127,12 @@ val authorizationGrantedEventGen: Gen[Any, MailEvent] =
   for {
     info <- tokenInfoGen
     timestamp <- timestampGen
-  } yield MailEvent.AuthorizationGranted(info, timestamp)
+  } yield MailEvent.AuthorizationGranted(token, timestamp)
 
 val authorizationRevokedEventGen: Gen[Any, MailEvent] =
   for {
     timestamp <- timestampGen
-  } yield MailEvent.AuthorizationRevoked(timestamp)
+  } yield MailEvent.AuthorizationRevoked(token, timestamp)
 
 val mailSyncedGen: Gen[Any, MailEvent] =
   for {
@@ -181,9 +181,7 @@ def validMailEventSequenceGen(isCompleted: Boolean = true): Gen[Any, NonEmptyLis
     startEvent <- syncStartedGen
     version <- versionGen
     startChange = Change(version, startEvent)
-    otherEvents <- Gen.listOf(
-      Gen.oneOf(mailSyncedGen, authorizationGrantedEventGen, authorizationRevokedEventGen),
-    )
+    otherEvents <- Gen.listOf(mailSyncedGen, authorizationGrantedEventGen, authorizationRevokedEventGen)
     progressChanges <- Gen.fromZIO {
       ZIO.foreach(otherEvents) { event =>
         for {
@@ -195,6 +193,10 @@ def validMailEventSequenceGen(isCompleted: Boolean = true): Gen[Any, NonEmptyLis
     version <- versionGen
     changes = progressChanges ::: (if isCompleted then (Change(version, done) :: Nil) else Nil)
   } yield NonEmptyList(startChange, changes*)
+
+val mailCursorGen: Gen[Any, Cursor] = (
+  timestampGen <*> mailTokenGen <*> totalMessagesGen <*> Gen.boolean
+).map(Cursor.apply)
 
 val authorizationPendingGen: Gen[Any, Authorization.Pending] = Gen.const(Authorization.Pending())
 val authorizationGrantedGen: Gen[Any, Authorization.Granted] =

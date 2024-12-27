@@ -1,5 +1,6 @@
 CREATE TABLE mail_account (
   key BIGINT,
+  type TEXT NOT NULL,
   name TEXT NOT NULL,
   email TEXT NOT NULL UNIQUE,
   settings BYTEA NOT NULL,

@@ -66,7 +66,7 @@ object FileEvent {
 
   object NS {
     val FileAdded = Namespace(0)
-    val ProviderAdded = Namespace(1)
+    val ProviderAdded = Namespace(100)
   }
 
   open class LoadIngestionFileByName(arg: IngestionFile.Name) extends EventHandler[FileEvent, Option[IngestionFile]] {

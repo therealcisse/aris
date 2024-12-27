@@ -16,7 +16,6 @@ import com.youtoo.mail.model.*
 import com.youtoo.mail.service.*
 import com.youtoo.mail.integration.*
 import com.youtoo.mail.repository.*
-import com.youtoo.cqrs.service.memory.*
 import com.youtoo.mail.store.*
 import com.youtoo.postgres.config.*
 import com.youtoo.job.service.*
@@ -40,9 +39,13 @@ import zio.telemetry.opentelemetry.OpenTelemetry
 import zio.telemetry.opentelemetry.tracing.Tracing
 import zio.telemetry.opentelemetry.baggage.Baggage
 
+import com.youtoo.mail.integration.internal.GmailSupport
+
 import com.youtoo.std.*
 
-object MailApp extends ZIOApp, JsonSupport {
+object MailApplication extends MailApp(8181) {}
+
+trait MailApp(val port: Int) extends ZIOApp, JsonSupport {
   import com.youtoo.cqrs.Codecs.json.given
 
   inline val FetchSize = 1_000L
@@ -53,7 +56,7 @@ object MailApp extends ZIOApp, JsonSupport {
   given environmentTag: EnvironmentTag[Environment] = EnvironmentTag[Environment]
 
   private val config = Server.Config.default
-    .port(8181)
+    .port(port)
 
   private val nettyConfig = NettyConfig.default
     .leakDetection(NettyConfig.LeakDetectionLevel.DISABLED)
@@ -74,8 +77,8 @@ object MailApp extends ZIOApp, JsonSupport {
         .makeSome[Scope, Environment](
           zio.metrics.jvm.DefaultJvmMetrics.live.unit,
           DatabaseConfig.pool,
-          // PostgresCQRSPersistence.live(),
-          MemoryCQRSPersistence.live(),
+          com.youtoo.cqrs.service.postgres.PostgresCQRSPersistence.live(),
+          // com.youtoo.cqrs.service.memory.MemoryCQRSPersistence.live(),
           FlywayMigration.live(),
           SnapshotStore.live(),
           MailEventStore.live(),
@@ -109,11 +112,26 @@ object MailApp extends ZIOApp, JsonSupport {
 
   val routes: Routes[Scope & Environment, Response] = Routes(
     Method.GET / "mail" / "health" -> handler(Response.json(ProjectInfo.toJson)),
-    Method.POST / "mail-accounts" -> handler { (req: Request) =>
-      endpoint.boundary("add_mail_account", req) {
+    Method.GET / "mail-accounts" -> handler { (req: Request) =>
+      endpoint.boundary("get_mail_accounts", req) {
+        getAllMailAccounts() map { mailAccounts => Response.json(mailAccounts.toJson) }
+      }
+    },
+    Method.POST / "mail-accounts" / long("accountId") / "authenticate" -> handler { (accountId: Long, req: Request) =>
+      endpoint.boundary("authenticate_mail_account", req) {
+        req.body.fromBody[String] flatMap { authorizationCode =>
+          authenticateMailAccount(MailAccount.Id(Key(accountId)), authorizationCode = authorizationCode) map { _ =>
+            Response.ok
+          }
+        }
+
+      }
+    },
+    Method.POST / "mail-accounts" / "gmail" -> handler { (req: Request) =>
+      endpoint.boundary("add_gmail_account", req) {
         for {
-          account <- req.body.fromBody[CreateMailAccountRequest]
-          accountId <- addMailAccount(account)
+          account <- req.body.fromBody[CreateGmailAccountRequest]
+          accountId <- addGmailAccount(account)
         } yield Response.json(s"""{"id":"$accountId"}""")
       }
     },
@@ -129,7 +147,7 @@ object MailApp extends ZIOApp, JsonSupport {
       (accountId: Long, req: Request) =>
         endpoint.boundary("toggle_mail_account_sync_auto", req) {
           req.body.fromBody[Boolean] flatMap { autoSync =>
-            updateSyncConfig(MailAccount.Id(Key(accountId)), autoSync = Some(autoSync)) map { _ => Response.ok }
+            updateMailSettings(MailAccount.Id(Key(accountId)), autoSync = Some(autoSync)) map { _ => Response.ok }
           }
         }
     },
@@ -137,7 +155,7 @@ object MailApp extends ZIOApp, JsonSupport {
       (accountId: Long, req: Request) =>
         endpoint.boundary("update_mail_account_auto_sync_schedule", req) {
           req.body.fromBody[String] flatMap { schedule =>
-            updateSyncConfig(MailAccount.Id(Key(accountId)), schedule = Some(schedule)) map { _ => Response.ok }
+            updateMailSettings(MailAccount.Id(Key(accountId)), schedule = Some(schedule)) map { _ => Response.ok }
           }
         }
     },
@@ -162,32 +180,77 @@ object MailApp extends ZIOApp, JsonSupport {
         }
       }
     },
-    Method.GET / "mail-sync" / long("accountId") -> handler { (accountId: Long, req: Request) =>
+    Method.POST / "mail-sync" / long("accountId") -> handler { (accountId: Long, req: Request) =>
       endpoint.boundary("trigger_mail_sync", req) {
         triggerMailSync(MailAccount.Id(Key(accountId))) `as` Response.ok
       }
     },
   )
 
-  def addMailAccount(request: CreateMailAccountRequest): RIO[Environment, Long] =
+  def addGmailAccount(request: CreateGmailAccountRequest): RIO[Environment, MailAccount.Id] =
     for {
       id <- MailAccount.Id.gen
       timestamp <- Timestamp.gen
 
       account = MailAccount(
         id = id,
+        accountType = AccountType.Gmail,
         name = request.name,
         email = request.email,
-        settings = request.settings,
+        settings = MailSettings(
+          authConfig = AuthConfig(clientInfo = request.clientInfo),
+          syncConfig = request.syncConfig,
+        ),
         timestamp = timestamp,
       )
 
-      a <- MailService.save(account)
-    } yield a
+      _ <- MailService.save(account)
+
+      info <- GmailSupport.getToken(request.clientInfo, request.authorizationCode).either
+
+      _ <- info match {
+        case Left(e) =>
+          Log.error(s"Could not authenticate account ${account.id} : ${e.getMessage}", e) *> MailService
+            .revokeAuthorization(account.id, timestamp)
+        case Right(token) => MailService.grantAuthorization(account.id, token, timestamp)
+      }
+
+    } yield id
 
   def getMailAccount(id: MailAccount.Id): RIO[Environment, Option[MailAccount]] = MailService.loadAccount(id)
 
-  def updateSyncConfig(
+  def authenticateMailAccount(
+    id: MailAccount.Id,
+    authorizationCode: String,
+  ): RIO[Environment, Unit] = for {
+    acc <- MailService.loadAccount(id)
+
+    _ <- acc match {
+      case Some(acc) =>
+        acc.accountType match {
+          case AccountType.Gmail =>
+            for {
+              info <- GmailSupport.getToken(acc.settings.authConfig.clientInfo, authorizationCode).either
+
+              timestamp <- Timestamp.gen
+
+              _ <- info match {
+                case Left(e) =>
+                  Log.error(s"Could not authenticate account ${acc.id} : ${e.getMessage}", e) *> MailService
+                    .revokeAuthorization(acc.id, timestamp)
+                case Right(token) => MailService.grantAuthorization(acc.id, token, timestamp)
+              }
+
+            } yield ()
+
+        }
+
+      case None => Log.error(s"Account not found $id")
+    }
+
+  } yield ()
+
+  def updateMailSettings(
     id: MailAccount.Id,
     schedule: Option[String] = None,
     autoSync: Option[Boolean] = None,
@@ -196,24 +259,40 @@ object MailApp extends ZIOApp, JsonSupport {
 
     _ <- acc match {
       case Some(acc) =>
-        def go(config: SyncConfig) = (schedule, autoSync) match {
-          case (Some(schedule), Some(autoSync)) =>
-            config.copy(autoSyncSchedule = SyncConfig.CronExpression(schedule), autoSyncEnabled = autoSync)
-          case (_, Some(autoSync)) => config.copy(autoSyncEnabled = autoSync)
-          case (Some(schedule), _) => config.copy(autoSyncSchedule = SyncConfig.CronExpression(schedule))
-          case (_, _) => config
+        (schedule, autoSync) match {
+          case (Some(cron), None) =>
+            val syncConfig = SyncConfig(
+              autoSync = SyncConfig.AutoSync.enabled(SyncConfig.CronExpression(cron)),
+            )
+
+            MailService.updateMailSettings(acc.id, acc.settings.copy(syncConfig = syncConfig))
+
+          case (None, Some(autoSync)) =>
+            val syncConfig = SyncConfig(
+              autoSync =
+                if autoSync then
+                  (acc.settings.syncConfig match {
+                    case SyncConfig(SyncConfig.AutoSync.disabled(Some(cron))) => SyncConfig.AutoSync.enabled(cron)
+                    case SyncConfig(autoSync) => autoSync
+                  })
+                else
+                  SyncConfig.AutoSync.disabled(acc.settings.syncConfig match {
+                    case SyncConfig(SyncConfig.AutoSync.enabled(cron)) => Some(cron)
+                    case _ => None
+                  }),
+            )
+
+            MailService.updateMailSettings(acc.id, acc.settings.copy(syncConfig = syncConfig))
+
+          case _ => ZIO.unit
         }
 
-        val updatedAccount = acc.copy(
-          settings = acc.settings.copy(syncConfig = go(acc.settings.syncConfig)),
-        )
-
-        MailService.save(updatedAccount)
-
-      case None => ZIO.unit
+      case None => Log.error(s"Account not found $id")
     }
 
   } yield ()
+
+  def getAllMailAccounts(): RIO[Environment, Chunk[MailAccount]] = MailService.loadAccounts(FetchOptions())
 
   def getAllMailData(): RIO[Environment, Chunk[MailData.Id]] = MailService.loadMails(FetchOptions())
 

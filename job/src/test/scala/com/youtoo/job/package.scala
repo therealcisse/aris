@@ -49,7 +49,7 @@ val jobStatusRunningGen: Gen[Any, JobStatus.Running] =
 
 val jobCompletionReasonGen: Gen[Any, Job.CompletionReason] = Gen.oneOf(
   Gen.const(Job.CompletionReason.Success()),
-  Gen.alphaNumericStringBounded(5, 100).map(Job.CompletionReason.Failure.apply),
+  Gen.option(Gen.alphaNumericStringBounded(5, 100)).map(Job.CompletionReason.Failure.apply),
 )
 
 val jobStatusCompletedGen: Gen[Any, JobStatus.Completed] =

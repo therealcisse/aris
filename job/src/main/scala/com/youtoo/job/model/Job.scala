@@ -35,7 +35,7 @@ object Job {
   enum CompletionReason {
     case Success()
     case Cancellation()
-    case Failure(message: String)
+    case Failure(message: Option[String])
   }
 
   object CompletionReason {

@@ -18,8 +18,8 @@ trait MailClient {
   def fetchMails(
     accountKey: MailAccount.Id,
     token: Option[MailToken],
-    labels: Set[MailLabels.LabelKey],
-  ): RIO[Scope, Option[(NonEmptyList[MailData.Id], MailToken)]]
+    labels: Option[NonEmptySet[MailLabels.LabelKey]],
+  ): RIO[Scope & Tracing, Option[(NonEmptyList[MailData.Id], MailToken)]]
   def loadMessage(accountKey: MailAccount.Id, id: MailData.Id): RIO[Scope, Option[MailData]]
 }
 
@@ -28,7 +28,7 @@ object MailClient {
     extension (a: Type) def value: Long = unwrap(a)
   }
 
-  given Config[BatchSize.Type] = Config.long.nested("mailBatchSize").withDefault(1024L).map(BatchSize(_))
+  given Config[BatchSize.Type] = Config.long.nested("mailBatchSize").withDefault(128L).map(BatchSize(_))
 
   def live(): ZLayer[Scope & Tracing & GmailPool, Throwable, MailClient] =
     ZLayer.scoped {
@@ -46,28 +46,29 @@ object MailClient {
         service <- pool.get(accountKey)
         response <- ZIO.attempt(service.users().labels().list("me").execute())
 
-        labels = response
-          .getLabels()
-          .asScala
-          .toList
-          .map(l =>
+        labels = Option(response)
+          .flatMap(r => Option(r.getLabels()))
+          .map(_.asScala.toList.map { l =>
             MailLabels.LabelInfo(
               MailLabels.LabelKey(l.getId()),
               MailLabels.Name(l.getName()),
               TotalMessages(l.getMessagesTotal()),
-            ),
-          )
+            )
+          })
+          .getOrElse(Nil)
 
       } yield Chunk(labels*)
 
     def fetchMails(
       accountKey: MailAccount.Id,
       token: Option[MailToken],
-      labels: Set[MailLabels.LabelKey],
-    ): RIO[Scope, Option[(NonEmptyList[MailData.Id], MailToken)]] =
+      labels: Option[NonEmptySet[MailLabels.LabelKey]],
+    ): RIO[Scope & Tracing, Option[(NonEmptyList[MailData.Id], MailToken)]] =
       for {
         service <- pool.get(accountKey)
         batchSize <- ZIO.config[BatchSize.Type]
+
+        _ <- Log.debug(s"Fetching mails from : $token")
 
         response <- ZIO.attempt {
           val builder = service
@@ -75,22 +76,29 @@ object MailClient {
             .messages()
             .list("me")
             .setMaxResults(batchSize.value)
-            .setLabelIds(labels.map(_.value).toList.asJava)
 
-          val r = token.fold(builder)(l => builder.setPageToken(l.value))
+          val withToken = token.fold(builder)(l => builder.setPageToken(l.value))
+          val withLabels = labels.fold(withToken)(l => withToken.setLabelIds(l.map(_.value).toList.asJava))
 
-          r.execute()
+          withLabels.execute()
         }
 
-        result = Option(response.getNextPageToken()) flatMap { token =>
-          val messages = response.getMessages().asScala.toList.map(m => MailData.Id(m.getId()))
+        result =
+          if response == null then None
+          else
+            Option(response.getNextPageToken()) flatMap { token =>
+              val messages = Option(response.getMessages()).fold(Nil)(_.asScala.toList.map(m => MailData.Id(m.getId())))
 
-          NonEmptyList.fromIterableOption(messages).map { nel =>
-            (nel, MailToken(token))
+              NonEmptyList.fromIterableOption(messages).map { nel =>
+                (nel, MailToken(token))
 
-          }
+              }
+            }
+
+        _ = result match {
+          case None => Log.debug(s"Fetched 0 mails from : $token")
+          case Some((nel, nextToken)) => Log.debug(s"Fetched ${nel.size} mails from : $token, nextToken=$nextToken")
         }
-
       } yield result
 
     def loadMessage(accountKey: MailAccount.Id, id: MailData.Id): RIO[Scope, Option[MailData]] =
@@ -108,19 +116,22 @@ object MailClient {
 
         timestamp <- Timestamp.gen
 
-        mail = (
-          Option(response.getId()),
-          Option(response.getRaw()),
-          Option(response.getInternalDate()),
-        ).mapN { case (id, body, internalDate) =>
-          MailData(
-            id = MailData.Id(id),
-            body = MailData.Body(body),
-            accountKey = accountKey,
-            internalDate = InternalDate(Timestamp(internalDate)),
-            timestamp = timestamp,
-          )
-        }
+        mail =
+          if response == null then None
+          else
+            (
+              Option(response.getId()),
+              Option(response.getRaw()),
+              Option(response.getInternalDate()),
+            ).mapN { case (id, body, internalDate) =>
+              MailData(
+                id = MailData.Id(id),
+                body = MailData.Body(body),
+                accountKey = accountKey,
+                internalDate = InternalDate(Timestamp(internalDate)),
+                timestamp = timestamp,
+              )
+            }
 
       } yield mail
 
@@ -134,14 +145,11 @@ object MailClient {
         def fetchMails(
           accountKey: MailAccount.Id,
           token: Option[MailToken],
-          labels: Set[MailLabels.LabelKey],
-        ): RIO[Scope, Option[(NonEmptyList[MailData.Id], MailToken)]] =
+          labels: Option[NonEmptySet[MailLabels.LabelKey]],
+        ): RIO[Scope & Tracing, Option[(NonEmptyList[MailData.Id], MailToken)]] =
           self.fetchMails(accountKey, token, labels) @@ tracing.aspects.span(
             "MailClient.fetchMails",
-            attributes = Attributes(
-              Attribute.long("accountId", accountKey.asKey.value),
-              Attribute.stringList("labels", labels.map(_.value).toList),
-            ),
+            attributes = Attributes(Attribute.long("accountId", accountKey.asKey.value)),
           )
         def loadMessage(accountKey: MailAccount.Id, id: MailData.Id): RIO[Scope, Option[MailData]] =
           self.loadMessage(accountKey, id) @@ tracing.aspects.span(

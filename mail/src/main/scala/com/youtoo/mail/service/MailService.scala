@@ -21,6 +21,8 @@ import zio.telemetry.opentelemetry.common.*
 
 trait MailService {
   def startSync(accountKey: MailAccount.Id, labels: MailLabels, timestamp: Timestamp, jobId: Job.Id): Task[Unit]
+  def grantAuthorization(accountKey: MailAccount.Id, token: TokenInfo, timestamp: Timestamp): Task[Unit]
+  def revokeAuthorization(accountKey: MailAccount.Id, timestamp: Timestamp): Task[Unit]
   def recordSynced(
     accountKey: MailAccount.Id,
     timestamp: Timestamp,
@@ -38,6 +40,7 @@ trait MailService {
   def loadMail(id: MailData.Id): Task[Option[MailData]]
   def loadMails(options: FetchOptions): Task[Chunk[MailData.Id]]
   def save(data: MailData): Task[Long]
+  def updateMailSettings(id: MailAccount.Id, settings: MailSettings): Task[Long]
 
 }
 
@@ -49,6 +52,16 @@ object MailService {
     jobId: Job.Id,
   ): RIO[MailService, Unit] =
     ZIO.serviceWithZIO(_.startSync(accountKey, labels, timestamp, jobId))
+
+  inline def grantAuthorization(
+    accountKey: MailAccount.Id,
+    token: TokenInfo,
+    timestamp: Timestamp,
+  ): RIO[MailService, Unit] =
+    ZIO.serviceWithZIO(_.grantAuthorization(accountKey, token, timestamp))
+
+  inline def revokeAuthorization(accountKey: MailAccount.Id, timestamp: Timestamp): RIO[MailService, Unit] =
+    ZIO.serviceWithZIO(_.revokeAuthorization(accountKey, timestamp))
 
   inline def recordSynced(
     accountKey: MailAccount.Id,
@@ -83,6 +96,9 @@ object MailService {
   inline def save(data: MailData): RIO[MailService, Long] =
     ZIO.serviceWithZIO(_.save(data))
 
+  inline def updateMailSettings(id: MailAccount.Id, settings: MailSettings): RIO[MailService, Long] =
+    ZIO.serviceWithZIO(_.updateMailSettings(id, settings))
+
   def live(): ZLayer[Tracing & ZConnectionPool & MailRepository & MailCQRS & MailEventStore, Throwable, MailService] =
     ZLayer.fromFunction {
       (
@@ -99,6 +115,14 @@ object MailService {
       extends MailService { self =>
     def startSync(accountKey: MailAccount.Id, labels: MailLabels, timestamp: Timestamp, jobId: Job.Id): Task[Unit] =
       val cmd = MailCommand.StartSync(labels, timestamp, jobId)
+      cqrs.add(accountKey.asKey, cmd)
+
+    def grantAuthorization(accountKey: MailAccount.Id, token: TokenInfo, timestamp: Timestamp): Task[Unit] =
+      val cmd = MailCommand.GrantAuthorization(token, timestamp)
+      cqrs.add(accountKey.asKey, cmd)
+
+    def revokeAuthorization(accountKey: MailAccount.Id, timestamp: Timestamp): Task[Unit] =
+      val cmd = MailCommand.RevokeAuthorization(timestamp)
       cqrs.add(accountKey.asKey, cmd)
 
     def recordSynced(
@@ -134,16 +158,26 @@ object MailService {
         o <- acc match {
           case Some(acc) =>
             for {
-              events <- eventStore.readEvents(
+              cursorEvents <- eventStore.readEvents(
                 id = acc.id.asKey,
-                query = PersistenceQuery.anyNamespace(Namespace(1), Namespace(2)),
+                query = PersistenceQuery.anyNamespace(MailEvent.NS.SyncStarted, MailEvent.NS.MailSynced),
                 options = FetchOptions(),
               )
 
-              cursor = events.fold(None) { es =>
+              cursor = cursorEvents.fold(None) { es =>
                 EventHandler.applyEvents(es)(using MailEvent.LoadCursor())
               }
-            } yield Mail(accountKey, cursor).some
+
+              authEvents <- eventStore.readEvents(
+                id = acc.id.asKey,
+                query =
+                  PersistenceQuery.anyNamespace(MailEvent.NS.AuthorizationGranted, MailEvent.NS.AuthorizationRevoked),
+                options = FetchOptions(),
+              )
+              authorization = authEvents.fold(Authorization.Pending()) { es =>
+                EventHandler.applyEvents(es)(using MailEvent.LoadAuthorization())
+              }
+            } yield Mail(accountKey, cursor, authorization).some
 
           case None =>
             ZIO.none
@@ -157,6 +191,9 @@ object MailService {
     def save(data: MailData): Task[Long] =
       repository.save(data).atomically.provideEnvironment(ZEnvironment(pool))
 
+    def updateMailSettings(id: MailAccount.Id, settings: MailSettings): Task[Long] =
+      repository.updateMailSettings(id, settings).atomically.provideEnvironment(ZEnvironment(pool))
+
     def traced(tracing: Tracing): MailService =
       new MailService {
         def startSync(accountKey: MailAccount.Id, labels: MailLabels, timestamp: Timestamp, jobId: Job.Id): Task[Unit] =
@@ -164,6 +201,21 @@ object MailService {
             "MailService.startSync",
             attributes = Attributes(Attribute.long("accountId", accountKey.asKey.value)),
           )
+        def grantAuthorization(
+          accountKey: MailAccount.Id,
+          token: TokenInfo,
+          timestamp: Timestamp,
+        ): Task[Unit] =
+          self.grantAuthorization(accountKey, token, timestamp) @@ tracing.aspects.span(
+            "MailService.grantAuthorization",
+            attributes = Attributes(Attribute.long("accountId", accountKey.asKey.value)),
+          )
+        def revokeAuthorization(accountKey: MailAccount.Id, timestamp: Timestamp): Task[Unit] =
+          self.revokeAuthorization(accountKey, timestamp) @@ tracing.aspects.span(
+            "MailService.revokeAuthorization",
+            attributes = Attributes(Attribute.long("accountId", accountKey.asKey.value)),
+          )
+
         def recordSynced(
           accountKey: MailAccount.Id,
           timestamp: Timestamp,
@@ -208,6 +260,12 @@ object MailService {
           self.save(data) @@ tracing.aspects.span(
             "MailService.save",
             attributes = Attributes(Attribute.string("mailId", data.id.value)),
+          )
+
+        def updateMailSettings(id: MailAccount.Id, settings: MailSettings): Task[Long] =
+          self.updateMailSettings(id, settings) @@ tracing.aspects.span(
+            "MailService.updateMailSettings",
+            attributes = Attributes(Attribute.long("accountId", id.asKey.value)),
           )
       }
 
