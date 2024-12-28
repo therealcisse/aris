@@ -91,30 +91,35 @@ object SyncService {
       }
 
     def scopedTask[R, E, A](task: Ref[Boolean] => ZIO[R & Scope, E, A]): ZIO[R & Tracing & Scope, E, A] =
-      ZIO.acquireReleaseExit {
+      ZIO.acquireRelease {
         for {
           interruption <- Ref.make(false)
-          scope <- Scope.make
-          fiber <- scope.extend(task(interruption)).fork
-          // fiber <- (task(interruption)).fork
+          fiber <- ZIO.scoped(task(interruption)).fork
 
         } yield (
-          scope,
           interruption,
           fiber,
         )
-      } { case ((scope, interruption, fiber), exit) =>
-        for {
-          _ <- Log.info("Sync interruption requested")
-          _ <- interruption.setAsync(true)
-          _ <- fiber.join
-            .timeoutFail(new IllegalStateException("timout"))(Duration(30L, ChronoUnit.SECONDS))
-            .ignoreLogged
-          _ <- scope.close(exit)
+      } {
+        case (
+              interruption,
+              fiber,
+            ) =>
+          for {
+            _ <- Log.error("Sync interruption requested")
+            _ <- interruption.setAsync(true)
 
-        } yield ()
-      }.flatMap { case (_, _, fiber) =>
-        fiber.join
+            _ <- fiber.join
+              .timeoutFail(new IllegalStateException("timout"))(Duration(30L, ChronoUnit.SECONDS))
+              .ignoreLogged
+
+          } yield ()
+      }.flatMap {
+        case (
+              _,
+              fiber,
+            ) =>
+          fiber.join
       }
 
     private def withLock(account: MailAccount)(

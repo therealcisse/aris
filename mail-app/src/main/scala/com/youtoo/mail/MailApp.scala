@@ -320,8 +320,8 @@ object MailApp extends ZIOApp, JsonSupport {
 
   def getMailState(id: MailAccount.Id): RIO[Environment, Option[Mail]] = MailService.loadState(id)
 
-  def triggerMailSync(id: MailAccount.Id): RIO[Environment, ?] =
-    ZIO.scoped(SyncService.sync(id)).forkDaemon
+  def triggerMailSync(id: MailAccount.Id): RIO[Scope & Environment, ?] =
+    SyncService.sync(id).forkScoped
 
   def run: RIO[Environment & Scope, Unit] =
     for {

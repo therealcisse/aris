@@ -258,6 +258,78 @@ object SyncServiceSpec extends MockSpecDefault, TestSupport {
             )
         }
       },
+      test("Successful Sync should release after sync ends") {
+        check(mailAccountGen, mailTokenGen, timestampGen, authorizationGrantedGen) {
+          (account, token, timestamp, authorization) =>
+            val cursor = Cursor(timestamp, token, total = TotalMessages(1), isSyncing = false)
+            val mail = Mail(accountKey = account.id, cursor = Some(cursor), authorization)
+            val mailKeys = NonEmptyList(MailData.Id("mail1"), MailData.Id("mail2"))
+            val nextToken = MailToken("nextToken")
+
+            val mockEnv = MailServiceMock.LoadAccount(
+              assertion = Assertion.equalTo(account.id),
+              result = Expectation.value(Some(account)),
+            ) ++
+              LockRepositoryMock.Acquire(
+                assertion = Assertion.equalTo(account.lock),
+                result = Expectation.value(true),
+              ) ++
+              MailServiceMock.LoadState(
+                assertion = Assertion.equalTo(account.id),
+                result = Expectation.value(Some(mail)),
+              ) ++
+              JobServiceMock.StartJob(
+                assertion = isPayload_StartJob(timestamp, JobMeasurement.Variable(), SyncService.MailSync),
+                result = Expectation.unit,
+              ) ++
+              MailServiceMock.StartSync(
+                assertion = isPayload_StartSync(account.id, MailLabels.All(), timestamp),
+                result = Expectation.unit,
+              ) ++
+              MailClientMock.FetchMails(
+                assertion = Assertion.equalTo((account.id, mail.cursor.map(_.token), None)),
+                result = Expectation.value(Some((mailKeys, nextToken))),
+              ) ++
+              MailServiceMock.RecordSynced(
+                assertion = isPayload_RecordSync(account.id, timestamp, mailKeys, nextToken),
+                result = Expectation.unit,
+              ) ++
+              JobServiceMock.IsCancelled(
+                assertion = Assertion.anything,
+                result = Expectation.value(false),
+              ) ++ MailClientMock.FetchMails(
+                assertion = Assertion.equalTo((account.id, Some(nextToken), None)),
+                result = Expectation.value(None),
+              ) ++
+              MailServiceMock.CompleteSync(
+                assertion = isPayload_CompleteSync(account.id, timestamp),
+                result = Expectation.unit,
+              ) ++
+              JobServiceMock.CompleteJob(
+                assertion = isPayload_CompleteJob(timestamp, Job.CompletionReason.Success()),
+                result = Expectation.unit,
+              ) ++
+              LockRepositoryMock.Release(
+                assertion = Assertion.equalTo(account.lock),
+                result = Expectation.value(true),
+              )
+
+            val effect = SyncService.sync(account.id)
+
+            val r = effect `as` assertCompletes
+
+            r.provideSomeLayer[Scope & Tracing & ZConnectionPool](
+              mockEnv.toLayer >>> ZLayer
+                .makeSome[
+                  Tracing & ZConnectionPool & MailClient & MailService & JobService & LockRepository,
+                  SyncService,
+                ](
+                  LockManager.live(),
+                  SyncService.live(),
+                ),
+            )
+        }
+      },
       test("Successful Sync with Lock and Release when cancelled") {
         check(mailAccountGen, mailTokenGen, timestampGen, authorizationGrantedGen) {
           (account, token, timestamp, authorization) =>
@@ -513,6 +585,86 @@ object SyncServiceSpec extends MockSpecDefault, TestSupport {
               fiber <- scope
                 .extend(
                   effect.provideSomeLayer[Scope & Tracing](mockEnv.toLayer >>> SyncService.live()),
+                )
+                .fork
+
+              _ <- scope.close(Exit.fail(Exception("boom!")))
+
+              _ <- p.succeed(())
+
+              _ <- fiber.join
+
+            } yield assertCompletes
+
+        }
+      } @@ TestAspect.flaky,
+      test("Graceful shutdown on interruption Lock and Release") {
+        check(mailAccountGen, mailTokenGen, timestampGen, authorizationGrantedGen) {
+          (account, token, timestamp, authorization) =>
+            val cursor = Cursor(timestamp, token, total = TotalMessages(1), isSyncing = false)
+            val mail = Mail(accountKey = account.id, cursor = Some(cursor), authorization)
+            val mailKeys = NonEmptyList(MailData.Id("mail1"), MailData.Id("mail2"))
+            val nextToken = MailToken("nextToken")
+
+            val effect = SyncService.sync(account.id)
+
+            for {
+              scope <- Scope.make
+              p <- Promise.make[Nothing, Unit]
+
+              mockEnv = MailServiceMock.LoadAccount(
+                assertion = Assertion.equalTo(account.id),
+                result = Expectation.value(Some(account)),
+              ) ++
+                LockRepositoryMock.Acquire(
+                  assertion = Assertion.equalTo(account.lock),
+                  result = Expectation.value(true),
+                ) ++
+                MailServiceMock.LoadState(
+                  assertion = Assertion.equalTo(account.id),
+                  result = Expectation.value(Some(mail)),
+                ) ++
+                JobServiceMock.StartJob(
+                  assertion = isPayload_StartJob(timestamp, JobMeasurement.Variable(), SyncService.MailSync),
+                  result = Expectation.unit,
+                ) ++
+                MailServiceMock.StartSync(
+                  assertion = isPayload_StartSync(account.id, MailLabels.All(), timestamp),
+                  result = Expectation.unit,
+                ) ++
+                MailClientMock.FetchMails(
+                  assertion = Assertion.equalTo((account.id, mail.cursor.map(_.token), None)),
+                  result = Expectation.valueZIO(_ => p.await `as` Some((mailKeys, nextToken))),
+                ) ++
+                MailServiceMock.RecordSynced(
+                  assertion = isPayload_RecordSync(account.id, timestamp, mailKeys, nextToken),
+                  result = Expectation.unit,
+                ) ++
+                MailServiceMock.CompleteSync(
+                  assertion = isPayload_CompleteSync(account.id, timestamp),
+                  result = Expectation.unit,
+                ) ++
+                JobServiceMock.CompleteJob(
+                  assertion = isPayload_CompleteJob(timestamp, Job.CompletionReason.Success()),
+                  result = Expectation.unit,
+                ) ++
+                LockRepositoryMock.Release(
+                  assertion = Assertion.equalTo(account.lock),
+                  result = Expectation.value(true),
+                )
+
+              fiber <- scope
+                .extend(
+                  effect.provideSomeLayer[Scope & Tracing & ZConnectionPool](
+                    mockEnv.toLayer >>> ZLayer
+                      .makeSome[
+                        Tracing & ZConnectionPool & MailClient & MailService & JobService & LockRepository,
+                        SyncService,
+                      ](
+                        LockManager.live(),
+                        SyncService.live(),
+                      ),
+                  ),
                 )
                 .fork
 
