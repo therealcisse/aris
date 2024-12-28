@@ -12,8 +12,6 @@ import zio.jdbc.*
 
 import com.youtoo.postgres.*
 import com.youtoo.cqrs.domain.*
-import com.youtoo.cqrs.service.*
-import com.youtoo.cqrs.service.postgres.*
 
 import com.youtoo.cqrs.Codecs.given
 
@@ -332,16 +330,16 @@ object MailServiceSpec extends MockSpecDefault, TestSupport {
       }
     },
     test("loadMails returns expected result using MailRepository") {
-      check(Gen.option(keyGen), Gen.long, mailDataIdGen) { case (key, limit, mail) =>
+      check(Gen.option(Gen.long(0, 1000)), Gen.long(1, 1_000_1000), mailDataIdGen) { case (offset, limit, mail) =>
         val expected = Chunk(mail)
 
         val mockEnv = MailRepositoryMock.LoadMails(
-          equalTo(FetchOptions(offset = key, limit = Some(limit))),
+          equalTo((offset, limit)),
           value(expected),
         )
 
         (for {
-          effect <- MailService.loadMails(FetchOptions(offset = key, limit = Some(limit)))
+          effect <- MailService.loadMails(offset = offset, limit = limit)
           testResult = assert(effect)(equalTo(expected))
         } yield testResult).provideSomeLayer[ZConnectionPool & zio.telemetry.opentelemetry.tracing.Tracing](
           mockEnv.toLayer >>> ZLayer.makeSome[
@@ -381,16 +379,15 @@ object MailServiceSpec extends MockSpecDefault, TestSupport {
       }
     },
     test("load many returns expected result using MailRepository") {
-      check(Gen.option(keyGen), Gen.long, mailAccountGen) { case (key, limit, account) =>
+      check(mailAccountGen) { case (account) =>
         val expected = Chunk(account)
 
         val mockEnv = MailRepositoryMock.LoadAccounts(
-          equalTo(FetchOptions(offset = key, limit = Some(limit))),
-          value(expected),
+          returns = value(expected),
         )
 
         (for {
-          effect <- MailService.loadAccounts(FetchOptions(offset = key, limit = Some(limit)))
+          effect <- MailService.loadAccounts()
           testResult = assert(effect)(equalTo(expected))
         } yield testResult).provideSomeLayer[ZConnectionPool & zio.telemetry.opentelemetry.tracing.Tracing](
           mockEnv.toLayer >>> ZLayer.makeSome[

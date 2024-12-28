@@ -19,8 +19,8 @@ import zio.schema.codec.*
 import zio.jdbc.*
 
 trait MailRepository {
-  def loadMails(options: FetchOptions): RIO[ZConnection, Chunk[MailData.Id]]
-  def loadAccounts(options: FetchOptions): RIO[ZConnection, Chunk[MailAccount]]
+  def loadMails(offset: Option[Long], limit: Long): RIO[ZConnection, Chunk[MailData.Id]]
+  def loadAccounts(): RIO[ZConnection, Chunk[MailAccount]]
   def loadAccount(key: MailAccount.Id): RIO[ZConnection, Option[MailAccount]]
   def save(account: MailAccount): RIO[ZConnection, Long]
   def loadMail(id: MailData.Id): RIO[ZConnection, Option[MailData]]
@@ -29,11 +29,11 @@ trait MailRepository {
 }
 
 object MailRepository {
-  inline def loadMails(options: FetchOptions): RIO[MailRepository & ZConnection, Chunk[MailData.Id]] =
-    ZIO.serviceWithZIO[MailRepository](_.loadMails(options))
+  inline def loadMails(offset: Option[Long], limit: Long): RIO[MailRepository & ZConnection, Chunk[MailData.Id]] =
+    ZIO.serviceWithZIO[MailRepository](_.loadMails(offset, limit))
 
-  inline def loadAccounts(options: FetchOptions): RIO[MailRepository & ZConnection, Chunk[MailAccount]] =
-    ZIO.serviceWithZIO[MailRepository](_.loadAccounts(options))
+  inline def loadAccounts(): RIO[MailRepository & ZConnection, Chunk[MailAccount]] =
+    ZIO.serviceWithZIO[MailRepository](_.loadAccounts())
 
   inline def loadAccount(key: MailAccount.Id): RIO[MailRepository & ZConnection, Option[MailAccount]] =
     ZIO.serviceWithZIO[MailRepository](_.loadAccount(key))
@@ -54,11 +54,11 @@ object MailRepository {
     ZLayer.fromFunction(tracing => new MailRepositoryLive().traced(tracing))
 
   class MailRepositoryLive() extends MailRepository { self =>
-    def loadMails(options: FetchOptions): RIO[ZConnection, Chunk[MailData.Id]] =
-      Queries.LOAD_MAILS(options).selectAll
+    def loadMails(offset: Option[Long], limit: Long): RIO[ZConnection, Chunk[MailData.Id]] =
+      Queries.LOAD_MAILS(offset, limit).selectAll
 
-    def loadAccounts(options: FetchOptions): RIO[ZConnection, Chunk[MailAccount]] =
-      Queries.LOAD_ACCOUNTS(options).selectAll
+    def loadAccounts(): RIO[ZConnection, Chunk[MailAccount]] =
+      Queries.LOAD_ACCOUNTS().selectAll
 
     def loadAccount(key: MailAccount.Id): RIO[ZConnection, Option[MailAccount]] =
       Queries.LOAD_ACCOUNT(key).selectOne
@@ -77,10 +77,10 @@ object MailRepository {
 
     def traced(tracing: Tracing): MailRepository =
       new MailRepository {
-        def loadMails(options: FetchOptions): RIO[ZConnection, Chunk[MailData.Id]] =
-          self.loadMails(options) @@ tracing.aspects.span("MailRepository.loadMails")
-        def loadAccounts(options: FetchOptions): RIO[ZConnection, Chunk[MailAccount]] =
-          self.loadAccounts(options) @@ tracing.aspects.span("MailRepository.loadAccounts")
+        def loadMails(offset: Option[Long], limit: Long): RIO[ZConnection, Chunk[MailData.Id]] =
+          self.loadMails(offset, limit) @@ tracing.aspects.span("MailRepository.loadMails")
+        def loadAccounts(): RIO[ZConnection, Chunk[MailAccount]] =
+          self.loadAccounts() @@ tracing.aspects.span("MailRepository.loadAccounts")
         def loadAccount(key: MailAccount.Id): RIO[ZConnection, Option[MailAccount]] =
           self.loadAccount(key) @@ tracing.aspects.span(
             "MailRepository.loadAccount",
@@ -135,27 +135,20 @@ object MailRepository {
 
     given jobIdDecoder: JdbcDecoder[Job.Id] = JdbcDecoder[Key].map(Job.Id.apply)
 
-    def LOAD_MAILS(options: FetchOptions): Query[MailData.Id] =
-      val (offsetQuery, limitQuery) = options.toSql
+    def LOAD_MAILS(offset: Option[Long], limit: Long): Query[MailData.Id] =
+      val offsetQuery = offset.map(o => sql" OFFSET $offset ").getOrElse(SqlFragment.empty)
+      val limitQuery = sql" LIMIT $limit "
 
       (sql"""
         SELECT id
         FROM mail_data
-        """ ++ offsetQuery.fold(SqlFragment.empty)(ql => sql" WHERE " ++ ql) ++ sql" ORDER BY id DESC" ++ limitQuery
-        .fold(
-          SqlFragment.empty,
-        )(ql => sql" " ++ ql)).query[MailData.Id]
+        """ ++ sql" ORDER BY id DESC" ++ offsetQuery ++ limitQuery).query[MailData.Id]
 
-    def LOAD_ACCOUNTS(options: FetchOptions): Query[MailAccount] =
-      val (offsetQuery, limitQuery) = options.toSql
-
+    def LOAD_ACCOUNTS(): Query[MailAccount] =
       (sql"""
         SELECT key, type, name, email, settings, timestamp
         FROM mail_account
-        """ ++ offsetQuery.fold(SqlFragment.empty)(ql => sql" WHERE " ++ ql) ++ sql" ORDER BY key DESC" ++ limitQuery
-        .fold(
-          SqlFragment.empty,
-        )(ql => sql" " ++ ql))
+        """)
         .query[
           (
             MailAccount.Id,
@@ -189,7 +182,7 @@ object MailRepository {
         java.util.Base64.getEncoder.encodeToString(summon[BinaryCodec[MailSettings]].encode(account.settings).toArray)
 
       sql"""
-    INSERT INTO mail_account (key, email, name, settings, timestamp)
+    INSERT INTO mail_account (key, type, email, name, settings, timestamp)
     VALUES (
       ${account.id},
       ${account.accountType},

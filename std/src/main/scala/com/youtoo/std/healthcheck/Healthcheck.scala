@@ -1,5 +1,6 @@
 package com.youtoo
 package std
+package healthcheck
 
 import cats.implicits.*
 

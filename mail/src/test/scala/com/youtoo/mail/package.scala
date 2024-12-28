@@ -26,9 +26,9 @@ val mailLabelsGen: Gen[Any, MailLabels] =
       MailLabels.Selection(NonEmptyList(key, keys*))
     },
   )
-val mailDataIdGen: Gen[Any, MailData.Id] = Gen.alphaNumericStringBounded(4, 36).map(MailData.Id.apply)
+val mailDataIdGen: Gen[Any, MailData.Id] = Gen.uuid.map(uuid => MailData.Id(uuid.toString))
 val mailTokenGen: Gen[Any, MailToken] = Gen.alphaNumericStringBounded(4, 36).map(MailToken.apply)
-val mailBodyGen: Gen[Any, MailData.Body] = Gen.alphaNumericStringBounded(10, 10000).map(MailData.Body.apply)
+val mailBodyGen: Gen[Any, MailData.Body] = Gen.alphaNumericStringBounded(1, 10).map(MailData.Body.apply)
 val totalMessagesGen: Gen[Any, TotalMessages] = Gen.int(4, 16).map(TotalMessages.apply)
 val mailCursorGen: Gen[Any, Cursor] = (
   timestampGen <*> mailTokenGen <*> totalMessagesGen <*> Gen.boolean
@@ -42,8 +42,8 @@ val mailDataGen: Gen[Any, MailData] =
     MailData(id, body, accountId, internalDate, timestamp)
   }
 
-val mailAccountNameGen: Gen[Any, MailAccount.Name] = Gen.alphaNumericStringBounded(5, 50).map(MailAccount.Name(_))
-val mailAccountEmailGen: Gen[Any, MailAccount.Email] = Gen.alphaNumericStringBounded(5, 50).map(MailAccount.Email(_))
+val mailAccountNameGen: Gen[Any, MailAccount.Name] = Gen.alphaNumericStringBounded(5, 5).map(MailAccount.Name(_))
+val mailAccountEmailGen: Gen[Any, MailAccount.Email] = Gen.alphaNumericStringBounded(5, 5).map(MailAccount.Email(_))
 
 val authConfigGen: Gen[Any, AuthConfig] =
   Gen.const(
@@ -52,8 +52,8 @@ val authConfigGen: Gen[Any, AuthConfig] =
   )
 
 val tokenInfoGen: Gen[Any, TokenInfo] = for {
-  refreshToken <- Gen.alphaNumericStringBounded(5, 50).map(TokenInfo.RefreshToken.apply)
-  idToken <- Gen.alphaNumericStringBounded(5, 50).map(TokenInfo.IdToken.apply)
+  refreshToken <- Gen.alphaNumericStringBounded(5, 5).map(TokenInfo.RefreshToken.apply)
+  idToken <- Gen.alphaNumericStringBounded(5, 5).map(TokenInfo.IdToken.apply)
 } yield TokenInfo(refreshToken, idToken)
 
 val accountTypeGen: Gen[Any, AccountType] =
@@ -76,12 +76,13 @@ val mailSettingsGen: Gen[Any, MailSettings] =
   (authConfigGen <*> syncConfigGen).map(MailSettings.apply)
 
 val mailAccountGen: Gen[Any, MailAccount] =
-  (mailAccountIdGen <*> accountTypeGen <*> mailAccountNameGen <*> mailAccountEmailGen <*> mailSettingsGen <*> timestampGen) map {
-    case (id, accountType, name, email, settings, timestamp) =>
-      MailAccount(id, accountType, name, email, settings, timestamp)
+  (
+    mailAccountIdGen <*> accountTypeGen <*> mailAccountNameGen <*> mailAccountEmailGen <*> mailSettingsGen <*> timestampGen
+  ) map { case (id, accountType, name, email, settings, timestamp) =>
+    MailAccount(id, accountType, name, email, settings, timestamp)
   }
 
-val startSyncGen: Gen[Any, MailCommand.StartSync] =
+val startSyncGen: Gen[Any, MailCommand] =
   (mailLabelsGen <*> timestampGen <*> jobIdGen) map { case (labels, timestamp, jobId) =>
     MailCommand.StartSync(labels, timestamp, jobId)
   }
@@ -96,13 +97,13 @@ val revokeAuthorizationCommandGen: Gen[Any, MailCommand] =
     MailCommand.RevokeAuthorization(timestamp)
   }
 
-val recordSyncGen: Gen[Any, MailCommand.RecordSync] =
+val recordSyncGen: Gen[Any, MailCommand] =
   (timestampGen <*> mailDataIdGen <*> Gen.listOf(mailDataIdGen) <*> mailTokenGen <*> jobIdGen) map {
     case (timestamp, key, keys, token, jobId) =>
       MailCommand.RecordSync(timestamp, NonEmptyList(key, keys*), token, jobId)
   }
 
-val completeSyncGen: Gen[Any, MailCommand.CompleteSync] =
+val completeSyncGen: Gen[Any, MailCommand] =
   (timestampGen <*> jobIdGen).map(MailCommand.CompleteSync.apply)
 
 val mailCommandGen: Gen[Any, MailCommand] =
@@ -136,7 +137,7 @@ val mailSyncedGen: Gen[Any, MailEvent] =
   for {
     timestamp <- timestampGen
     key <- mailDataIdGen
-    keys <- Gen.listOf(mailDataIdGen)
+    keys <- Gen.listOfBounded(0, 8)(mailDataIdGen)
     token <- mailTokenGen
     jobId <- jobIdGen
   } yield MailEvent.MailSynced(timestamp = timestamp, mailKeys = NonEmptyList(key, keys*), token = token, jobId = jobId)

@@ -9,7 +9,8 @@ import zio.mock.Expectation.*
 import zio.mock.*
 import zio.*
 
-import com.youtoo.std.*
+import com.youtoo.std.interruption.*
+import com.youtoo.std.healthcheck.*
 
 import com.youtoo.migration.model.*
 import com.youtoo.migration.service.*

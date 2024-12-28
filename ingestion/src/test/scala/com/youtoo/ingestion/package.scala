@@ -17,22 +17,24 @@ inline def isPayload[Event](key: Key, payload: Event) = assertion[(Key, Change[E
   id == key && ch.payload == payload
 }
 
-given keyGen: Gen[Any, Key] = Gen.fromZIO(Key.gen.orDie)
-given ingestionIdGen: Gen[Any, Ingestion.Id] = Gen.fromZIO(Ingestion.Id.gen.orDie)
-given timestampGen: Gen[Any, Timestamp] = Gen.fromZIO(Timestamp.gen)
+val keyGen: Gen[Any, Key] = Gen.fromZIO(Key.gen.orDie)
+val ingestionIdGen: Gen[Any, Ingestion.Id] = keyGen.map(Ingestion.Id.apply)
+val timestampGen: Gen[Any, Timestamp] = Gen.fromZIO(Timestamp.gen)
 
-given ingestionGen: Gen[Any, Ingestion] =
-  (ingestionIdGen <*> IngestionStatusGenerators.genStatus <*> timestampGen) map { case (id, status, timestamp) =>
+val ingestionGen: Gen[Any, Ingestion] =
+  (
+    ingestionIdGen <*> IngestionStatusGenerators.genStatus <*> timestampGen
+  ) map { case (id, status, timestamp) =>
     Ingestion(id, status = status, timestamp)
   }
 
-val startIngestionGen: Gen[Any, IngestionCommand.StartIngestion] =
+val startIngestionGen: Gen[Any, IngestionCommand] =
   for {
     id <- ingestionIdGen
     timestamp <- timestampGen
   } yield IngestionCommand.StartIngestion(id, timestamp)
 
-val setFilesGen: Gen[Any, IngestionCommand.SetFiles] =
+val setFilesGen: Gen[Any, IngestionCommand] =
   Gen
     .setOfBounded(1, 12)(keyGen)
     .map(s =>
@@ -42,13 +44,13 @@ val setFilesGen: Gen[Any, IngestionCommand.SetFiles] =
       },
     )
 
-val fileProcessedGen: Gen[Any, IngestionCommand.FileProcessed] =
+val fileProcessedGen: Gen[Any, IngestionCommand] =
   keyGen.map(IngestionFile.Id.apply).map(IngestionCommand.FileProcessed.apply)
 
 val fileFailedGen: Gen[Any, IngestionCommand.FileFailed] =
   keyGen.map(IngestionFile.Id.apply).map(IngestionCommand.FileFailed.apply)
 
-val stopIngestionGen: Gen[Any, IngestionCommand.StopIngestion] =
+val stopIngestionGen: Gen[Any, IngestionCommand] =
   timestampGen.map(IngestionCommand.StopIngestion.apply)
 
 val ingestionCommandGen: Gen[Any, IngestionCommand] =
@@ -60,7 +62,7 @@ val ingestionCommandGen: Gen[Any, IngestionCommand] =
     stopIngestionGen,
   )
 
-given versionGen: Gen[Any, Version] = Gen.fromZIO(Version.gen.orDie)
+val versionGen: Gen[Any, Version] = Gen.fromZIO(Version.gen.orDie)
 
 val ingestionStartedGen: Gen[Any, IngestionEvent] =
   for {
@@ -68,7 +70,7 @@ val ingestionStartedGen: Gen[Any, IngestionEvent] =
     timestamp <- timestampGen
   } yield IngestionEvent.IngestionStarted(id, timestamp)
 
-val ingestionFilesResolvedGen: Gen[Any, IngestionEvent.IngestionFilesResolved] =
+val ingestionFilesResolvedGen: Gen[Any, IngestionEvent] =
   Gen
     .setOfBounded(3, 8)(keyGen)
     .map(s =>
@@ -78,10 +80,10 @@ val ingestionFilesResolvedGen: Gen[Any, IngestionEvent.IngestionFilesResolved] =
       },
     )
 
-val ingestionFileProcessedGen: Gen[Any, IngestionEvent.IngestionFileProcessed] =
+val ingestionFileProcessedGen: Gen[Any, IngestionEvent] =
   keyGen.map(IngestionFile.Id.apply).map(IngestionEvent.IngestionFileProcessed.apply)
 
-val ingestionFileFailedGen: Gen[Any, IngestionEvent.IngestionFileFailed] =
+val ingestionFileFailedGen: Gen[Any, IngestionEvent] =
   keyGen.map(IngestionFile.Id.apply).map(IngestionEvent.IngestionFileFailed.apply)
 
 val ingestionCompletedGen: Gen[Any, IngestionEvent] =

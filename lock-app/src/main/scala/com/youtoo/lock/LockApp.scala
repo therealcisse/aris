@@ -24,7 +24,7 @@ import zio.telemetry.opentelemetry.tracing.Tracing
 import zio.telemetry.opentelemetry.metrics.Meter
 import zio.telemetry.opentelemetry.baggage.Baggage
 
-import com.youtoo.std.*
+import com.youtoo.std.utils.*
 
 object LockApp extends ZIOApp with JsonSupport {
   type Environment =

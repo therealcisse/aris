@@ -5,7 +5,7 @@ set -xe
 case "$1" in
   dataloader)
     echo "Benchmarking Dataloader"
-    sbt "benchmarks/Jmh/run -prof zio.profiling.jmh.JmhZioProfiler com.youtoo.std.DataloaderBenchmark"
+    sbt "benchmarks/Jmh/run -prof zio.profiling.jmh.JmhZioProfiler com.youtoo.std.dataloader.DataloaderBenchmark"
     ;;
   migration)
     echo "Benchmarking DataMigration"

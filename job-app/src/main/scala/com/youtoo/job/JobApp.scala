@@ -34,7 +34,7 @@ import zio.telemetry.opentelemetry.OpenTelemetry
 import zio.telemetry.opentelemetry.tracing.Tracing
 import zio.telemetry.opentelemetry.baggage.Baggage
 
-import com.youtoo.std.*
+import com.youtoo.std.utils.*
 
 object JobApp extends ZIOApp, JsonSupport {
   import com.youtoo.cqrs.Codecs.json.given

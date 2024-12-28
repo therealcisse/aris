@@ -36,7 +36,7 @@ import zio.telemetry.opentelemetry.baggage.Baggage
 
 import zio.json.*
 
-import com.youtoo.std.*
+import com.youtoo.std.utils.*
 
 object IngestionApp extends ZIOApp, JsonSupport {
   import com.youtoo.cqrs.Codecs.json.given

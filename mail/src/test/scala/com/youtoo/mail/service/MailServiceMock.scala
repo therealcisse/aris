@@ -4,7 +4,6 @@ package service
 
 import com.youtoo.mail.model.*
 import com.youtoo.job.model.*
-import com.youtoo.cqrs.*
 
 import zio.prelude.*
 import zio.mock.*
@@ -20,11 +19,11 @@ object MailServiceMock extends Mock[MailService] {
       extends Effect[(MailAccount.Id, Timestamp, NonEmptyList[MailData.Id], MailToken, Job.Id), Throwable, Unit]
   object CompleteSync extends Effect[(MailAccount.Id, Timestamp, Job.Id), Throwable, Unit]
 
-  object LoadAccounts extends Effect[FetchOptions, Throwable, Chunk[MailAccount]]
+  object LoadAccounts extends Effect[Unit, Throwable, Chunk[MailAccount]]
   object LoadAccount extends Effect[MailAccount.Id, Throwable, Option[MailAccount]]
   object SaveAccount extends Effect[MailAccount, Throwable, Long]
   object LoadMail extends Effect[MailData.Id, Throwable, Option[MailData]]
-  object LoadMails extends Effect[FetchOptions, Throwable, Chunk[MailData.Id]]
+  object LoadMails extends Effect[(Option[Long], Long), Throwable, Chunk[MailData.Id]]
   object SaveMail extends Effect[MailData, Throwable, Long]
   object LoadState extends Effect[MailAccount.Id, Throwable, Option[Mail]]
   object UpdateMailSettings extends Effect[(MailAccount.Id, MailSettings), Throwable, Long]
@@ -55,8 +54,8 @@ object MailServiceMock extends Mock[MailService] {
         def completeSync(accountKey: MailAccount.Id, timestamp: Timestamp, jobId: Job.Id): Task[Unit] =
           proxy(CompleteSync, (accountKey, timestamp, jobId))
 
-        def loadAccounts(options: FetchOptions): Task[Chunk[MailAccount]] =
-          proxy(LoadAccounts, options)
+        def loadAccounts(): Task[Chunk[MailAccount]] =
+          proxy(LoadAccounts)
 
         def loadAccount(key: MailAccount.Id): Task[Option[MailAccount]] =
           proxy(LoadAccount, key)
@@ -70,8 +69,8 @@ object MailServiceMock extends Mock[MailService] {
         def loadState(accountKey: MailAccount.Id): Task[Option[Mail]] =
           proxy(LoadState, accountKey)
 
-        def loadMails(options: FetchOptions): Task[Chunk[MailData.Id]] =
-          proxy(LoadMails, options)
+        def loadMails(offset: Option[Long], limit: Long): Task[Chunk[MailData.Id]] =
+          proxy(LoadMails, (offset, limit))
 
         def save(data: MailData): Task[Long] =
           proxy(SaveMail, data)

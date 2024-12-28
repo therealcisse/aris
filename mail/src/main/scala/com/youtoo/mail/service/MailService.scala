@@ -32,13 +32,13 @@ trait MailService {
   ): Task[Unit]
   def completeSync(accountKey: MailAccount.Id, timestamp: Timestamp, jobId: Job.Id): Task[Unit]
 
-  def loadAccounts(options: FetchOptions): Task[Chunk[MailAccount]]
+  def loadAccounts(): Task[Chunk[MailAccount]]
   def loadAccount(key: MailAccount.Id): Task[Option[MailAccount]]
   def loadState(accountKey: MailAccount.Id): Task[Option[Mail]]
   def save(account: MailAccount): Task[Long]
 
   def loadMail(id: MailData.Id): Task[Option[MailData]]
-  def loadMails(options: FetchOptions): Task[Chunk[MailData.Id]]
+  def loadMails(offset: Option[Long], limit: Long): Task[Chunk[MailData.Id]]
   def save(data: MailData): Task[Long]
   def updateMailSettings(id: MailAccount.Id, settings: MailSettings): Task[Long]
 
@@ -75,8 +75,8 @@ object MailService {
   inline def completeSync(accountKey: MailAccount.Id, timestamp: Timestamp, jobId: Job.Id): RIO[MailService, Unit] =
     ZIO.serviceWithZIO(_.completeSync(accountKey, timestamp, jobId))
 
-  inline def loadAccounts(options: FetchOptions): RIO[MailService, Chunk[MailAccount]] =
-    ZIO.serviceWithZIO(_.loadAccounts(options))
+  inline def loadAccounts(): RIO[MailService, Chunk[MailAccount]] =
+    ZIO.serviceWithZIO(_.loadAccounts())
 
   inline def loadAccount(key: MailAccount.Id): RIO[MailService, Option[MailAccount]] =
     ZIO.serviceWithZIO(_.loadAccount(key))
@@ -90,8 +90,8 @@ object MailService {
   inline def loadState(accountKey: MailAccount.Id): RIO[MailService, Option[Mail]] =
     ZIO.serviceWithZIO(_.loadState(accountKey))
 
-  inline def loadMails(options: FetchOptions): RIO[MailService, Chunk[MailData.Id]] =
-    ZIO.serviceWithZIO(_.loadMails(options))
+  inline def loadMails(offset: Option[Long], limit: Long): RIO[MailService, Chunk[MailData.Id]] =
+    ZIO.serviceWithZIO(_.loadMails(offset, limit))
 
   inline def save(data: MailData): RIO[MailService, Long] =
     ZIO.serviceWithZIO(_.save(data))
@@ -139,8 +139,8 @@ object MailService {
       val cmd = MailCommand.CompleteSync(timestamp, jobId)
       cqrs.add(accountKey.asKey, cmd)
 
-    def loadAccounts(options: FetchOptions): Task[Chunk[MailAccount]] =
-      repository.loadAccounts(options).atomically.provideEnvironment(ZEnvironment(pool))
+    def loadAccounts(): Task[Chunk[MailAccount]] =
+      repository.loadAccounts().atomically.provideEnvironment(ZEnvironment(pool))
 
     def loadAccount(key: MailAccount.Id): Task[Option[MailAccount]] =
       repository.loadAccount(key).atomically.provideEnvironment(ZEnvironment(pool))
@@ -185,8 +185,8 @@ object MailService {
 
       } yield o).atomically.provideEnvironment(ZEnvironment(pool))
 
-    def loadMails(options: FetchOptions): Task[Chunk[MailData.Id]] =
-      repository.loadMails(options).atomically.provideEnvironment(ZEnvironment(pool))
+    def loadMails(offset: Option[Long], limit: Long): Task[Chunk[MailData.Id]] =
+      repository.loadMails(offset, limit).atomically.provideEnvironment(ZEnvironment(pool))
 
     def save(data: MailData): Task[Long] =
       repository.save(data).atomically.provideEnvironment(ZEnvironment(pool))
@@ -232,8 +232,8 @@ object MailService {
             "MailService.completeSync",
             attributes = Attributes(Attribute.long("accountId", accountKey.asKey.value)),
           )
-        def loadAccounts(options: FetchOptions): Task[Chunk[MailAccount]] =
-          self.loadAccounts(options) @@ tracing.aspects.span("MailService.loadAccounts")
+        def loadAccounts(): Task[Chunk[MailAccount]] =
+          self.loadAccounts() @@ tracing.aspects.span("MailService.loadAccounts")
         def loadAccount(key: MailAccount.Id): Task[Option[MailAccount]] =
           self.loadAccount(key) @@ tracing.aspects.span(
             "MailService.loadAccount",
@@ -254,8 +254,8 @@ object MailService {
             "MailService.loadState",
             attributes = Attributes(Attribute.long("accountId", accountKey.asKey.value)),
           )
-        def loadMails(options: FetchOptions): Task[Chunk[MailData.Id]] =
-          self.loadMails(options) @@ tracing.aspects.span("MailService.loadMails")
+        def loadMails(offset: Option[Long], limit: Long): Task[Chunk[MailData.Id]] =
+          self.loadMails(offset, limit) @@ tracing.aspects.span("MailService.loadMails")
         def save(data: MailData): Task[Long] =
           self.save(data) @@ tracing.aspects.span(
             "MailService.save",

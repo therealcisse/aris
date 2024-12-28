@@ -21,7 +21,7 @@ object IngestionCommandHandlerSpec extends ZIOSpecDefault {
     test("SetFiles command produces IngestionFilesResolved event") {
       check(setFilesGen) { command =>
         val events = handler.applyCmd(command)
-        val expectedEvent = IngestionEvent.IngestionFilesResolved(command.files)
+        val expectedEvent = IngestionEvent.IngestionFilesResolved(command.asInstanceOf[IngestionCommand.SetFiles].files)
         assert(events)(equalTo(NonEmptyList(expectedEvent)))
       }
     },

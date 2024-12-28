@@ -41,7 +41,7 @@ import zio.telemetry.opentelemetry.baggage.Baggage
 
 import com.youtoo.mail.integration.internal.GmailSupport
 
-import com.youtoo.std.*
+import com.youtoo.std.utils.*
 
 object MailApplication extends MailApp(8181) {}
 
@@ -160,8 +160,18 @@ trait MailApp(val port: Int) extends ZIOApp, JsonSupport {
         }
     },
     Method.GET / "mail-data" / long("accountId") -> handler { (accountId: Long, req: Request) =>
+      val offset = req.queryParamTo[Long]("offset").toOption
+      val limit = req.queryParamToOrElse[Long]("limit", FetchSize)
+
       endpoint.boundary("get_mail_data", req) {
-        getAllMailData() map { mailData => Response.json(mailData.toJson) }
+        getAllMailData(offset = offset.map(Key.apply), limit) map { mailData =>
+          val ids = mailData.map(_.id.asKey)
+
+          val nextOffset =
+            (if ids.size < limit then None else ids.minOption).map(id => s""","nextOffset":"$id"""").getOrElse("")
+
+          Response.json(s"""{"data":${mailData.toJson}$nextOffset}""")
+        }
       }
     },
     Method.GET / "mail-data" / string("mailId") -> handler { (mailId: String, req: Request) =>
@@ -293,9 +303,10 @@ trait MailApp(val port: Int) extends ZIOApp, JsonSupport {
 
   } yield ()
 
-  def getAllMailAccounts(): RIO[Environment, Chunk[MailAccount]] = MailService.loadAccounts(FetchOptions())
+  def getAllMailAccounts(): RIO[Environment, Chunk[MailAccount]] = MailService.loadAccounts()
 
-  def getAllMailData(): RIO[Environment, Chunk[MailData.Id]] = MailService.loadMails(FetchOptions())
+  def getAllMailData(offset: Option[Key], limit: Long): RIO[Environment, Chunk[MailData.Id]] =
+    MailService.loadMails(offset, limit)
 
   def getMailData(id: MailData.Id): RIO[Environment, Option[MailData]] = MailService.loadMail(id)
 
