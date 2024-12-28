@@ -41,6 +41,7 @@ import zio.telemetry.opentelemetry.tracing.Tracing
 import zio.telemetry.opentelemetry.baggage.Baggage
 
 import com.youtoo.mail.integration.internal.GmailSupport
+import com.google.api.client.http.javanet.NetHttpTransport
 
 import com.youtoo.std.utils.*
 
@@ -56,7 +57,7 @@ object MailApp extends ZIOApp, JsonSupport {
   given Config[Port.Type] = Config.int.nested("mail_app_port").withDefault(8181).map(Port(_))
 
   type Environment =
-    FlywayMigration & ZConnectionPool & CQRSPersistence & SnapshotStore & MailEventStore & MailCQRS & Server & Server.Config & NettyConfig & MailService & SyncService & MailClient & GmailPool & MailRepository & JobService & JobRepository & JobEventStore & JobCQRS & LockManager & LockRepository & SnapshotStrategy.Factory & Tracing & Baggage & Meter
+    FlywayMigration & ZConnectionPool & CQRSPersistence & SnapshotStore & MailEventStore & MailCQRS & Server & Server.Config & NettyConfig & MailService & SyncService & MailClient & GmailPool & MailRepository & JobService & JobRepository & JobEventStore & JobCQRS & LockManager & LockRepository & SnapshotStrategy.Factory & Tracing & Baggage & Meter & NetHttpTransport
 
   given environmentTag: EnvironmentTag[Environment] = EnvironmentTag[Environment]
 
@@ -108,6 +109,7 @@ object MailApp extends ZIOApp, JsonSupport {
           SnapshotStrategy.live(),
           MailClient.live(),
           GmailPool.live(),
+          GmailSupport.httpTransport(),
           OtelSdk.custom(resourceName),
           OpenTelemetry.tracing(instrumentationScopeName),
           OpenTelemetry.metrics(instrumentationScopeName),

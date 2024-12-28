@@ -28,7 +28,7 @@ object MailClient {
     extension (a: Type) def value: Long = unwrap(a)
   }
 
-  given Config[BatchSize.Type] = Config.long.nested("mailBatchSize").withDefault(128L).map(BatchSize(_))
+  given Config[BatchSize.Type] = Config.long.nested("mailFetchBatchSize").withDefault(128L).map(BatchSize(_))
 
   def live(): ZLayer[Scope & Tracing & GmailPool, Throwable, MailClient] =
     ZLayer.scoped {
@@ -142,6 +142,7 @@ object MailClient {
               }
 
         } yield mail
+
       }
 
     def traced(tracing: Tracing): MailClient =
