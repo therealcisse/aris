@@ -16,7 +16,7 @@ object PersistenceQuerySpec extends ZIOSpecDefault, JdbcCodecs {
   def spec = suite("PersistenceQuerySpec")(
     suite("PersistenceQuery.toSql")(
       test("EventProperty.toSql should produce correct SQL fragment") {
-        check(genEventProperty) { prop =>
+        check(eventProperyGen) { prop =>
           val sqlFragment = prop.toSql
           val expectedFragment = s"props->>'${prop.key}' = " ++ sql"${prop.value}"
 
@@ -24,7 +24,7 @@ object PersistenceQuerySpec extends ZIOSpecDefault, JdbcCodecs {
         }
       },
       test("Namespace.toSql should produce correct SQL fragment") {
-        check(genNamespace) { ns =>
+        check(namespaceGen) { ns =>
           val sqlFragment = ns.toSql
           val expectedFragment = sql"namespace = ${ns.value}"
 
@@ -32,42 +32,42 @@ object PersistenceQuerySpec extends ZIOSpecDefault, JdbcCodecs {
         }
       },
       test("PersistenceQuery toSql conversion") {
-        check(genPersistenceQuery) { query =>
+        check(persistenceQueryGen) { query =>
           val result = query.toSql
           val expected = expectedPersistenceQuerySql(query)
           assert(result.map(_.toString))(equalTo(expected.map(_.toString)))
         }
       },
       test("PersistenceQuery.Condition toSql conversion") {
-        check(genCondition) { condition =>
+        check(conditionGen) { condition =>
           val result = condition.toSql
           val expected = expectedConditionSql(condition)
           assert(result.map(_.toString))(equalTo(expected.map(_.toString)))
         }
       },
       test("NonEmptyList[Namespace] toSql conversion") {
-        check(genNamespaceList) { namespaces =>
+        check(namespaceListGen) { namespaces =>
           val result = namespaces.toSql
           val expected = expectedNamespaceSql(namespaces)
           assert(result.toString)(equalTo(expected.toString))
         }
       },
       test("Hierarchy toSql conversion") {
-        check(genHierarchy) { hierarchy =>
+        check(hierarchyGen) { hierarchy =>
           val result = hierarchy.toSql
           val expected = expectedHierarchySql(hierarchy)
           assert(result.toString)(equalTo(expected.toString))
         }
       },
       test("Reference toSql conversion") {
-        check(genReference) { ref =>
+        check(referenceGen) { ref =>
           val result = ref.toSql
           val expected = expectedReferenceSql(ref)
           assert(result.toString)(equalTo(expected.toString))
         }
       },
       test("EventProperty toSql conversion") {
-        check(genEventProperty) { prop =>
+        check(eventProperyGen) { prop =>
           val result = prop.toSql
           val expected = expectedEventPropertySql(prop)
           assert(result.toString)(equalTo(expected.toString))

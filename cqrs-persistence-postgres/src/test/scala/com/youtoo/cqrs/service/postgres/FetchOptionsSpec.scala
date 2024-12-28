@@ -19,7 +19,7 @@ object FetchOptionsSpec extends ZIOSpecDefault, JdbcCodecs {
   def spec = suite("FetchOptionsSpec")(
     suite("FetchOptions.toSql")(
       test("FetchOptions toSql conversion") {
-        check(genFetchOptions) { options =>
+        check(fetchOptionsGen) { options =>
           val result = options.toSql
           val expected = expectedFetchOptionsSql(options)
           assert(result)(equalTo(expected))

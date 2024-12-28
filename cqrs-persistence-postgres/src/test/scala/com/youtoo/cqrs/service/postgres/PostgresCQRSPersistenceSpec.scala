@@ -342,8 +342,8 @@ object PostgresCQRSPersistenceSpec extends PgSpec, TestSupport {
       test("should retrieve events with query and fetch option") {
         check(
           discriminatorGen,
-          genPersistenceQuery,
-          genFetchOptions,
+          persistenceQueryGen,
+          fetchOptionsGen,
         ) { (discriminator, query, options) =>
           for {
             persistence <- ZIO.service[CQRSPersistence]
@@ -362,8 +362,8 @@ object PostgresCQRSPersistenceSpec extends PgSpec, TestSupport {
         check(
           keyGen,
           discriminatorGen,
-          genPersistenceQuery,
-          genFetchOptions,
+          persistenceQueryGen,
+          fetchOptionsGen,
         ) { (id, discriminator, query, options) =>
           for {
             persistence <- ZIO.service[CQRSPersistence]
@@ -491,8 +491,8 @@ object PostgresCQRSPersistenceSpec extends PgSpec, TestSupport {
       },
       test("read all events by args is optimized") {
         check(
-          genPersistenceQuery,
-          genFetchOptions,
+          persistenceQueryGen,
+          fetchOptionsGen,
           discriminatorGen
         ) {
           case (q, options, discriminator) =>
@@ -518,8 +518,8 @@ object PostgresCQRSPersistenceSpec extends PgSpec, TestSupport {
       test("read all events by args for aggregate is optimized") {
         check(
           keyGen,
-          genPersistenceQuery,
-          genFetchOptions,
+          persistenceQueryGen,
+          fetchOptionsGen,
           discriminatorGen
         ) {
           case (id, q, options, discriminator) =>
@@ -558,35 +558,4 @@ object PostgresCQRSPersistenceSpec extends PgSpec, TestSupport {
 
     }
 
-  val namespaceGen: Gen[Any, Namespace] =
-    Gen.int.map(Namespace(_))
-
-  val discriminatorGen: Gen[Any, Discriminator] =
-    Gen.alphaNumericStringBounded(5, 5).map(Discriminator(_))
-
-  val keyGen: Gen[Any, Key] = Gen.fromZIO(Key.gen.orDie)
-  val versionGen: Gen[Any, Version] = Gen.fromZIO(Version.gen.orDie)
-
-  val hierarchyGen: Gen[Any, Hierarchy] = Gen.oneOf(
-    keyGen map { parentId => Hierarchy.Child(parentId) },
-    keyGen map { grandParentId => Hierarchy.GrandChild(grandParentId) },
-    (keyGen <*> keyGen) map { case (grandParentId, parentId) => Hierarchy.Descendant(grandParentId, parentId) },
-  )
-
-  val namespacesGen: Gen[Any, NonEmptyList[Namespace]] =
-    Gen
-      .setOfBounded(1, 8)(Gen.int)
-      .map(s =>
-        NonEmptyList.fromIterableOption(s) match {
-          case None => throw IllegalArgumentException("empty")
-          case Some(nes) => nes.map(Namespace.apply)
-        },
-      )
-
-  val eventPropertiesGen: Gen[Any, NonEmptyList[EventProperty]] =
-    Gen
-      .setOfBounded(1, 8)(
-        (Gen.alphaNumericStringBounded(3, 20) <*> Gen.alphaNumericStringBounded(128, 512)) `map` EventProperty.apply,
-      )
-      .map(s => NonEmptyList.fromIterableOption(s).getOrElse(throw IllegalArgumentException("empty")))
 }
