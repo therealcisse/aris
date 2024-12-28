@@ -22,7 +22,7 @@ import com.google.api.client.auth.oauth2.TokenResponseException
 object GmailSupport {
   val jsonFactory = GsonFactory.getDefaultInstance
 
-  case class GoogleTransport(transport: NetHttpTransport) extends AnyVal
+  private case class GoogleTransport(transport: NetHttpTransport) extends AnyVal
 
   def httpTransport(): ZLayer[Any, Throwable, NetHttpTransport] =
     ZLayer.scoped {
@@ -63,45 +63,24 @@ object GmailSupport {
       }
     }
 
-  private def refreshAccessToken(
-    clientInfo: GoogleClientInfo,
-    refreshToken: TokenInfo.RefreshToken,
-  ): RIO[NetHttpTransport, TokenInfo.RefreshToken] =
-    ZIO.serviceWithZIO[NetHttpTransport] { (httpTransport: NetHttpTransport) =>
-
-      val tokenResponse = new GoogleRefreshTokenRequest(
-        httpTransport,
-        jsonFactory,
-        clientInfo.clientId.value,
-        clientInfo.clientSecret.value,
-        refreshToken.value,
-      ).setGrantType("refresh_token").execute()
-
-      ZIO.fromOption {
-        Option(tokenResponse.getRefreshToken) map TokenInfo.RefreshToken.apply
-      }.mapError(_ => new IllegalStateException("token refresh error"))
-    }
-
   def getClient(clientInfo: GoogleClientInfo, tokenInfo: TokenInfo): RIO[Scope & NetHttpTransport, Gmail] =
-    refreshAccessToken(clientInfo, tokenInfo.refreshToken).flatMap { refreshedToken =>
-      ZIO.serviceWithZIO[NetHttpTransport] { (httpTransport: NetHttpTransport) =>
-        ZIO.attempt {
+    ZIO.serviceWithZIO[NetHttpTransport] { (httpTransport: NetHttpTransport) =>
+      ZIO.attempt {
 
-          val credentials = UserCredentials
-            .newBuilder()
-            .setClientId(clientInfo.clientId.value)
-            .setClientSecret(clientInfo.clientSecret.value)
-            .setRefreshToken(refreshedToken.value)
-            .build()
+        val credentials = UserCredentials
+          .newBuilder()
+          .setClientId(clientInfo.clientId.value)
+          .setClientSecret(clientInfo.clientSecret.value)
+          .setRefreshToken(tokenInfo.refreshToken.value)
+          .build()
 
-          val requestInitializer = new HttpCredentialsAdapter(credentials)
+        val requestInitializer = new HttpCredentialsAdapter(credentials)
 
-          new Gmail.Builder(httpTransport, jsonFactory, requestInitializer)
-            .setApplicationName("YouToo Mail App")
-            .build()
-        }
-
+        new Gmail.Builder(httpTransport, jsonFactory, requestInitializer)
+          .setApplicationName("YouToo Mail App")
+          .build()
       }
+
     }
 
 }
