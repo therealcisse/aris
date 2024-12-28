@@ -5,6 +5,7 @@ import scala.language.future
 
 import zio.*
 import zio.jdbc.*
+import zio.prelude.*
 
 import com.youtoo.postgres.*
 import com.youtoo.cqrs.*
@@ -43,25 +44,34 @@ import com.youtoo.mail.integration.internal.GmailSupport
 
 import com.youtoo.std.utils.*
 
-object MailApplication extends MailApp(8181) {}
-
-trait MailApp(val port: Int) extends ZIOApp, JsonSupport {
+object MailApp extends ZIOApp, JsonSupport {
   import com.youtoo.cqrs.Codecs.json.given
 
   inline val FetchSize = 1_000L
+
+  object Port extends Newtype[Int] {
+    extension (a: Type) def value: Int = unwrap(a)
+  }
+
+  given Config[Port.Type] = Config.int.nested("mail_app_port").withDefault(8181).map(Port(_))
 
   type Environment =
     FlywayMigration & ZConnectionPool & CQRSPersistence & SnapshotStore & MailEventStore & MailCQRS & Server & Server.Config & NettyConfig & MailService & SyncService & MailClient & GmailPool & MailRepository & JobService & JobRepository & JobEventStore & JobCQRS & LockManager & LockRepository & SnapshotStrategy.Factory & Tracing & Baggage & Meter
 
   given environmentTag: EnvironmentTag[Environment] = EnvironmentTag[Environment]
 
-  private val config = Server.Config.default
-    .port(port)
-
   private val nettyConfig = NettyConfig.default
     .leakDetection(NettyConfig.LeakDetectionLevel.DISABLED)
 
-  private val configLayer = ZLayer.succeed(config)
+  private val configLayer = ZLayer {
+    for {
+      port <- ZIO.config[Port.Type]
+
+      config = Server.Config.default.port(port.value)
+    } yield config
+
+  }
+
   private val nettyConfigLayer = ZLayer.succeed(nettyConfig)
 
   private val instrumentationScopeName = "com.youtoo.mail.MailApp"
@@ -310,8 +320,8 @@ trait MailApp(val port: Int) extends ZIOApp, JsonSupport {
 
   def getMailState(id: MailAccount.Id): RIO[Environment, Option[Mail]] = MailService.loadState(id)
 
-  def triggerMailSync(id: MailAccount.Id): RIO[Scope & Environment, ?] =
-    SyncService.sync(id).forkScoped
+  def triggerMailSync(id: MailAccount.Id): RIO[Environment, ?] =
+    ZIO.scoped(SyncService.sync(id)).forkDaemon
 
   def run: RIO[Environment & Scope, Unit] =
     for {

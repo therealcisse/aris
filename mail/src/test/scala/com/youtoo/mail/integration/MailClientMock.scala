@@ -32,10 +32,10 @@ object MailClientMock extends Mock[MailClient] {
           accountKey: MailAccount.Id,
           token: Option[MailToken],
           labels: Option[NonEmptySet[MailLabels.LabelKey]],
-        ): RIO[Scope & Tracing, Option[(NonEmptyList[MailData.Id], MailToken)]] =
+        ): RIO[Tracing, Option[(NonEmptyList[MailData.Id], MailToken)]] =
           proxy(FetchMails, (accountKey, token, labels))
 
-        def loadMessage(accountKey: MailAccount.Id, id: MailData.Id): RIO[Scope, Option[MailData]] =
+        def loadMessage(accountKey: MailAccount.Id, id: MailData.Id): Task[Option[MailData]] =
           proxy(LoadMessage, (accountKey, id))
       }
     }

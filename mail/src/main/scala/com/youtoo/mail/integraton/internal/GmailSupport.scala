@@ -21,7 +21,7 @@ import com.google.api.client.auth.oauth2.TokenResponseException
 object GmailSupport {
   val jsonFactory = GsonFactory.getDefaultInstance
 
-  def isTokenRevoked: Throwable => Boolean = {
+  def isAuthorizationRevoked: Throwable => Boolean = {
     case e: TokenResponseException =>
       Option(e.getDetails).fold(false)(_.getError == "invalid_grant")
 

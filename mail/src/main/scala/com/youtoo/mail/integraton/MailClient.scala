@@ -19,8 +19,8 @@ trait MailClient {
     accountKey: MailAccount.Id,
     token: Option[MailToken],
     labels: Option[NonEmptySet[MailLabels.LabelKey]],
-  ): RIO[Scope & Tracing, Option[(NonEmptyList[MailData.Id], MailToken)]]
-  def loadMessage(accountKey: MailAccount.Id, id: MailData.Id): RIO[Scope, Option[MailData]]
+  ): RIO[Tracing, Option[(NonEmptyList[MailData.Id], MailToken)]]
+  def loadMessage(accountKey: MailAccount.Id, id: MailData.Id): Task[Option[MailData]]
 }
 
 object MailClient {
@@ -63,77 +63,86 @@ object MailClient {
       accountKey: MailAccount.Id,
       token: Option[MailToken],
       labels: Option[NonEmptySet[MailLabels.LabelKey]],
-    ): RIO[Scope & Tracing, Option[(NonEmptyList[MailData.Id], MailToken)]] =
-      for {
-        service <- pool.get(accountKey)
-        batchSize <- ZIO.config[BatchSize.Type]
+    ): RIO[Tracing, Option[(NonEmptyList[MailData.Id], MailToken)]] =
+      ZIO.scoped {
 
-        _ <- Log.debug(s"Fetching mails from : $token")
+        for {
+          service <- pool.get(accountKey)
+          batchSize <- ZIO.config[BatchSize.Type]
 
-        response <- ZIO.attempt {
-          val builder = service
-            .users()
-            .messages()
-            .list("me")
-            .setMaxResults(batchSize.value)
+          _ <- Log.debug(s"Fetching mails from : $token")
 
-          val withToken = token.fold(builder)(l => builder.setPageToken(l.value))
-          val withLabels = labels.fold(withToken)(l => withToken.setLabelIds(l.map(_.value).toList.asJava))
+          response <- ZIO.attempt {
 
-          withLabels.execute()
-        }
+            val builder = service
+              .users()
+              .messages()
+              .list("me")
+              .setMaxResults(batchSize.value)
 
-        result =
-          if response == null then None
-          else
-            Option(response.getNextPageToken()) flatMap { token =>
-              val messages = Option(response.getMessages()).fold(Nil)(_.asScala.toList.map(m => MailData.Id(m.getId())))
+            val withToken = token.fold(builder)(l => builder.setPageToken(l.value))
+            val withLabels = labels.fold(withToken)(l => withToken.setLabelIds(l.map(_.value).toList.asJava))
 
-              NonEmptyList.fromIterableOption(messages).map { nel =>
-                (nel, MailToken(token))
+            withLabels.execute()
+          }
 
+          result =
+            if response == null then None
+            else
+              Option(response.getNextPageToken()) flatMap { token =>
+                val messages =
+                  Option(response.getMessages()).fold(Nil)(_.asScala.toList.map(m => MailData.Id(m.getId())))
+
+                NonEmptyList.fromIterableOption(messages).map { nel =>
+                  (nel, MailToken(token))
+
+                }
               }
-            }
 
-        _ = result match {
-          case None => Log.debug(s"Fetched 0 mails from : $token")
-          case Some((nel, nextToken)) => Log.debug(s"Fetched ${nel.size} mails from : $token, nextToken=$nextToken")
-        }
-      } yield result
+          _ = result match {
+            case None => Log.debug(s"Fetched 0 mails from : $token")
+            case Some((nel, nextToken)) =>
+              Log.debug(s"Fetched ${nel.size} mails from : $token, nextToken=$nextToken")
+          }
+        } yield result
+      }
 
-    def loadMessage(accountKey: MailAccount.Id, id: MailData.Id): RIO[Scope, Option[MailData]] =
-      for {
-        service <- pool.get(accountKey)
+    def loadMessage(accountKey: MailAccount.Id, id: MailData.Id): Task[Option[MailData]] =
+      ZIO.scoped {
 
-        response <- ZIO.attempt {
-          service
-            .users()
-            .messages()
-            .get("me", id.value)
-            .setFormat("raw")
-            .execute()
-        }
+        for {
+          service <- pool.get(accountKey)
 
-        timestamp <- Timestamp.gen
+          response <- ZIO.attempt {
+            service
+              .users()
+              .messages()
+              .get("me", id.value)
+              .setFormat("raw")
+              .execute()
+          }
 
-        mail =
-          if response == null then None
-          else
-            (
-              Option(response.getId()),
-              Option(response.getRaw()),
-              Option(response.getInternalDate()),
-            ).mapN { case (id, body, internalDate) =>
-              MailData(
-                id = MailData.Id(id),
-                body = MailData.Body(body),
-                accountKey = accountKey,
-                internalDate = InternalDate(Timestamp(internalDate)),
-                timestamp = timestamp,
-              )
-            }
+          timestamp <- Timestamp.gen
 
-      } yield mail
+          mail =
+            if response == null then None
+            else
+              (
+                Option(response.getId()),
+                Option(response.getRaw()),
+                Option(response.getInternalDate()),
+              ).mapN { case (id, body, internalDate) =>
+                MailData(
+                  id = MailData.Id(id),
+                  body = MailData.Body(body),
+                  accountKey = accountKey,
+                  internalDate = InternalDate(Timestamp(internalDate)),
+                  timestamp = timestamp,
+                )
+              }
+
+        } yield mail
+      }
 
     def traced(tracing: Tracing): MailClient =
       new MailClient {
@@ -146,12 +155,12 @@ object MailClient {
           accountKey: MailAccount.Id,
           token: Option[MailToken],
           labels: Option[NonEmptySet[MailLabels.LabelKey]],
-        ): RIO[Scope & Tracing, Option[(NonEmptyList[MailData.Id], MailToken)]] =
+        ): RIO[Tracing, Option[(NonEmptyList[MailData.Id], MailToken)]] =
           self.fetchMails(accountKey, token, labels) @@ tracing.aspects.span(
             "MailClient.fetchMails",
             attributes = Attributes(Attribute.long("accountId", accountKey.asKey.value)),
           )
-        def loadMessage(accountKey: MailAccount.Id, id: MailData.Id): RIO[Scope, Option[MailData]] =
+        def loadMessage(accountKey: MailAccount.Id, id: MailData.Id): Task[Option[MailData]] =
           self.loadMessage(accountKey, id) @@ tracing.aspects.span(
             "MailClient.loadMessage",
             attributes = Attributes(Attribute.long("accountId", accountKey.asKey.value)),

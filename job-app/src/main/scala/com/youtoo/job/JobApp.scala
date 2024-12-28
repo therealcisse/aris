@@ -5,6 +5,7 @@ import scala.language.future
 
 import zio.*
 import zio.jdbc.*
+import zio.prelude.*
 
 import cats.implicits.*
 
@@ -41,18 +42,29 @@ object JobApp extends ZIOApp, JsonSupport {
 
   inline val FetchSize = 1_000L
 
+  object Port extends Newtype[Int] {
+    extension (a: Type) def value: Int = unwrap(a)
+  }
+
+  given Config[Port.Type] = Config.int.nested("job_app_port").withDefault(8181).map(Port(_))
+
   type Environment =
     FlywayMigration & ZConnectionPool & CQRSPersistence & SnapshotStore & JobEventStore & JobCQRS & Server & Server.Config & NettyConfig & JobService & JobRepository & SnapshotStrategy.Factory & Tracing & Baggage & Meter
 
   given environmentTag: EnvironmentTag[Environment] = EnvironmentTag[Environment]
 
-  private val config = Server.Config.default
-    .port(8181)
-
   private val nettyConfig = NettyConfig.default
     .leakDetection(NettyConfig.LeakDetectionLevel.DISABLED)
 
-  private val configLayer = ZLayer.succeed(config)
+  private val configLayer = ZLayer {
+    for {
+      port <- ZIO.config[Port.Type]
+
+      config = Server.Config.default.port(port.value)
+    } yield config
+
+  }
+
   private val nettyConfigLayer = ZLayer.succeed(nettyConfig)
 
   private val instrumentationScopeName = "com.youtoo.job.JobApp"

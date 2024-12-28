@@ -16,6 +16,8 @@ import zio.telemetry.opentelemetry.common.*
 import zio.stream.*
 import com.youtoo.mail.integration.*
 
+import java.time.temporal.ChronoUnit
+
 import com.youtoo.mail.integration.internal.GmailSupport
 
 trait SyncService {
@@ -88,16 +90,30 @@ object SyncService {
           }
       }
 
-    def scopedTask[R, E, A](task: Ref[Boolean] => ZIO[R & Scope, E, A]): ZIO[R & Scope, E, A] =
-      ZIO.acquireRelease {
+    def scopedTask[R, E, A](task: Ref[Boolean] => ZIO[R & Scope, E, A]): ZIO[R & Tracing & Scope, E, A] =
+      ZIO.acquireReleaseExit {
         for {
           interruption <- Ref.make(false)
-          fiber <- ZIO.scoped(task(interruption)).fork
+          scope <- Scope.make
+          fiber <- scope.extend(task(interruption)).fork
+          // fiber <- (task(interruption)).fork
 
-        } yield (interruption, fiber)
-      } { case (interruption, fiber) =>
-        interruption.set(true) *> fiber.join.ignoreLogged
-      }.flatMap { case (_, fiber) =>
+        } yield (
+          scope,
+          interruption,
+          fiber,
+        )
+      } { case ((scope, interruption, fiber), exit) =>
+        for {
+          _ <- Log.info("Sync interruption requested")
+          _ <- interruption.setAsync(true)
+          _ <- fiber.join
+            .timeoutFail(new IllegalStateException("timout"))(Duration(30L, ChronoUnit.SECONDS))
+            .ignoreLogged
+          _ <- scope.close(exit)
+
+        } yield ()
+      }.flatMap { case (_, _, fiber) =>
         fiber.join
       }
 
@@ -131,7 +147,7 @@ object SyncService {
                   case AccountType.Gmail =>
                     val reason = Job.CompletionReason.Failure(Option(e.getMessage))
 
-                    if GmailSupport.isTokenRevoked(e) then
+                    if GmailSupport.isAuthorizationRevoked(e) then
                       for {
                         _ <- Log.error(s"Mail account token revoked: ${account.id}")
                         timestamp <- Timestamp.gen
@@ -167,29 +183,30 @@ object SyncService {
 
         ZStream
           .unfoldZIO(init) { state =>
-            Log.debug(s"Begin fetch for account") *> restore(
-              options.applyZIO {
-                mailClient.fetchMails(account.id, state.token, None)
-              },
-            ).flatMap {
-              case None => ZIO.none
-              case Some((mailKeys, nextToken)) =>
-                for {
-                  _ <- Log.debug(s"Fetched ${mailKeys.size} mails for account")
-                  timestamp <- Timestamp.gen
-                  _ <- mailService.recordSynced(accountKey = account.id, timestamp, mailKeys, nextToken, jobId)
-                  interrupted <- interruption.get
-                  nextState = state.next(nextToken)
-                  expired = nextState.isExpired(options, timestamp)
-                  cancelled <- if !expired && !interrupted then jobService.isCancelled(jobId) else ZIO.succeed(false)
-                  _ <- Log.info(s"Sync interrupted for account") when interrupted
-                  _ <- Log.info(s"Sync cancelled for account") when cancelled
-                  _ <- Log.info(s"Sync expired for account") when expired
-                  _ <- cancelledRef.set(true) when cancelled
-                } yield
-                  if cancelled || expired || interrupted then None
-                  else Some((), nextState)
+            val op = options.applyZIO {
+              restore(mailClient.fetchMails(account.id, state.token, None))
             }
+
+            Log.debug(s"Begin fetch for account from ${state.token}") *>
+              op.flatMap {
+                case None => ZIO.none
+                case Some((mailKeys, nextToken)) =>
+                  for {
+                    _ <- Log.debug(s"Fetched ${mailKeys.size} mails for account")
+                    timestamp <- Timestamp.gen
+                    _ <- mailService.recordSynced(accountKey = account.id, timestamp, mailKeys, nextToken, jobId)
+                    interrupted <- interruption.get
+                    nextState = state.next(nextToken)
+                    expired = nextState.isExpired(options, timestamp)
+                    cancelled <- if !expired && !interrupted then jobService.isCancelled(jobId) else ZIO.succeed(false)
+                    _ <- Log.info(s"Sync interrupted for account") when interrupted
+                    _ <- Log.info(s"Sync cancelled for account") when cancelled
+                    _ <- Log.info(s"Sync expired for account") when expired
+                    _ <- cancelledRef.set(true) when cancelled
+                  } yield
+                    if cancelled || expired || interrupted then None
+                    else Some((), nextState)
+              }
           }
           .runDrain *> cancelledRef.get
       }

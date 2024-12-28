@@ -53,7 +53,7 @@ val authConfigGen: Gen[Any, AuthConfig] =
 
 val tokenInfoGen: Gen[Any, TokenInfo] = for {
   refreshToken <- Gen.alphaNumericStringBounded(5, 5).map(TokenInfo.RefreshToken.apply)
-  idToken <- Gen.alphaNumericStringBounded(5, 5).map(TokenInfo.IdToken.apply)
+  idToken <- Gen.option(Gen.alphaNumericStringBounded(5, 5).map(TokenInfo.IdToken.apply))
 } yield TokenInfo(refreshToken, idToken)
 
 val accountTypeGen: Gen[Any, AccountType] =
