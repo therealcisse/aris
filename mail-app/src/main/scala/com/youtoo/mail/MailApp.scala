@@ -120,9 +120,10 @@ trait MailApp(val port: Int) extends ZIOApp, JsonSupport {
     Method.POST / "mail-accounts" / long("accountId") / "authenticate" -> handler { (accountId: Long, req: Request) =>
       endpoint.boundary("authenticate_mail_account", req) {
         req.body.fromBody[String] flatMap { authorizationCode =>
-          authenticateMailAccount(MailAccount.Id(Key(accountId)), authorizationCode = authorizationCode) map { _ =>
-            Response.ok
-          }
+          authenticateMailAccount(MailAccount.Id(Key(accountId)), authorizationCode = authorizationCode) foldZIO (
+            success = _ => ZIO.succeed(Response.ok),
+            failure = e => Log.error(s"Authentication failed", e) as Response.badRequest,
+          )
         }
 
       }
@@ -163,14 +164,9 @@ trait MailApp(val port: Int) extends ZIOApp, JsonSupport {
       val offset = req.queryParamTo[Long]("offset").toOption
       val limit = req.queryParamToOrElse[Long]("limit", FetchSize)
 
-      endpoint.boundary("get_mail_data", req) {
-        getAllMailData(offset = offset.map(Key.apply), limit) map { mailData =>
-          val ids = mailData.map(_.id.asKey)
-
-          val nextOffset =
-            (if ids.size < limit then None else ids.minOption).map(id => s""","nextOffset":"$id"""").getOrElse("")
-
-          Response.json(s"""{"data":${mailData.toJson}$nextOffset}""")
+      endpoint.boundary("get_mail_ids", req) {
+        getAllMailData(offset, limit) map { ids =>
+          Response.json(ids.toJson)
         }
       }
     },
@@ -248,8 +244,10 @@ trait MailApp(val port: Int) extends ZIOApp, JsonSupport {
               _ <- info match {
                 case Left(e) =>
                   Log.error(s"Authentication failed for account ${acc.id} : ${e.getMessage}", e) *> MailService
-                    .revokeAuthorization(acc.id, timestamp)
-                case Right(token) => MailService.grantAuthorization(acc.id, token, timestamp)
+                    .revokeAuthorization(acc.id, timestamp) *> ZIO.fail(e)
+
+                case Right(token) =>
+                  MailService.grantAuthorization(acc.id, token, timestamp)
               }
 
             } yield ()
@@ -305,7 +303,7 @@ trait MailApp(val port: Int) extends ZIOApp, JsonSupport {
 
   def getAllMailAccounts(): RIO[Environment, Chunk[MailAccount]] = MailService.loadAccounts()
 
-  def getAllMailData(offset: Option[Key], limit: Long): RIO[Environment, Chunk[MailData.Id]] =
+  def getAllMailData(offset: Option[Long], limit: Long): RIO[Environment, Chunk[MailData.Id]] =
     MailService.loadMails(offset, limit)
 
   def getMailData(id: MailData.Id): RIO[Environment, Option[MailData]] = MailService.loadMail(id)

@@ -6,7 +6,7 @@ import zio.prelude.*
 
 import zio.schema.*
 
-case class TokenInfo(refreshToken: TokenInfo.RefreshToken, idToken: TokenInfo.IdToken)
+case class TokenInfo(refreshToken: TokenInfo.RefreshToken, idToken: Option[TokenInfo.IdToken])
 
 object TokenInfo {
   given Schema[TokenInfo] = DeriveSchema.gen

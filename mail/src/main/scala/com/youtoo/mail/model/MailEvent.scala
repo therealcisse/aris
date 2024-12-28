@@ -45,8 +45,8 @@ object MailEvent {
 
     extension (self: MailEvent) def hierarchy: Option[Hierarchy] = self match {
       case e: MailEvent.SyncStarted => Hierarchy.Child(e.jobId.asKey).some
-      case e: MailEvent.AuthorizationGranted => None
-      case e: MailEvent.AuthorizationRevoked => None
+      case _: MailEvent.AuthorizationGranted => None
+      case _: MailEvent.AuthorizationRevoked => None
       case e: MailEvent.MailSynced => Hierarchy.Child(e.jobId.asKey).some
       case e: MailEvent.SyncCompleted => Hierarchy.Child(e.jobId.asKey).some
 

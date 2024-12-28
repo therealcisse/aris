@@ -44,7 +44,7 @@ object GmailSupport {
     try
       TokenInfo(
         refreshToken = TokenInfo.RefreshToken(ts.getRefreshToken()),
-        idToken = TokenInfo.IdToken(ts.getIdToken()),
+        idToken = Option(ts.getIdToken()) map TokenInfo.IdToken.apply,
       )
     finally httpTransport.shutdown()
   }
