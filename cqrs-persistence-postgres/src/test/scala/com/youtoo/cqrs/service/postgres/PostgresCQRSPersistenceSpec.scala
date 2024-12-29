@@ -330,7 +330,7 @@ object PostgresCQRSPersistenceSpec extends PgSpec, TestSupport {
             es <- atomically(persistence.readEvents[DummyEvent](
               discriminator,
               query = PersistenceQuery.condition(),
-              FetchOptions(None, Some(l)),
+              FetchOptions(None, Some(l), FetchOptions.Order.asc),
               catalog = Catalog.Default,
             ))
 

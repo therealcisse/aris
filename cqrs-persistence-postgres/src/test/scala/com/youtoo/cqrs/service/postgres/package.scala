@@ -87,8 +87,15 @@ val persistenceQueryGen: Gen[Any, PersistenceQuery] =
     conditionGen,
   )
 
+val orderGen: Gen[Any, FetchOptions.Order] =
+  Gen.elements(
+    FetchOptions.Order.asc,
+    FetchOptions.Order.desc,
+  )
+
 val fetchOptionsGen: Gen[Any, FetchOptions] =
   for {
     offset <- Gen.option(keyGen)
     limit <- Gen.option(Gen.long(0, 1000))
-  } yield FetchOptions(offset, limit)
+    order <- orderGen
+  } yield FetchOptions(offset, limit, order)

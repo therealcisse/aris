@@ -172,7 +172,7 @@ object MailService {
                 id = acc.id.asKey,
                 query =
                   PersistenceQuery.anyNamespace(MailEvent.NS.AuthorizationGranted, MailEvent.NS.AuthorizationRevoked),
-                options = FetchOptions(),
+                options = FetchOptions().desc().limit(1L),
               )
               authorization = authEvents.fold(Authorization.Pending()) { es =>
                 EventHandler.applyEvents(es)(using MailEvent.LoadAuthorization())

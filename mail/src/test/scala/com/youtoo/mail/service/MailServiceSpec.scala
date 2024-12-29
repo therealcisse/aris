@@ -272,7 +272,7 @@ object MailServiceSpec extends MockSpecDefault, TestSupport {
                 MailEvent.NS.AuthorizationGranted,
                 MailEvent.NS.AuthorizationRevoked,
               ),
-              FetchOptions(),
+              FetchOptions().desc().limit(1L),
             ),
           ),
           value {

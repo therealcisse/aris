@@ -36,11 +36,28 @@ trait JdbcCodecs {
   given JdbcDecoder[Timestamp] = JdbcDecoder[Long].map(Timestamp.apply)
 
   extension (o: FetchOptions)
-    def toSql: (Option[SqlFragment], Option[SqlFragment]) =
-      val offsetQuery = o.offset.map(offset => sql"version > $offset")
+    def toSql: (
+      Option[SqlFragment],
+      Option[SqlFragment],
+      SqlFragment,
+    ) =
+      val offsetQuery = o.offset.map(offset =>
+        o.order match {
+          case FetchOptions.Order.asc => sql"version > $offset"
+          case FetchOptions.Order.desc => sql"version < $offset"
+        },
+      )
       val limitQuery = o.limit.map(limit => sql"LIMIT $limit")
+      val orderQuery = o.order match {
+        case FetchOptions.Order.asc => sql" ORDER BY version ASC"
+        case FetchOptions.Order.desc => sql" ORDER BY version DESC"
+      }
 
-      (offsetQuery, limitQuery)
+      (
+        offsetQuery,
+        limitQuery,
+        orderQuery,
+      )
 
   extension (q: PersistenceQuery)
     def toSql: Option[SqlFragment] =

@@ -194,14 +194,18 @@ object PostgresCQRSPersistence {
     ): Query[Change[Event]] =
       given JdbcDecoder[Event] = byteArrayDecoder[Event]
 
-      val (offsetQuery, limitQuery) = options.toSql
+      val (
+        offsetQuery,
+        limitQuery,
+        orderQuery,
+      ) = options.toSql
 
       SqlFragment
         .select("version", "payload")
         .from(catalog.tableName)
         .where(
           sql"""discriminator = $discriminator""" ++ query.toSql.fold(SqlFragment.empty)(ql => sql" AND " ++ ql) ++ offsetQuery.fold(SqlFragment.empty)(ql => sql" AND " ++ ql) ++
-          sql""" ORDER BY version ASC""" ++ limitQuery.fold(SqlFragment.empty)(ql => sql" " ++ ql)
+          orderQuery ++ limitQuery.fold(SqlFragment.empty)(ql => sql" " ++ ql)
         ).query[
         (
           Version,
@@ -218,14 +222,18 @@ object PostgresCQRSPersistence {
     ): Query[Change[Event]] =
       given JdbcDecoder[Event] = byteArrayDecoder[Event]
 
-      val (offsetQuery, limitQuery) = options.toSql
+      val (
+        offsetQuery,
+        limitQuery,
+        orderQuery,
+      ) = options.toSql
 
       SqlFragment
         .select("version", "payload")
         .from(catalog.tableName)
         .where(
           sql"""aggregate_id = $id AND discriminator = $discriminator""" ++ query.toSql.fold(SqlFragment.empty)(ql => sql" AND " ++ ql) ++ offsetQuery.fold(SqlFragment.empty)(ql => sql" AND " ++ ql) ++
-          sql""" ORDER BY version ASC""" ++ limitQuery.fold(SqlFragment.empty)(ql => sql" " ++ ql)
+          orderQuery ++ limitQuery.fold(SqlFragment.empty)(ql => sql" " ++ ql)
         ).query[
         (
           Version,

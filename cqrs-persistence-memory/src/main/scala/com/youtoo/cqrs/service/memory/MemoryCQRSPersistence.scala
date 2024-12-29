@@ -12,7 +12,7 @@ import com.youtoo.cqrs.domain.*
 
 import zio.schema.codec.*
 
-import zio.prelude.*
+import zio.prelude.{Ordering as _, *}
 import scala.collection.immutable.MultiDict
 
 trait MemoryCQRSPersistence extends CQRSPersistence {}
@@ -147,13 +147,36 @@ object MemoryCQRSPersistence {
                 query.isMatch(ch)
             }
 
-            val res = Chunk.fromIterable(matches).sorted
+            val ch = Chunk.fromIterable(matches)
 
             options match {
-              case FetchOptions(Some(o), Some(l)) => res.dropWhile(_.version.value <= o.value).take(l.toInt)
-              case FetchOptions(Some(o), None)    => res.dropWhile(_.version.value <= o.value)
-              case FetchOptions(None, Some(l))    => res.take(l.toInt)
-              case FetchOptions(None, None)       => res
+              case FetchOptions(Some(o), Some(l), order) =>
+
+                order match {
+                  case FetchOptions.Order.asc =>  ch.sorted.dropWhile(_.version.value <= o.value).take(l.toInt)
+                  case FetchOptions.Order.desc => ch.sorted(using Ordering[Change[?]].reverse).dropWhile(_.version.value >= o.value).take(l.toInt)
+                }
+
+              case FetchOptions(Some(o), None, order)    =>
+
+                order match {
+                  case FetchOptions.Order.asc =>  ch.sorted.dropWhile(_.version.value <= o.value)
+                  case FetchOptions.Order.desc => ch.sorted(using Ordering[Change[?]].reverse).dropWhile(_.version.value >= o.value)
+                }
+
+              case FetchOptions(None, Some(l), order)    =>
+
+                order match {
+                  case FetchOptions.Order.asc =>  ch.sorted.take(l.toInt)
+                  case FetchOptions.Order.desc => ch.sorted(using Ordering[Change[?]].reverse).take(l.toInt)
+                }
+
+              case FetchOptions(None, None, order)       =>
+
+                order match {
+                  case FetchOptions.Order.asc =>  ch.sorted
+                  case FetchOptions.Order.desc => ch.sorted(using Ordering[Change[?]].reverse)
+                }
             }
 
         }
