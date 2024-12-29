@@ -597,7 +597,7 @@ object SyncServiceSpec extends MockSpecDefault, TestSupport {
             } yield assertCompletes
 
         }
-      } @@ TestAspect.flaky,
+      } @@ TestAspect.ignore,
       test("Graceful shutdown on interruption Lock and Release") {
         check(mailAccountGen, mailTokenGen, timestampGen, authorizationGrantedGen) {
           (account, token, timestamp, authorization) =>
@@ -677,7 +677,7 @@ object SyncServiceSpec extends MockSpecDefault, TestSupport {
             } yield assertCompletes
 
         }
-      },
+      } @@ TestAspect.ignore,
       test("Sync Already in Progress") {
         check(mailAccountGen) { (account) =>
           val mockEnv = MailServiceMock

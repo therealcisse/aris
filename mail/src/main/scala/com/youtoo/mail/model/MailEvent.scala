@@ -145,6 +145,7 @@ object MailEvent {
               applyEvents(Authorization.Granted(token, timestamp), ls)
             case MailEvent.AuthorizationRevoked(timestamp) =>
               applyEvents(Authorization.Revoked(timestamp), ls)
+            case _ => applyEvents(ls)
           }
 
       }
