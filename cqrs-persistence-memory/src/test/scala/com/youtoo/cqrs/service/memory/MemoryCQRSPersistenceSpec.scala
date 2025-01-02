@@ -36,7 +36,7 @@ object MemoryCQRSPersistenceSpec extends ZIOSpecDefault {
     extension (self: DummyEvent) def namespace: Namespace = Namespace(0)
     extension (self: DummyEvent) def hierarchy: Option[Hierarchy] = Hierarchy.Descendant(Key(1L), Key(2L)).some
     extension (self: DummyEvent) def props: Chunk[EventProperty] = Chunk(EventProperty("type", "DummyEvent"))
-    extension (self: DummyEvent) def reference: Option[Reference] = None
+    extension (self: DummyEvent) def reference: Option[ReferenceKey] = None
 
   }
 
@@ -51,7 +51,7 @@ object MemoryCQRSPersistenceSpec extends ZIOSpecDefault {
               extension (self: DummyEvent)
                 def hierarchy: Option[Hierarchy] = Hierarchy.Descendant(grandParentId, parentId).some
               extension (self: DummyEvent) def props: Chunk[EventProperty] = Chunk()
-              extension (self: DummyEvent) def reference: Option[Reference] = None
+              extension (self: DummyEvent) def reference: Option[ReferenceKey] = None
 
             }
 
@@ -116,7 +116,7 @@ object MemoryCQRSPersistenceSpec extends ZIOSpecDefault {
               extension (self: DummyEvent)
                 def hierarchy: Option[Hierarchy] = Hierarchy.Descendant(grandParentId, parentId).some
               extension (self: DummyEvent) def props: Chunk[EventProperty] = Chunk(EventProperty("type", "DummyEvent"))
-              extension (self: DummyEvent) def reference: Option[Reference] = None
+              extension (self: DummyEvent) def reference: Option[ReferenceKey] = None
 
             }
 
@@ -171,7 +171,7 @@ object MemoryCQRSPersistenceSpec extends ZIOSpecDefault {
               extension (self: DummyEvent)
                 def hierarchy: Option[Hierarchy] = Hierarchy.Descendant(grandParentId, parentId).some
               extension (self: DummyEvent) def props: Chunk[EventProperty] = Chunk(EventProperty("type", "DummyEvent"))
-              extension (self: DummyEvent) def reference: Option[Reference] = None
+              extension (self: DummyEvent) def reference: Option[ReferenceKey] = None
 
             }
 

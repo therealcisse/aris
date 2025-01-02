@@ -4,6 +4,7 @@ package service
 
 import zio.*
 import zio.prelude.*
+import zio.jdbc.*
 import zio.mock.*
 import zio.test.*
 import zio.test.Assertion
@@ -15,14 +16,11 @@ import com.youtoo.mail.store.*
 import com.youtoo.mail.model.*
 import com.youtoo.mail.integration.*
 import com.youtoo.lock.*
-import com.youtoo.lock.repository.*
 import com.youtoo.job.service.*
 import com.youtoo.job.model.*
 import com.youtoo.postgres.*
 
 import zio.telemetry.opentelemetry.tracing.Tracing
-import zio.jdbc.ZConnectionPool
-import org.mockito.Mockito
 
 object DownloadServiceSpec extends MockSpecDefault, TestSupport {
 

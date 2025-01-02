@@ -32,7 +32,7 @@ object DownloadEvent {
 
     }
     extension (self: DownloadEvent) def props: Chunk[EventProperty] = Chunk.empty
-    extension (self: DownloadEvent) def reference: Option[Reference] = None
+    extension (self: DownloadEvent) def reference: Option[ReferenceKey] = None
   }
 
   object NS {

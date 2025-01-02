@@ -22,7 +22,7 @@ trait JdbcCodecs {
   given SqlFragment.Setter[Timestamp] = SqlFragment.Setter[Long].contramap(_.value)
   given SqlFragment.Setter[Discriminator] = SqlFragment.Setter[String].contramap(_.value)
   given SqlFragment.Setter[Namespace] = SqlFragment.Setter[Int].contramap(_.value)
-  given SqlFragment.Setter[Reference] = SqlFragment.Setter[Key].contramap(_.value)
+  given SqlFragment.Setter[ReferenceKey] = SqlFragment.Setter[Key].contramap(_.value)
 
   inline def byteArrayDecoder[T: BinaryCodec]: JdbcDecoder[T] =
     JdbcDecoder[Array[Byte]].map { array =>
@@ -133,8 +133,8 @@ trait JdbcCodecs {
       case n => sql"""namespace = $n"""
 
     }
-  extension (o: Reference)
-    @scala.annotation.targetName("toSql_Reference")
+  extension (o: ReferenceKey)
+    @scala.annotation.targetName("toSql_ReferenceKey")
     def toSql: SqlFragment = o match {
       case r => sql"""reference = $r"""
 

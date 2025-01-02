@@ -48,8 +48,8 @@ val namespaceListGen: Gen[Any, NonEmptyList[Namespace]] =
     case Nil => throw IllegalStateException("Should not generate empty lists")
   }
 
-val referenceGen: Gen[Any, Reference] =
-  keyGen.map(Reference.apply)
+val referenceGen: Gen[Any, ReferenceKey] =
+  keyGen.map(ReferenceKey.apply)
 
 val conditionGen: Gen[Any, PersistenceQuery.Condition] =
   for {
