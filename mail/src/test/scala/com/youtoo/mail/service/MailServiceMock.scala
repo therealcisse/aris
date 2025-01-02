@@ -25,7 +25,9 @@ object MailServiceMock extends Mock[MailService] {
   object LoadMail extends Effect[MailData.Id, Throwable, Option[MailData]]
   object LoadMails extends Effect[(Option[Long], Long), Throwable, Chunk[MailData.Id]]
   object SaveMail extends Effect[MailData, Throwable, Long]
+  object SaveMails extends Effect[NonEmptyList[MailData], Throwable, Long]
   object LoadState extends Effect[MailAccount.Id, Throwable, Option[Mail]]
+  object LoadDownloadState extends Effect[MailAccount.Id, Throwable, Option[Download]]
   object UpdateMailSettings extends Effect[(MailAccount.Id, MailSettings), Throwable, Long]
 
   val compose: URLayer[Proxy, MailService] =
@@ -69,11 +71,17 @@ object MailServiceMock extends Mock[MailService] {
         def loadState(accountKey: MailAccount.Id): Task[Option[Mail]] =
           proxy(LoadState, accountKey)
 
+        def loadDownloadState(accountKey: MailAccount.Id): Task[Option[Download]] =
+          proxy(LoadDownloadState, accountKey)
+
         def loadMails(offset: Option[Long], limit: Long): Task[Chunk[MailData.Id]] =
           proxy(LoadMails, (offset, limit))
 
         def save(data: MailData): Task[Long] =
           proxy(SaveMail, data)
+
+        def saveMails(data: NonEmptyList[MailData]): Task[Long] =
+          proxy(SaveMails, data)
 
         def updateMailSettings(id: MailAccount.Id, settings: MailSettings): Task[Long] =
           proxy(UpdateMailSettings, (id, settings))

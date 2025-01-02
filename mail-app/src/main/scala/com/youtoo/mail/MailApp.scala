@@ -57,7 +57,7 @@ object MailApp extends ZIOApp, JsonSupport {
   given Config[Port.Type] = Config.int.nested("mail_app_port").withDefault(8181).map(Port(_))
 
   type Environment =
-    FlywayMigration & ZConnectionPool & CQRSPersistence & SnapshotStore & MailEventStore & MailCQRS & Server & Server.Config & NettyConfig & MailService & SyncService & MailClient & GmailPool & MailRepository & JobService & JobRepository & JobEventStore & JobCQRS & LockManager & LockRepository & SnapshotStrategy.Factory & Tracing & Baggage & Meter & NetHttpTransport
+    FlywayMigration & ZConnectionPool & CQRSPersistence & SnapshotStore & MailEventStore & MailCQRS & Server & Server.Config & NettyConfig & MailService & SyncService & MailClient & GmailPool & MailRepository & JobService & JobRepository & JobEventStore & JobCQRS & DownloadService & DownloadCQRS & DownloadEventStore & AuthorizationCQRS & AuthorizationEventStore & LockManager & LockRepository & SnapshotStrategy.Factory & Tracing & Baggage & Meter & NetHttpTransport
 
   given environmentTag: EnvironmentTag[Environment] = EnvironmentTag[Environment]
 
@@ -87,6 +87,11 @@ object MailApp extends ZIOApp, JsonSupport {
       ZLayer
         .makeSome[Scope, Environment](
           zio.metrics.jvm.DefaultJvmMetrics.live.unit,
+          DownloadCQRS.live(),
+          DownloadService.live(),
+          DownloadEventStore.live(),
+          AuthorizationCQRS.live(),
+          AuthorizationEventStore.live(),
           DatabaseConfig.pool,
           com.youtoo.cqrs.service.postgres.PostgresCQRSPersistence.live(),
           // com.youtoo.cqrs.service.memory.MemoryCQRSPersistence.live(),
@@ -201,6 +206,11 @@ object MailApp extends ZIOApp, JsonSupport {
     Method.POST / "mail-sync" / long("accountId") -> handler { (accountId: Long, req: Request) =>
       endpoint.boundary("trigger_mail_sync", req) {
         triggerMailSync(MailAccount.Id(Key(accountId))) `as` Response.ok
+      }
+    },
+    Method.POST / "mail-download" / long("accountId") -> handler { (accountId: Long, req: Request) =>
+      endpoint.boundary("trigger_mail_download", req) {
+        triggerMailDownload(MailAccount.Id(Key(accountId))) `as` Response.ok
       }
     },
   )
@@ -324,6 +334,9 @@ object MailApp extends ZIOApp, JsonSupport {
 
   def triggerMailSync(id: MailAccount.Id): RIO[Scope & Environment, ?] =
     SyncService.sync(id).forkScoped
+
+  def triggerMailDownload(id: MailAccount.Id): RIO[Scope & Environment, ?] =
+    DownloadService.download(id).forkScoped
 
   def run: RIO[Environment & Scope, Unit] =
     for {

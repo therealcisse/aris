@@ -1,13 +1,12 @@
 package com.youtoo
 package mail
-package client
+package integration
 
 import zio.*
 import zio.mock.*
 import zio.prelude.*
 
 import com.youtoo.mail.model.*
-import com.youtoo.mail.integration.*
 
 import zio.telemetry.opentelemetry.tracing.Tracing
 

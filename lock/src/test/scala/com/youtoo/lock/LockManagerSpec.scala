@@ -19,7 +19,7 @@ object LockManagerSpec extends ZIOSpecDefault, TestSupport {
   val timestampGen: Gen[Any, Timestamp] = Gen.fromZIO(Timestamp.gen)
 
   def spec = suite("LockManagerSpec")(
-    test("aquireScoped should acquire and release lock successfully") {
+    test("acquireScoped should acquire and release lock successfully") {
       check(lockGen) { lock =>
 
         val acquireExpectation = LockRepositoryMock.Acquire(equalTo(lock), result = value(true))
@@ -34,7 +34,7 @@ object LockManagerSpec extends ZIOSpecDefault, TestSupport {
         )
 
         val effect = ZIO.scoped {
-          ZIO.serviceWithZIO[LockManager](_.aquireScoped(lock))
+          ZIO.serviceWithZIO[LockManager](_.acquireScoped(lock))
         }
 
         assertZIO(effect.provideLayer(env))(isTrue)

@@ -20,6 +20,7 @@ import com.youtoo.mail.repository.*
 import com.youtoo.mail.model.*
 import com.youtoo.mail.store.*
 import com.youtoo.cqrs.*
+import com.youtoo.mail.integration.*
 
 object MailServiceSpec extends MockSpecDefault, TestSupport {
   inline val Threshold = 10
@@ -47,6 +48,9 @@ object MailServiceSpec extends MockSpecDefault, TestSupport {
             MailRepository & ZConnectionPool & zio.telemetry.opentelemetry.tracing.Tracing,
             MailService,
           ](
+            MockDownloadEventStore.empty,
+            MockAuthorizationEventStore.empty,
+            MockAuthorizationCQRS.empty,
             MockMailEventStore.empty,
             MailService.live(),
             MockMailCQRS.empty,
@@ -71,6 +75,9 @@ object MailServiceSpec extends MockSpecDefault, TestSupport {
             MailCQRS & ZConnectionPool & zio.telemetry.opentelemetry.tracing.Tracing,
             MailService,
           ](
+            MockDownloadEventStore.empty,
+            MockAuthorizationEventStore.empty,
+            MockAuthorizationCQRS.empty,
             MockMailEventStore.empty,
             MailService.live(),
             MailRepositoryMock.empty,
@@ -78,10 +85,10 @@ object MailServiceSpec extends MockSpecDefault, TestSupport {
         )
       }
     },
-    test("grantAuthorization calls MailCQRS.add") {
+    test("grantAuthorization calls AuthorizationCQRS.add") {
       check(mailAccountGen, tokenInfoGen, timestampGen) { case (account, tokenInfo, timestamp) =>
-        val expectedCommand = MailCommand.GrantAuthorization(tokenInfo, timestamp)
-        val mockEnv = MockMailCQRS.Add(
+        val expectedCommand = AuthorizationCommand.GrantAuthorization(tokenInfo, timestamp)
+        val mockEnv = MockAuthorizationCQRS.Add(
           equalTo((account.id.asKey, expectedCommand)),
           unit,
         )
@@ -91,9 +98,12 @@ object MailServiceSpec extends MockSpecDefault, TestSupport {
           testResult = assert(effect)(isUnit)
         } yield testResult).provideSomeLayer[ZConnectionPool & zio.telemetry.opentelemetry.tracing.Tracing](
           mockEnv.toLayer >>> ZLayer.makeSome[
-            MailCQRS & ZConnectionPool & zio.telemetry.opentelemetry.tracing.Tracing,
+            AuthorizationCQRS & ZConnectionPool & zio.telemetry.opentelemetry.tracing.Tracing,
             MailService,
           ](
+            MockAuthorizationEventStore.empty,
+            MockMailCQRS.empty,
+            MockDownloadEventStore.empty,
             MockMailEventStore.empty,
             MailService.live(),
             MailRepositoryMock.empty,
@@ -101,10 +111,10 @@ object MailServiceSpec extends MockSpecDefault, TestSupport {
         )
       }
     },
-    test("revokeAuthorization calls MailCQRS.add") {
+    test("revokeAuthorization calls MockAuthorizationCQRS.add") {
       check(mailAccountGen, timestampGen) { case (account, timestamp) =>
-        val expectedCommand = MailCommand.RevokeAuthorization(timestamp)
-        val mockEnv = MockMailCQRS.Add(
+        val expectedCommand = AuthorizationCommand.RevokeAuthorization(timestamp)
+        val mockEnv = MockAuthorizationCQRS.Add(
           equalTo((account.id.asKey, expectedCommand)),
           unit,
         )
@@ -114,9 +124,12 @@ object MailServiceSpec extends MockSpecDefault, TestSupport {
           testResult = assert(effect)(isUnit)
         } yield testResult).provideSomeLayer[ZConnectionPool & zio.telemetry.opentelemetry.tracing.Tracing](
           mockEnv.toLayer >>> ZLayer.makeSome[
-            MailCQRS & ZConnectionPool & zio.telemetry.opentelemetry.tracing.Tracing,
+            AuthorizationCQRS & ZConnectionPool & zio.telemetry.opentelemetry.tracing.Tracing,
             MailService,
           ](
+            MockAuthorizationEventStore.empty,
+            MockMailCQRS.empty,
+            MockDownloadEventStore.empty,
             MockMailEventStore.empty,
             MailService.live(),
             MailRepositoryMock.empty,
@@ -141,6 +154,9 @@ object MailServiceSpec extends MockSpecDefault, TestSupport {
               MailCQRS & ZConnectionPool & zio.telemetry.opentelemetry.tracing.Tracing,
               MailService,
             ](
+              MockAuthorizationEventStore.empty,
+              MockAuthorizationCQRS.empty,
+              MockDownloadEventStore.empty,
               MockMailEventStore.empty,
               MailService.live(),
               MailRepositoryMock.empty,
@@ -164,6 +180,9 @@ object MailServiceSpec extends MockSpecDefault, TestSupport {
             MailCQRS & ZConnectionPool & zio.telemetry.opentelemetry.tracing.Tracing,
             MailService,
           ](
+            MockAuthorizationEventStore.empty,
+            MockAuthorizationCQRS.empty,
+            MockDownloadEventStore.empty,
             MockMailEventStore.empty,
             MailService.live(),
             MailRepositoryMock.empty,
@@ -188,6 +207,9 @@ object MailServiceSpec extends MockSpecDefault, TestSupport {
             MailRepository & ZConnectionPool & zio.telemetry.opentelemetry.tracing.Tracing,
             MailService,
           ](
+            MockAuthorizationEventStore.empty,
+            MockAuthorizationCQRS.empty,
+            MockDownloadEventStore.empty,
             MockMailEventStore.empty,
             MailService.live(),
             MockMailCQRS.empty,
@@ -212,6 +234,9 @@ object MailServiceSpec extends MockSpecDefault, TestSupport {
             MailRepository & ZConnectionPool & zio.telemetry.opentelemetry.tracing.Tracing,
             MailService,
           ](
+            MockAuthorizationEventStore.empty,
+            MockAuthorizationCQRS.empty,
+            MockDownloadEventStore.empty,
             MockMailEventStore.empty,
             MailService.live(),
             MockMailCQRS.empty,
@@ -264,13 +289,13 @@ object MailServiceSpec extends MockSpecDefault, TestSupport {
           },
         )
 
-        val mockAuthorizationEnv = MockMailEventStore.ReadEvents.FullArgsByAggregate(
+        val mockAuthorizationEnv = MockAuthorizationEventStore.ReadEvents.FullArgsByAggregate(
           equalTo(
             (
               mailAccount.id.asKey,
               PersistenceQuery.anyNamespace(
-                MailEvent.NS.AuthorizationGranted,
-                MailEvent.NS.AuthorizationRevoked,
+                AuthorizationEvent.NS.AuthorizationGranted,
+                AuthorizationEvent.NS.AuthorizationRevoked,
               ),
               FetchOptions().desc().limit(1L),
             ),
@@ -278,9 +303,9 @@ object MailServiceSpec extends MockSpecDefault, TestSupport {
           value {
             authorization match {
               case Authorization.Granted(token, timestamp) =>
-                Some(NonEmptyList(Change(version, MailEvent.AuthorizationGranted(token, timestamp))))
+                Some(NonEmptyList(Change(version, AuthorizationEvent.AuthorizationGranted(token, timestamp))))
               case Authorization.Revoked(timestamp) =>
-                Some(NonEmptyList(Change(version, MailEvent.AuthorizationRevoked(timestamp))))
+                Some(NonEmptyList(Change(version, AuthorizationEvent.AuthorizationRevoked(timestamp))))
               case _ => None
             }
           },
@@ -288,7 +313,7 @@ object MailServiceSpec extends MockSpecDefault, TestSupport {
 
         val layers =
           if hasAccount then (loadEnv ++ mockEnv ++ mockAuthorizationEnv).toLayer
-          else loadEnv.toLayer ++ MockMailEventStore.empty
+          else loadEnv.toLayer ++ MockMailEventStore.empty ++ MockAuthorizationEventStore.empty
 
         (for {
           effect <- MailService.loadState(mailAccount.id)
@@ -296,9 +321,91 @@ object MailServiceSpec extends MockSpecDefault, TestSupport {
           testResult = assert(effect)(equalTo(expectation))
         } yield testResult).provideSomeLayer[ZConnectionPool & zio.telemetry.opentelemetry.tracing.Tracing](
           layers >>> ZLayer.makeSome[
-            MailEventStore & MailRepository & ZConnectionPool & zio.telemetry.opentelemetry.tracing.Tracing,
+            MailRepository & MailEventStore & AuthorizationEventStore & ZConnectionPool & zio.telemetry.opentelemetry.tracing.Tracing,
             MailService,
           ](
+            MockAuthorizationCQRS.empty,
+            MockDownloadEventStore.empty,
+            MailService.live(),
+            MockMailCQRS.empty,
+          ),
+        )
+      }
+    },
+    test("loadDownloadState returns expected result using DownloadEventStore and MailRepository") {
+      check(
+        versionGen,
+        Gen.option(versionGen),
+        versionGen,
+        jobIdGen,
+        mailAccountGen,
+        Gen.boolean,
+        authorizationGen,
+      ) { case (versionEvent, lastVersion, version, jobId, mailAccount, hasAccount, authorization) =>
+        val expected = Download(mailAccount.id, lastVersion, authorization)
+
+        val loadEnv = MailRepositoryMock.LoadAccount(
+          equalTo(mailAccount.id),
+          value(if hasAccount then Some(mailAccount) else None),
+        )
+
+        val mockEnv = MockDownloadEventStore.ReadEvents.FullArgsByAggregate(
+          equalTo(
+            (
+              mailAccount.id.asKey,
+              PersistenceQuery.ns(DownloadEvent.NS.Downloaded),
+              FetchOptions().desc().limit(1L),
+            ),
+          ),
+          value {
+            lastVersion map { v =>
+              NonEmptyList(
+                Change(versionEvent, DownloadEvent.Downloaded(v, jobId)),
+              )
+            }
+          },
+        )
+
+        val mockAuthorizationEnv = MockAuthorizationEventStore.ReadEvents.FullArgsByAggregate(
+          equalTo(
+            (
+              mailAccount.id.asKey,
+              PersistenceQuery.anyNamespace(
+                AuthorizationEvent.NS.AuthorizationGranted,
+                AuthorizationEvent.NS.AuthorizationRevoked,
+              ),
+              FetchOptions().desc().limit(1L),
+            ),
+          ),
+          value {
+            authorization match {
+              case Authorization.Granted(token, timestamp) =>
+                Some(NonEmptyList(Change(version, AuthorizationEvent.AuthorizationGranted(token, timestamp))))
+              case Authorization.Revoked(timestamp) =>
+                Some(NonEmptyList(Change(version, AuthorizationEvent.AuthorizationRevoked(timestamp))))
+              case _ => None
+            }
+          },
+        )
+
+        val layers =
+          if hasAccount then
+            (
+              loadEnv ++ mockEnv ++ mockAuthorizationEnv
+            ).toLayer
+          else loadEnv.toLayer ++ MockDownloadEventStore.empty ++ MockAuthorizationEventStore.empty
+
+        (for {
+          effect <- MailService.loadDownloadState(mailAccount.id)
+          expectation = if hasAccount then Some(expected) else None
+          testResult = assert(effect)(equalTo(expectation))
+        } yield testResult).provideSomeLayer[ZConnectionPool & zio.telemetry.opentelemetry.tracing.Tracing](
+          layers >>> ZLayer.makeSome[
+            MailRepository & DownloadEventStore & AuthorizationEventStore & ZConnectionPool & zio.telemetry.opentelemetry.tracing.Tracing,
+            MailService,
+          ](
+            MockMailEventStore.empty,
+            MockAuthorizationCQRS.empty,
             MailService.live(),
             MockMailCQRS.empty,
           ),
@@ -322,6 +429,9 @@ object MailServiceSpec extends MockSpecDefault, TestSupport {
             MailRepository & ZConnectionPool & zio.telemetry.opentelemetry.tracing.Tracing,
             MailService,
           ](
+            MockAuthorizationEventStore.empty,
+            MockAuthorizationCQRS.empty,
+            MockDownloadEventStore.empty,
             MockMailEventStore.empty,
             MailService.live(),
             MockMailCQRS.empty,
@@ -346,6 +456,9 @@ object MailServiceSpec extends MockSpecDefault, TestSupport {
             MailRepository & ZConnectionPool & zio.telemetry.opentelemetry.tracing.Tracing,
             MailService,
           ](
+            MockAuthorizationEventStore.empty,
+            MockAuthorizationCQRS.empty,
+            MockDownloadEventStore.empty,
             MockMailEventStore.empty,
             MailService.live(),
             MockMailCQRS.empty,
@@ -370,6 +483,38 @@ object MailServiceSpec extends MockSpecDefault, TestSupport {
             MailRepository & ZConnectionPool & zio.telemetry.opentelemetry.tracing.Tracing,
             MailService,
           ](
+            MockAuthorizationEventStore.empty,
+            MockAuthorizationCQRS.empty,
+            MockDownloadEventStore.empty,
+            MockMailEventStore.empty,
+            MailService.live(),
+            MockMailCQRS.empty,
+          ),
+        )
+
+      }
+    },
+    test("saveMails(MailData) returns expected result using MailRepository") {
+      check(mailDataGen, Gen.listOf(mailDataGen)) { case (mailData, moreMailData) =>
+        val mails = NonEmptyList(mailData, moreMailData*)
+        val expected = mails.size
+
+        val mockEnv = MailRepositoryMock.SaveMails(
+          equalTo(mails),
+          value(expected),
+        )
+
+        (for {
+          effect <- MailService.saveMails(mails)
+          testResult = assert(effect)(equalTo(expected))
+        } yield testResult).provideSomeLayer[ZConnectionPool & zio.telemetry.opentelemetry.tracing.Tracing](
+          mockEnv.toLayer >>> ZLayer.makeSome[
+            MailRepository & ZConnectionPool & zio.telemetry.opentelemetry.tracing.Tracing,
+            MailService,
+          ](
+            MockAuthorizationEventStore.empty,
+            MockAuthorizationCQRS.empty,
+            MockDownloadEventStore.empty,
             MockMailEventStore.empty,
             MailService.live(),
             MockMailCQRS.empty,
@@ -394,6 +539,9 @@ object MailServiceSpec extends MockSpecDefault, TestSupport {
             MailRepository & ZConnectionPool & zio.telemetry.opentelemetry.tracing.Tracing,
             MailService,
           ](
+            MockAuthorizationEventStore.empty,
+            MockAuthorizationCQRS.empty,
+            MockDownloadEventStore.empty,
             MockMailEventStore.empty,
             MailService.live(),
             MockMailCQRS.empty,

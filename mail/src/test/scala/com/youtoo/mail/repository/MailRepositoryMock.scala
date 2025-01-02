@@ -5,6 +5,7 @@ package repository
 import zio.*
 import zio.mock.*
 import zio.jdbc.*
+import zio.prelude.*
 
 import com.youtoo.mail.model.*
 
@@ -16,6 +17,7 @@ object MailRepositoryMock extends Mock[MailRepository] {
   object SaveAccount extends Effect[MailAccount, Throwable, Long]
   object LoadMail extends Effect[MailData.Id, Throwable, Option[MailData]]
   object SaveMail extends Effect[MailData, Throwable, Long]
+  object SaveMails extends Effect[NonEmptyList[MailData], Throwable, Long]
   object UpdateMailSettings extends Effect[(MailAccount.Id, MailSettings), Throwable, Long]
 
   val compose: URLayer[Proxy, MailRepository] =
@@ -40,6 +42,9 @@ object MailRepositoryMock extends Mock[MailRepository] {
 
         def save(data: MailData): RIO[ZConnection, Long] =
           proxy(SaveMail, data)
+
+        def saveMails(data: NonEmptyList[MailData]): RIO[ZConnection, Long] =
+          proxy(SaveMails, data)
 
         def updateMailSettings(id: MailAccount.Id, settings: MailSettings): RIO[ZConnection, Long] =
           proxy(UpdateMailSettings, (id, settings))

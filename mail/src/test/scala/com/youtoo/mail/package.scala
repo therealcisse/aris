@@ -87,16 +87,6 @@ val startSyncGen: Gen[Any, MailCommand] =
     MailCommand.StartSync(labels, timestamp, jobId)
   }
 
-val grantAuthorizationCommandGen: Gen[Any, MailCommand] =
-  (tokenInfoGen <*> timestampGen) map { case (token, timestamp) =>
-    MailCommand.GrantAuthorization(token, timestamp)
-  }
-
-val revokeAuthorizationCommandGen: Gen[Any, MailCommand] =
-  (timestampGen) map { case (timestamp) =>
-    MailCommand.RevokeAuthorization(timestamp)
-  }
-
 val recordSyncGen: Gen[Any, MailCommand] =
   (timestampGen <*> mailDataIdGen <*> Gen.listOf(mailDataIdGen) <*> mailTokenGen <*> jobIdGen) map {
     case (timestamp, key, keys, token, jobId) =>
@@ -110,8 +100,6 @@ val mailCommandGen: Gen[Any, MailCommand] =
   Gen.oneOf(
     startSyncGen,
     recordSyncGen,
-    grantAuthorizationCommandGen,
-    revokeAuthorizationCommandGen,
     completeSyncGen,
   )
 
@@ -121,17 +109,6 @@ val syncStartedGen: Gen[Any, MailEvent] =
     timestamp <- timestampGen
     jobId <- jobIdGen
   } yield MailEvent.SyncStarted(labels, timestamp, jobId)
-
-val authorizationGrantedEventGen: Gen[Any, MailEvent] =
-  for {
-    info <- tokenInfoGen
-    timestamp <- timestampGen
-  } yield MailEvent.AuthorizationGranted(info, timestamp)
-
-val authorizationRevokedEventGen: Gen[Any, MailEvent] =
-  for {
-    timestamp <- timestampGen
-  } yield MailEvent.AuthorizationRevoked(timestamp)
 
 val mailSyncedGen: Gen[Any, MailEvent] =
   for {
@@ -152,22 +129,14 @@ val mailEventGen: Gen[Any, MailEvent] =
   Gen.oneOf(
     syncStartedGen,
     mailSyncedGen,
-    authorizationGrantedEventGen,
-    authorizationRevokedEventGen,
     syncCompletedGen,
   )
 
-val changeEventGen: Gen[Any, Change[MailEvent]] =
+val mailEventChangeGen: Gen[Any, Change[MailEvent]] =
   (versionGen <*> mailEventGen).map(Change.apply)
 
 val syncStartedChangeGen: Gen[Any, Change[MailEvent]] =
   (versionGen <*> syncStartedGen).map(Change.apply)
-
-val authorizationGrantedChangeGen: Gen[Any, Change[MailEvent]] =
-  (versionGen <*> authorizationGrantedEventGen).map(Change.apply)
-
-val authorizationRevokedChangeGen: Gen[Any, Change[MailEvent]] =
-  (versionGen <*> authorizationRevokedEventGen).map(Change.apply)
 
 val syncCompletedChangeGen: Gen[Any, Change[MailEvent]] =
   (versionGen <*> syncCompletedGen).map(Change.apply)
@@ -180,9 +149,7 @@ def validMailEventSequenceGen(isCompleted: Boolean = true): Gen[Any, NonEmptyLis
     startEvent <- syncStartedGen
     version <- versionGen
     startChange = Change(version, startEvent)
-    otherEvents <- Gen.listOf(
-      Gen.oneOf(mailSyncedGen, authorizationGrantedEventGen, authorizationRevokedEventGen),
-    )
+    otherEvents <- Gen.listOf(mailSyncedGen)
     progressChanges <- Gen.fromZIO {
       ZIO.foreach(otherEvents) { event =>
         for {
@@ -212,3 +179,65 @@ val unauthorizedMailGen: Gen[Any, Mail] =
 
 val authorizedMailGen: Gen[Any, Mail] =
   (mailAccountIdGen <*> Gen.option(mailCursorGen) <*> authorizationGrantedGen).map(Mail.apply)
+
+val downloadGen: Gen[Any, Download] =
+  (
+    mailAccountIdGen <*> Gen.option(versionGen) <*> authorizationGen
+  ).map(Download.apply)
+
+val unauthorizedDownloadGen: Gen[Any, Download] =
+  (
+    mailAccountIdGen <*> Gen.option(versionGen) <*> Gen.oneOf(authorizationPendingGen, authorizationRevokedGen)
+  ).map(Download.apply)
+
+val recordDownloadCommandGen: Gen[Any, DownloadCommand] =
+  (versionGen <*> jobIdGen).map(DownloadCommand.RecordDownload.apply)
+
+val downloadCommandGen: Gen[Any, DownloadCommand] =
+  Gen.oneOf(recordDownloadCommandGen)
+
+val grantAuthorizationCommandGen: Gen[Any, AuthorizationCommand] =
+  (tokenInfoGen <*> timestampGen).map { case (token, timestamp) =>
+    AuthorizationCommand.GrantAuthorization(token, timestamp)
+  }
+
+val revokeAuthorizationCommandGen: Gen[Any, AuthorizationCommand] =
+  timestampGen.map(AuthorizationCommand.RevokeAuthorization.apply)
+
+val authorizationCommandGen: Gen[Any, AuthorizationCommand] =
+  Gen.oneOf(grantAuthorizationCommandGen, revokeAuthorizationCommandGen)
+
+val authorizationGrantedEventGen: Gen[Any, AuthorizationEvent] =
+  for {
+    info <- tokenInfoGen
+    timestamp <- timestampGen
+  } yield AuthorizationEvent.AuthorizationGranted(info, timestamp)
+
+val authorizationRevokedEventGen: Gen[Any, AuthorizationEvent] =
+  for {
+    timestamp <- timestampGen
+  } yield AuthorizationEvent.AuthorizationRevoked(timestamp)
+
+val authorizationGrantedChangeGen: Gen[Any, Change[AuthorizationEvent]] =
+  (versionGen <*> authorizationGrantedEventGen).map(Change.apply)
+
+val authorizationRevokedChangeGen: Gen[Any, Change[AuthorizationEvent]] =
+  (versionGen <*> authorizationRevokedEventGen).map(Change.apply)
+
+val authorizationEventGen: Gen[Any, AuthorizationEvent] =
+  Gen.oneOf(authorizationGrantedEventGen, authorizationRevokedEventGen)
+
+val authorizationEventChangeGen: Gen[Any, Change[AuthorizationEvent]] =
+  (versionGen <*> authorizationEventGen).map { case (version, event) =>
+    Change(version, event)
+  }
+
+val downloadedEventGen: Gen[Any, DownloadEvent] =
+  (versionGen <*> jobIdGen).map { case (version, jobId) =>
+    DownloadEvent.Downloaded(version, jobId)
+  }
+
+val downloadedChangeGen: Gen[Any, Change[DownloadEvent]] =
+  (versionGen <*> downloadedEventGen).map { case (version, event) =>
+    Change(version, event)
+  }

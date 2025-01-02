@@ -12,14 +12,14 @@ import zio.telemetry.opentelemetry.tracing.Tracing
 import zio.telemetry.opentelemetry.common.*
 
 trait LockManager {
-  def aquireScoped(lock: Lock): ZIO[Scope & Tracing, Throwable, Boolean]
+  def acquireScoped(lock: Lock): ZIO[Scope & Tracing, Throwable, Boolean]
   def locks: Task[Chunk[Lock.Info]]
 
 }
 
 object LockManager {
-  def aquireScoped(lock: Lock): ZIO[LockManager & Scope & Tracing, Throwable, Boolean] =
-    ZIO.serviceWithZIO[LockManager](_.aquireScoped(lock))
+  def acquireScoped(lock: Lock): ZIO[LockManager & Scope & Tracing, Throwable, Boolean] =
+    ZIO.serviceWithZIO[LockManager](_.acquireScoped(lock))
 
   def locks: ZIO[LockManager, Throwable, Chunk[Lock.Info]] =
     ZIO.serviceWithZIO[LockManager](_.locks)
@@ -31,7 +31,7 @@ object LockManager {
 
   class LockManagerLive(repository: LockRepository, pool: ZConnectionPool) extends LockManager { self =>
 
-    def aquireScoped(lock: Lock): ZIO[Scope & Tracing, Throwable, Boolean] =
+    def acquireScoped(lock: Lock): ZIO[Scope & Tracing, Throwable, Boolean] =
       atomically {
 
         for {
@@ -63,9 +63,9 @@ object LockManager {
       }.provideEnvironment(ZEnvironment(pool))
 
     def traced(tracing: Tracing): LockManager = new LockManager {
-      def aquireScoped(lock: Lock): ZIO[Scope & Tracing, Throwable, Boolean] =
-        self.aquireScoped(lock) @@ tracing.aspects.span(
-          "LockManager.aquireScoped",
+      def acquireScoped(lock: Lock): ZIO[Scope & Tracing, Throwable, Boolean] =
+        self.acquireScoped(lock) @@ tracing.aspects.span(
+          "LockManager.acquireScoped",
           attributes = Attributes(Attribute.string("lock", lock.value)),
         )
 

@@ -11,6 +11,7 @@ import zio.jdbc.*
 import zio.schema.codec.*
 
 object MockCQRSPersistence extends Mock[CQRSPersistence] {
+  object ReadEvent extends Poly.Effect.Output[(Version, Catalog), Throwable]
   object ReadEvents {
     object Full extends Poly.Effect.Output[(Key, Discriminator, Catalog), Throwable]
     object Snapshot extends Poly.Effect.Output[(Key, Discriminator, Version, Catalog), Throwable]
@@ -54,6 +55,18 @@ object MockCQRSPersistence extends Mock[CQRSPersistence] {
       for {
         proxy <- ZIO.service[Proxy]
       } yield new CQRSPersistence {
+        def readEvent[Event: {BinaryCodec, Tag, MetaInfo}](
+          version: Version,
+          catalog: Catalog,
+          ): RIO[ZConnection, Option[Change[Event]]] =
+            proxy(
+            ReadEvent.of[Option[Change[Event]]],
+            (
+              version,
+              catalog,
+            )
+          )
+
         def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
           id: Key,
           discriminator: Discriminator,

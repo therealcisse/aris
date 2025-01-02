@@ -9,6 +9,10 @@ import zio.jdbc.*
 import zio.schema.codec.*
 
 trait CQRSPersistence {
+  def readEvent[Event: {BinaryCodec, Tag, MetaInfo}](
+    version: Version,
+    catalog: Catalog,
+    ): RIO[ZConnection, Option[Change[Event]]]
   def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
     id: Key,
     discriminator: Discriminator,

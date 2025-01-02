@@ -3,6 +3,7 @@ package mail
 package repository
 
 import zio.*
+import zio.prelude.*
 
 import com.youtoo.cqrs.Codecs.given
 
@@ -25,6 +26,7 @@ trait MailRepository {
   def save(account: MailAccount): RIO[ZConnection, Long]
   def loadMail(id: MailData.Id): RIO[ZConnection, Option[MailData]]
   def save(data: MailData): RIO[ZConnection, Long]
+  def saveMails(data: NonEmptyList[MailData]): RIO[ZConnection, Long]
   def updateMailSettings(id: MailAccount.Id, settings: MailSettings): RIO[ZConnection, Long]
 }
 
@@ -46,6 +48,9 @@ object MailRepository {
 
   inline def save(data: MailData): RIO[MailRepository & ZConnection, Long] =
     ZIO.serviceWithZIO[MailRepository](_.save(data))
+
+  inline def saveMails(data: NonEmptyList[MailData]): RIO[MailRepository & ZConnection, Long] =
+    ZIO.serviceWithZIO[MailRepository](_.saveMails(data))
 
   inline def updateMailSettings(id: MailAccount.Id, settings: MailSettings): RIO[MailRepository & ZConnection, Long] =
     ZIO.serviceWithZIO[MailRepository](_.updateMailSettings(id, settings))
@@ -71,6 +76,9 @@ object MailRepository {
 
     def save(data: MailData): RIO[ZConnection, Long] =
       Queries.SAVE_MAIL(data).insert
+
+    def saveMails(data: NonEmptyList[MailData]): RIO[ZConnection, Long] =
+      Queries.SAVE_MAILS(data).insert
 
     def updateMailSettings(id: MailAccount.Id, settings: MailSettings): RIO[ZConnection, Long] =
       Queries.UPDATE_MAIL_SETTINGS(id, settings).update
@@ -100,6 +108,11 @@ object MailRepository {
           self.save(data) @@ tracing.aspects.span(
             "MailRepository.save",
             attributes = Attributes(Attribute.string("mailId", data.id.value)),
+          )
+        def saveMails(data: NonEmptyList[MailData]): RIO[ZConnection, Long] =
+          self.saveMails(data) @@ tracing.aspects.span(
+            "MailRepository.saveMails",
+            attributes = Attributes(Attribute.long("mails", data.size)),
           )
 
         def updateMailSettings(id: MailAccount.Id, settings: MailSettings): RIO[ZConnection, Long] =
@@ -219,6 +232,29 @@ object MailRepository {
       ${mail.timestamp}
     )
     """
+
+    def SAVE_MAILS(data: NonEmptyList[MailData]): SqlFragment =
+      SqlFragment
+        .insertInto("mail_data")(
+          "id",
+          "raw_body",
+          "account_id",
+          "internal_date",
+          "timestamp",
+        )
+        .values(
+          data
+            .map(m =>
+              (
+                m.id,
+                m.body,
+                m.accountKey,
+                m.internalDate,
+                m.timestamp,
+              ),
+            )
+            .toSeq,
+        )
 
     def UPDATE_MAIL_SETTINGS(id: MailAccount.Id, settings: MailSettings): SqlFragment =
       val payload =

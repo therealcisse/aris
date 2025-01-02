@@ -23,6 +23,12 @@ object PostgresCQRSPersistence {
     ZLayer.fromFunction(new PostgresCQRSPersistenceLive().traced(_))
 
   class PostgresCQRSPersistenceLive() extends CQRSPersistence { self =>
+    def readEvent[Event: {BinaryCodec, Tag, MetaInfo}](
+      version: Version,
+      catalog: Catalog,
+      ): RIO[ZConnection, Option[Change[Event]]] =
+      Queries.READ_EVENT(version, catalog).selectOne
+
     def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
       id: Key,
       discriminator: Discriminator,
@@ -71,6 +77,17 @@ object PostgresCQRSPersistence {
 
     def traced(tracing: Tracing): CQRSPersistence =
       new CQRSPersistence {
+        def readEvent[Event: {BinaryCodec, Tag, MetaInfo}](
+          version: Version,
+          catalog: Catalog,
+          ): RIO[ZConnection, Option[Change[Event]]] =
+          self.readEvent(version, catalog) @@ tracing.aspects.span(
+            "PostgresCQRSPersistence.readEvent",
+            attributes = Attributes(
+              Attribute.long("version", version.value),
+            ),
+          )
+
         def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
           id: Key,
           discriminator: Discriminator,
@@ -154,6 +171,19 @@ object PostgresCQRSPersistence {
   }
 
   object Queries extends JdbcCodecs {
+
+    def READ_EVENT[Event: BinaryCodec](version: Version, catalog: Catalog): Query[Change[Event]] =
+      given JdbcDecoder[Event] = byteArrayDecoder[Event]
+
+      SqlFragment
+        .select("version", "payload")
+        .from(catalog.tableName)
+        .where(
+          sql"""
+          version = $version
+          ORDER BY version ASC
+          """
+        ).query[(Version, Event)].map(Change.apply)
 
     def READ_EVENTS[Event: BinaryCodec](id: Key, discriminator: Discriminator, catalog: Catalog): Query[Change[Event]] =
       given JdbcDecoder[Event] = byteArrayDecoder[Event]

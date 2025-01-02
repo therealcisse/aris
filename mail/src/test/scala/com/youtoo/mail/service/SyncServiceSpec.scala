@@ -7,8 +7,10 @@ import zio.prelude.*
 import zio.mock.*
 import zio.test.*
 import zio.test.Assertion
+import zio.test.Assertion.*
 import zio.mock.Expectation
 
+import com.youtoo.mail.store.*
 import com.youtoo.mail.model.*
 import com.youtoo.mail.integration.*
 import com.youtoo.lock.*
@@ -16,7 +18,6 @@ import com.youtoo.lock.repository.*
 import com.youtoo.job.service.*
 import com.youtoo.job.model.*
 import com.youtoo.postgres.*
-import com.youtoo.mail.client.*
 
 import zio.telemetry.opentelemetry.tracing.Tracing
 import zio.jdbc.ZConnectionPool
@@ -32,11 +33,11 @@ object SyncServiceSpec extends MockSpecDefault, TestSupport {
             assertion = Assertion.equalTo(MailAccount.Id(Key(1))),
             result = Expectation.value(None),
           )
-          .toLayer ++ MailClientMock.empty ++ LockManagerMock.empty ++ JobServiceMock.empty
+          .toLayer ++ MailClientMock.empty ++ LockManagerMock.empty ++ JobServiceMock.empty ++ MockDownloadEventStore.empty
 
         val effect = SyncService.sync(MailAccount.Id(Key(1)))
 
-        val r = ZIO.scoped(effect) `as` assertCompletes
+        val r = assertZIO(ZIO.scoped(effect).exit)(failsWithA[IllegalArgumentException])
 
         r.provideSomeLayer[Tracing](mockEnv >>> SyncService.live())
       },
@@ -51,7 +52,7 @@ object SyncServiceSpec extends MockSpecDefault, TestSupport {
           ) ++ MailServiceMock.LoadState(
             assertion = Assertion.equalTo(account.id),
             result = Expectation.value(None),
-          )).toLayer ++ MailClientMock.empty ++ JobServiceMock.empty
+          )).toLayer ++ MailClientMock.empty ++ JobServiceMock.empty ++ MockDownloadEventStore.empty
 
           val effect = SyncService.sync(account.id)
 
@@ -71,7 +72,7 @@ object SyncServiceSpec extends MockSpecDefault, TestSupport {
           ) ++ MailServiceMock.LoadState(
             assertion = Assertion.equalTo(account.id),
             result = Expectation.value(Some(mail)),
-          )).toLayer ++ MailClientMock.empty ++ JobServiceMock.empty
+          )).toLayer ++ MailClientMock.empty ++ JobServiceMock.empty ++ MockDownloadEventStore.empty
 
           val effect = SyncService.sync(account.id)
 
@@ -137,7 +138,7 @@ object SyncServiceSpec extends MockSpecDefault, TestSupport {
 
             val r = ZIO.scoped(effect) `as` assertCompletes
 
-            r.provideSomeLayer[Tracing](mockEnv.toLayer >>> SyncService.live())
+            r.provideSomeLayer[Tracing](mockEnv.toLayer ++ MockDownloadEventStore.empty >>> SyncService.live())
         }
       },
       test("Failed Sync with Lock") {
@@ -183,7 +184,7 @@ object SyncServiceSpec extends MockSpecDefault, TestSupport {
 
             val r = ZIO.scoped(effect) `as` assertCompletes
 
-            r.provideSomeLayer[Tracing](mockEnv.toLayer >>> SyncService.live())
+            r.provideSomeLayer[Tracing](mockEnv.toLayer ++ MockDownloadEventStore.empty >>> SyncService.live())
         }
       },
       test("Successful Sync with Lock and Release") {
@@ -247,9 +248,9 @@ object SyncServiceSpec extends MockSpecDefault, TestSupport {
             val r = ZIO.scoped(effect) `as` assertCompletes
 
             r.provideSomeLayer[Tracing & ZConnectionPool](
-              mockEnv.toLayer >>> ZLayer
+              mockEnv.toLayer ++ MockDownloadEventStore.empty >>> ZLayer
                 .makeSome[
-                  Tracing & ZConnectionPool & MailClient & MailService & JobService & LockRepository,
+                  Tracing & ZConnectionPool & MailClient & MailService & JobService & LockRepository & DownloadEventStore,
                   SyncService,
                 ](
                   LockManager.live(),
@@ -319,9 +320,9 @@ object SyncServiceSpec extends MockSpecDefault, TestSupport {
             val r = effect `as` assertCompletes
 
             r.provideSomeLayer[Scope & Tracing & ZConnectionPool](
-              mockEnv.toLayer >>> ZLayer
+              mockEnv.toLayer ++ MockDownloadEventStore.empty >>> ZLayer
                 .makeSome[
-                  Tracing & ZConnectionPool & MailClient & MailService & JobService & LockRepository,
+                  Tracing & ZConnectionPool & MailClient & MailService & JobService & LockRepository & DownloadEventStore,
                   SyncService,
                 ](
                   LockManager.live(),
@@ -388,9 +389,9 @@ object SyncServiceSpec extends MockSpecDefault, TestSupport {
             val r = ZIO.scoped(effect) `as` assertCompletes
 
             r.provideSomeLayer[Tracing & ZConnectionPool](
-              mockEnv.toLayer >>> ZLayer
+              mockEnv.toLayer ++ MockDownloadEventStore.empty >>> ZLayer
                 .makeSome[
-                  Tracing & ZConnectionPool & MailClient & MailService & JobService & LockRepository,
+                  Tracing & ZConnectionPool & MailClient & MailService & JobService & LockRepository & DownloadEventStore,
                   SyncService,
                 ](
                   LockManager.live(),
@@ -456,9 +457,9 @@ object SyncServiceSpec extends MockSpecDefault, TestSupport {
             val r = ZIO.scoped(effect) `as` assertCompletes
 
             r.provideSomeLayer[Tracing & ZConnectionPool](
-              mockEnv.toLayer >>> ZLayer
+              mockEnv.toLayer ++ MockDownloadEventStore.empty >>> ZLayer
                 .makeSome[
-                  Tracing & ZConnectionPool & MailClient & MailService & JobService & LockRepository,
+                  Tracing & ZConnectionPool & MailClient & MailService & JobService & LockRepository & DownloadEventStore,
                   SyncService,
                 ](
                   LockManager.live(),
@@ -520,9 +521,9 @@ object SyncServiceSpec extends MockSpecDefault, TestSupport {
             val r = ZIO.scoped(effect) `as` assertCompletes
 
             r.provideSomeLayer[Tracing & ZConnectionPool](
-              mockEnv.toLayer >>> ZLayer
+              mockEnv.toLayer ++ MockDownloadEventStore.empty >>> ZLayer
                 .makeSome[
-                  Tracing & ZConnectionPool & MailClient & MailService & JobService & LockRepository,
+                  Tracing & ZConnectionPool & MailClient & MailService & JobService & LockRepository & DownloadEventStore,
                   SyncService,
                 ](
                   LockManager.live(),
@@ -584,7 +585,9 @@ object SyncServiceSpec extends MockSpecDefault, TestSupport {
 
               fiber <- scope
                 .extend(
-                  effect.provideSomeLayer[Scope & Tracing](mockEnv.toLayer >>> SyncService.live()),
+                  effect.provideSomeLayer[Scope & Tracing](
+                    mockEnv.toLayer ++ MockDownloadEventStore.empty >>> SyncService.live(),
+                  ),
                 )
                 .fork
 
@@ -656,9 +659,9 @@ object SyncServiceSpec extends MockSpecDefault, TestSupport {
               fiber <- scope
                 .extend(
                   effect.provideSomeLayer[Scope & Tracing & ZConnectionPool](
-                    mockEnv.toLayer >>> ZLayer
+                    mockEnv.toLayer ++ MockDownloadEventStore.empty >>> ZLayer
                       .makeSome[
-                        Tracing & ZConnectionPool & MailClient & MailService & JobService & LockRepository,
+                        Tracing & ZConnectionPool & MailClient & MailService & JobService & LockRepository & DownloadEventStore,
                         SyncService,
                       ](
                         LockManager.live(),
@@ -692,7 +695,7 @@ object SyncServiceSpec extends MockSpecDefault, TestSupport {
                 result = Expectation.value(false),
               )
               .toLayer ++
-            MailClientMock.empty ++ JobServiceMock.empty
+            MailClientMock.empty ++ JobServiceMock.empty ++ MockDownloadEventStore.empty
 
           val effect = SyncService.sync(account.id)
 

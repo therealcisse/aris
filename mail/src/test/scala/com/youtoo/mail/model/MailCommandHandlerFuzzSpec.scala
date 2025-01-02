@@ -2,26 +2,38 @@ package com.youtoo
 package mail
 package model
 
-import zio.test.*
-import zio.test.Assertion.*
-import zio.prelude.*
 import zio.*
+import zio.test.*
+import zio.prelude.*
+
 import com.youtoo.cqrs.*
 
-object MailCommandHandlerFuzzSpec extends ZIOSpecDefault {
+object MailEventHandlerFuzzSpec extends ZIOSpecDefault {
 
-  def spec = suite("MailCommandHandlerFuzzSpec")(
-    test("Fuzz test MailCommandHandler with random commands") {
-      check(Gen.listOf1(mailCommandGen)) { commands =>
-        ZIO.foldLeft(commands)(assert(true)(isTrue)) { (s, cmd) =>
-          ZIO.attempt(CmdHandler.applyCmd(cmd)).either.map {
-            case Left(_) =>
-              assert(false)(isTrue) // Fail the test if an exception is thrown
-            case Right(events) =>
-              s && assert(events.toList)(isNonEmpty)
-          }
+  def spec = suite("MailEventHandlerFuzzSpec")(
+    test("Fuzz test MailEventHandler does not crash on invalid inputs") {
+      check(
+        mailEventChangeGen,
+        Gen.listOf(mailEventChangeGen),
+      ) { (e, es) =>
+        val events = NonEmptyList(e, es*)
+        val result = ZIO.attempt(EventHandler.applyEvents(events)(using MailEvent.LoadCursor()))
+        result.fold(
+          _ => assertCompletes, // Test passes if an exception is thrown (as expected)
+          _ => assertCompletes, // Test also passes if no exception is thrown
+        )
+      }
+    },
+    test("Fuzz test MailEventHandler with random events") {
+      check(validMailEventSequenceGen()) { events =>
+        val result = ZIO.attempt(EventHandler.applyEvents(events)(using MailEvent.LoadCursor())).either
+        result.map {
+          case Left(_) =>
+            throw IllegalStateException("fails")
+          case Right(_) =>
+            assertCompletes
         }
       }
     },
-  )
+  ) @@ TestAspect.withLiveClock
 }

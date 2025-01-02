@@ -267,6 +267,17 @@ object MemoryCQRSPersistenceSpec extends ZIOSpecDefault {
           } yield a && b
         }
       },
+      test("should save and retrieve an event correctly") {
+        check(keyGen, versionGen, discriminatorGen) { (key, version, discriminator) =>
+          for {
+            persistence <- ZIO.service[CQRSPersistence]
+            event = Change(version = version, DummyEvent("test"))
+
+            saveResult <- atomically(persistence.saveEvent(key, discriminator, event, Catalog.Default))
+            result <- atomically(persistence.readEvent[DummyEvent](version = event.version, Catalog.Default))
+          } yield assert(result)(isSome(equalTo(event)))
+        }
+      },
       test("should save and retrieve events by namespace correctly") {
         check(keyGen, versionGen, discriminatorGen) { (key, version, discriminator) =>
           for {

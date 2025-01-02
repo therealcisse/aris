@@ -2,6 +2,8 @@ package com.youtoo
 package mail
 package repository
 
+import cats.implicits.*
+
 import com.youtoo.postgres.*
 import com.youtoo.mail.model.*
 import com.youtoo.postgres.config.*
@@ -11,6 +13,7 @@ import zio.test.*
 import zio.test.TestAspect.*
 import zio.test.Assertion.*
 import zio.jdbc.*
+import zio.prelude.*
 
 object MailRepositorySpec extends PgSpec, TestSupport {
 
@@ -20,6 +23,7 @@ object MailRepositorySpec extends PgSpec, TestSupport {
       loadAccountIsOptimized,
       shouldUpdateMailSettingsForAnExistingAccount,
       shouldSaveAndLoadAMail,
+      shouldSaveMailsAndLoadAMail,
       shouldSaveAndLoadAnAccount,
       shouldLoadMultipleAccountsWithLoadMany,
       loadShouldReturnNoneForNonExistentMail,
@@ -90,6 +94,21 @@ object MailRepositorySpec extends PgSpec, TestSupport {
             _ <- MailRepository.save(mail)
             result <- MailRepository.loadMail(mail.id)
           } yield assert(result)(isSome(equalTo(mail)))
+        }
+      }
+    }
+
+  def shouldSaveMailsAndLoadAMail =
+    test("should save many mails and load a mail") {
+      check(mailDataGen, Gen.listOf(mailDataGen)) { (mail, more) =>
+        val mails = NonEmptyList(mail, more*)
+
+        atomically {
+          for {
+            _ <- MailRepository.saveMails(mails)
+            result <- ZIO.foreach(mails.toList)(m => MailRepository.loadMail(m.id))
+            t = NonEmptyList.fromIterableOption(result.toList.mapFilter(a => a))
+          } yield assert(t)(isSome(equalTo(mails)))
         }
       }
     }

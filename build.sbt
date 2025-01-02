@@ -423,6 +423,7 @@ lazy val mail = (project in file("mail"))
     libraryDependencies ++= Dependencies.gmail,
     libraryDependencies ++= Dependencies.db,
     libraryDependencies ++= Seq(
+      `zio-interop-cats`,
       mockito,
       `zio-jdbc`,
       zio,

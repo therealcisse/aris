@@ -201,6 +201,17 @@ object PostgresCQRSPersistenceSpec extends PgSpec, TestSupport {
             } yield a && b && c && d && e && f
         }
       },
+      test("should save and retrieve an event correctly") {
+        check(keyGen, versionGen, discriminatorGen) { (key, version, discriminator) =>
+          for {
+            persistence <- ZIO.service[CQRSPersistence]
+            event = Change(version = version, DummyEvent("test"))
+
+            saveResult <- atomically(persistence.saveEvent(key, discriminator, event, Catalog.Default))
+            result <- atomically(persistence.readEvent[DummyEvent](version = event.version, Catalog.Default))
+          } yield assert(result)(isSome(equalTo(event)))
+        }
+      },
       test("should save and retrieve events correctly by props") {
         check(keyGen, versionGen, discriminatorGen) { (key, version, discriminator) =>
           for {
@@ -460,6 +471,21 @@ object PostgresCQRSPersistenceSpec extends PgSpec, TestSupport {
           } yield planAssertion && timeAssertion
         }
       },
+      test("read an event is optimized") {
+        check(versionGen, discriminatorGen) { (version, discriminator) =>
+
+          val query = PostgresCQRSPersistence.Queries.READ_EVENT[DummyEvent](version, Catalog.Default)
+          for {
+
+            executionTime <- atomically(query.selectOne).timed.map(_._1)
+            timeAssertion = assert(executionTime.toMillis)(isLessThanEqualTo(100L))
+
+            executionPlan <- atomically(query.sql.getExecutionPlan)
+            planAssertion = assert(executionPlan)(containsString("Index Scan") || containsString("Index Only Scan"))
+
+          } yield planAssertion && timeAssertion
+        }
+      },
       test("read all events is optimized") {
         check(keyGen, discriminatorGen) { (key, discriminator) =>
 
@@ -549,7 +575,7 @@ object PostgresCQRSPersistenceSpec extends PgSpec, TestSupport {
         zio.telemetry.opentelemetry.OpenTelemetry.contextZIO,
         PostgresCQRSPersistence.live(),
       ),
-    ) @@ TestAspect.withLiveClock @@ TestAspect.nondeterministic @@ TestAspect.beforeAll {
+    ) @@ TestAspect.withLiveClock @@ TestAspect.nondeterministic @@ TestAspect.nondeterministic @@ TestAspect.beforeAll {
       for {
         config <- ZIO.service[DatabaseConfig]
         _ <- FlywayMigration.run(config)

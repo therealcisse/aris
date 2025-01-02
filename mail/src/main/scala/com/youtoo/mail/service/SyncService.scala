@@ -74,7 +74,7 @@ object SyncService {
 
     def sync(id: MailAccount.Id, options: SyncOptions): ZIO[Scope & Tracing, Throwable, Unit] =
       mailService.loadAccount(id).flatMap {
-        case None => Log.error("Account not found")
+        case None => ZIO.fail(new IllegalArgumentException(s"Account with key $id not found"))
         case Some(account) =>
           scopedTask { interruption =>
             withLock(account) {
@@ -83,7 +83,7 @@ object SyncService {
                 _ <- state match {
                   case Some(mail) if !mail.authorization.isGranted() => Log.error("Mail account not authorized")
                   case Some(mail) => performSync(account, mail, options, interruption)
-                  case None => Log.error("Mail state not found")
+                  case None => Log.error("Sync state not found")
                 }
               } yield ()
             }
@@ -107,7 +107,7 @@ object SyncService {
             ) =>
           for {
             _ <- Log.error("Sync interruption requested")
-            _ <- interruption.setAsync(true)
+            _ <- interruption.set(true).fork
 
             _ <- fiber.join
               .timeoutFail(new IllegalStateException("timout"))(Duration(30L, ChronoUnit.SECONDS))
@@ -125,7 +125,7 @@ object SyncService {
     private def withLock(account: MailAccount)(
       action: => ZIO[Scope & Tracing, Throwable, Unit],
     ): ZIO[Scope & Tracing, Throwable, Unit] =
-      val lock = lockManager.aquireScoped(account.lock)
+      val lock = lockManager.acquireScoped(account.lock)
       ZIO.ifZIO(lock)(
         onTrue = action,
         onFalse = Log.info(s"Sync already in progress for account"),

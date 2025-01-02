@@ -14,7 +14,7 @@ object LockManagerMock extends Mock[LockManager] {
   val compose: URLayer[Proxy, LockManager] =
     ZLayer.fromFunction { (proxy: Proxy) =>
       new LockManager {
-        def aquireScoped(lock: Lock): ZIO[Scope & Tracing, Throwable, Boolean] =
+        def acquireScoped(lock: Lock): ZIO[Scope & Tracing, Throwable, Boolean] =
           proxy(AcquireScoped, lock)
 
         def locks: Task[Chunk[Lock.Info]] =

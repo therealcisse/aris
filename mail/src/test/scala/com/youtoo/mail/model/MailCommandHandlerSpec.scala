@@ -20,22 +20,6 @@ object MailCommandHandlerSpec extends ZIOSpecDefault {
         assert(events)(equalTo(NonEmptyList(expectedEvent)))
       }
     },
-    test("GrantAuthorization command produces AuthorizationGranted event") {
-      check(tokenInfoGen, timestampGen) { (token, timestamp) =>
-        val command = MailCommand.GrantAuthorization(token, timestamp)
-        val events = handler.applyCmd(command)
-        val expectedEvent = MailEvent.AuthorizationGranted(token = token, timestamp = timestamp)
-        assert(events)(equalTo(NonEmptyList(expectedEvent)))
-      }
-    },
-    test("RevokeAuthorization command produces AuthorizationRevoked event") {
-      check(timestampGen) { (timestamp) =>
-        val command = MailCommand.RevokeAuthorization(timestamp)
-        val events = handler.applyCmd(command)
-        val expectedEvent = MailEvent.AuthorizationRevoked(timestamp = timestamp)
-        assert(events)(equalTo(NonEmptyList(expectedEvent)))
-      }
-    },
     test("RecordSync command produces MailSynced event") {
       check(timestampGen, mailDataIdGen, Gen.listOf(mailDataIdGen), mailTokenGen, jobIdGen) {
         (timestamp, key, keys, token, jobId) =>
