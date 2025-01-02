@@ -2,6 +2,8 @@ package com.youtoo
 package mail
 package model
 
+import cats.implicits.*
+
 import zio.test.*
 import zio.test.Assertion.*
 import zio.*
@@ -15,7 +17,7 @@ object DownloadEventMetaInfoSpec extends ZIOSpecDefault {
       check(versionGen, jobIdGen) { (version, jobId) =>
         val event = DownloadEvent.Downloaded(version, jobId)
         val expectedNamespace = Namespace(0)
-        val expectedHierarchy = None
+        val expectedHierarchy = Hierarchy.Child(jobId.asKey).some
 
         val namespaceAssertion = assert(event.namespace)(equalTo(expectedNamespace))
         val hierarchyAssertion = assert(event.hierarchy)(equalTo(expectedHierarchy))

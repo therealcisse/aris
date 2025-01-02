@@ -20,7 +20,6 @@ import com.youtoo.mail.repository.*
 import com.youtoo.mail.model.*
 import com.youtoo.mail.store.*
 import com.youtoo.cqrs.*
-import com.youtoo.mail.integration.*
 
 object MailServiceSpec extends MockSpecDefault, TestSupport {
   inline val Threshold = 10
@@ -312,7 +311,8 @@ object MailServiceSpec extends MockSpecDefault, TestSupport {
         )
 
         val layers =
-          if hasAccount then (loadEnv ++ mockEnv ++ mockAuthorizationEnv).toLayer
+          if hasAccount then
+            (loadEnv ++ ((mockEnv ++ mockAuthorizationEnv) || (mockAuthorizationEnv ++ mockEnv))).toLayer
           else loadEnv.toLayer ++ MockMailEventStore.empty ++ MockAuthorizationEventStore.empty
 
         (for {
@@ -391,7 +391,7 @@ object MailServiceSpec extends MockSpecDefault, TestSupport {
         val layers =
           if hasAccount then
             (
-              loadEnv ++ mockEnv ++ mockAuthorizationEnv
+              loadEnv ++ ((mockEnv ++ mockAuthorizationEnv) || (mockAuthorizationEnv ++ mockEnv))
             ).toLayer
           else loadEnv.toLayer ++ MockDownloadEventStore.empty ++ MockAuthorizationEventStore.empty
 

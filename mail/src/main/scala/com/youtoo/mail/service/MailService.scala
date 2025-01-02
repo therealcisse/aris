@@ -9,7 +9,6 @@ import zio.jdbc.*
 import zio.prelude.*
 
 import com.youtoo.cqrs.*
-import com.youtoo.mail.integration.*
 import com.youtoo.mail.model.*
 import com.youtoo.job.model.*
 import com.youtoo.mail.store.*
@@ -188,7 +187,7 @@ object MailService {
 
         o <- acc match {
           case Some(acc) =>
-            for {
+            val cursor = for {
               cursorEvents <- mailStore.readEvents(
                 id = acc.id.asKey,
                 query = PersistenceQuery.anyNamespace(MailEvent.NS.SyncStarted, MailEvent.NS.MailSynced),
@@ -199,6 +198,9 @@ object MailService {
                 EventHandler.applyEvents(es)(using MailEvent.LoadCursor())
               }
 
+            } yield cursor
+
+            val authorization = for {
               authEvents <- authorizationStore.readEvents(
                 id = acc.id.asKey,
                 query = PersistenceQuery
@@ -208,7 +210,11 @@ object MailService {
               authorization = authEvents.fold(Authorization.Pending()) { es =>
                 EventHandler.applyEvents(es)(using AuthorizationEvent.LoadAuthorization())
               }
-            } yield Mail(accountKey, cursor, authorization).some
+            } yield authorization
+
+            (cursor <&> authorization) map { case (cursor, authorization) =>
+              Mail(accountKey, cursor, authorization).some
+            }
 
           case None =>
             ZIO.none
@@ -222,7 +228,7 @@ object MailService {
 
         o <- acc match {
           case Some(acc) =>
-            for {
+            val lastVersion = for {
               events <- downloadStore.readEvents(
                 id = acc.id.asKey,
                 query = PersistenceQuery.ns(DownloadEvent.NS.Downloaded),
@@ -233,6 +239,9 @@ object MailService {
                 EventHandler.applyEvents(es)(using DownloadEvent.LoadVersion()).some
               }
 
+            } yield version
+
+            val authorization = for {
               authEvents <- authorizationStore.readEvents(
                 id = acc.id.asKey,
                 query = PersistenceQuery
@@ -242,7 +251,11 @@ object MailService {
               authorization = authEvents.fold(Authorization.Pending()) { es =>
                 EventHandler.applyEvents(es)(using AuthorizationEvent.LoadAuthorization())
               }
-            } yield Download(accountKey, lastVersion = version, authorization).some
+            } yield authorization
+
+            (lastVersion <&> authorization) map { case (version, authorization) =>
+              Download(accountKey, version, authorization).some
+            }
 
           case None =>
             ZIO.none

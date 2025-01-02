@@ -2,6 +2,8 @@ package com.youtoo
 package mail
 package model
 
+import cats.implicits.*
+
 import com.youtoo.job.model.*
 import com.youtoo.cqrs.domain.*
 import com.youtoo.cqrs.*
@@ -21,9 +23,14 @@ object DownloadEvent {
   given MetaInfo[DownloadEvent] {
 
     extension (self: DownloadEvent)
-      def namespace: Namespace = NS.Downloaded
+      def namespace: Namespace = self match {
+        case _: DownloadEvent.Downloaded => NS.Downloaded
+      }
 
-    extension (self: DownloadEvent) def hierarchy: Option[Hierarchy] = None
+    extension (self: DownloadEvent) def hierarchy: Option[Hierarchy] = self match {
+      case e: DownloadEvent.Downloaded => Hierarchy.Child(e.jobId.asKey).some
+
+    }
     extension (self: DownloadEvent) def props: Chunk[EventProperty] = Chunk.empty
     extension (self: DownloadEvent) def reference: Option[Reference] = None
   }
