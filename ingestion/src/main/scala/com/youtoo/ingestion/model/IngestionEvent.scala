@@ -50,7 +50,7 @@ object IngestionEvent {
 
     extension (self: IngestionEvent) def hierarchy: Option[Hierarchy] = None
     extension (self: IngestionEvent) def props: Chunk[EventProperty] = Chunk.empty
-    extension (self: IngestionEvent) def reference: Option[Reference] = None
+    extension (self: IngestionEvent) def reference: Option[ReferenceKey] = None
   }
 
   given IngestionEventHandler  {

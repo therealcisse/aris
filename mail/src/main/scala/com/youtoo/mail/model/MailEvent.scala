@@ -45,7 +45,7 @@ object MailEvent {
 
     }
     extension (self: MailEvent) def props: Chunk[EventProperty] = Chunk.empty
-    extension (self: MailEvent) def reference: Option[Reference] = None
+    extension (self: MailEvent) def reference: Option[ReferenceKey] = None
   }
 
   object NS {

@@ -37,7 +37,7 @@ object AuthorizationEvent {
 
     }
     extension (self: AuthorizationEvent) def props: Chunk[EventProperty] = Chunk.empty
-    extension (self: AuthorizationEvent) def reference: Option[Reference] = None
+    extension (self: AuthorizationEvent) def reference: Option[ReferenceKey] = None
   }
 
   object NS {

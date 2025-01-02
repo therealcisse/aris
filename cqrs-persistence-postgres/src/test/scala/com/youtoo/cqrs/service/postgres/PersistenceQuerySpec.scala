@@ -59,10 +59,10 @@ object PersistenceQuerySpec extends ZIOSpecDefault, JdbcCodecs {
           assert(result.toString)(equalTo(expected.toString))
         }
       },
-      test("Reference toSql conversion") {
+      test("ReferenceKey toSql conversion") {
         check(referenceGen) { ref =>
           val result = ref.toSql
-          val expected = expectedReferenceSql(ref)
+          val expected = expectedReferenceKeySql(ref)
           assert(result.toString)(equalTo(expected.toString))
         }
       },
@@ -121,7 +121,7 @@ object PersistenceQuerySpec extends ZIOSpecDefault, JdbcCodecs {
       sql"parent_id = $parentId AND grand_parent_id = $grandParentId"
   }
 
-  def expectedReferenceSql(ref: Reference): SqlFragment =
+  def expectedReferenceKeySql(ref: ReferenceKey): SqlFragment =
     sql"reference = $ref"
 
   def expectedEventPropertySql(prop: EventProperty): SqlFragment = prop match {

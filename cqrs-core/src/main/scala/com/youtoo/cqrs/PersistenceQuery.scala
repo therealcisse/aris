@@ -10,7 +10,7 @@ enum PersistenceQuery {
     namespace: Option[Namespace],
     props: Option[NonEmptyList[EventProperty]],
     hierarchy: Option[Hierarchy],
-    reference: Option[Reference],
+    reference: Option[ReferenceKey],
   )
   case any(condition: PersistenceQuery.Condition, more: PersistenceQuery.Condition*)
   case forall(condition: PersistenceQuery, more: PersistenceQuery*)
@@ -21,7 +21,7 @@ object PersistenceQuery {
     namespace: Option[Namespace] = None,
     props: Option[NonEmptyList[EventProperty]] = None,
     hierarchy: Option[Hierarchy] = None,
-    reference: Option[Reference] = None,
+    reference: Option[ReferenceKey] = None,
   ): PersistenceQuery.Condition = PersistenceQuery.Condition(
     namespace,
     props,
@@ -40,6 +40,6 @@ object PersistenceQuery {
     condition(hierarchy = Hierarchy.Descendant(grandParentId, parentId).some)
   inline def grandChild(grandParentId: Key): PersistenceQuery.Condition =
     condition(hierarchy = Hierarchy.GrandChild(grandParentId).some)
-  inline def reference(value: Reference): PersistenceQuery.Condition = condition(reference = value.some)
+  inline def reference(value: ReferenceKey): PersistenceQuery.Condition = condition(reference = value.some)
 
 }

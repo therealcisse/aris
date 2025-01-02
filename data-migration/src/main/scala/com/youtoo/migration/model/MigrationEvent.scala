@@ -56,7 +56,7 @@ object MigrationEvent {
       }
 
     extension (self: MigrationEvent) def props: Chunk[EventProperty] = Chunk.empty
-    extension (self: MigrationEvent) def reference: Option[Reference] = None
+    extension (self: MigrationEvent) def reference: Option[ReferenceKey] = None
 
   }
 

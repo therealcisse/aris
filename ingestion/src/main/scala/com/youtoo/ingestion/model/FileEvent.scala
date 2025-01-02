@@ -60,7 +60,7 @@ object FileEvent {
 
       }
 
-    extension (self: FileEvent) def reference: Option[Reference] = None
+    extension (self: FileEvent) def reference: Option[ReferenceKey] = None
 
   }
 
