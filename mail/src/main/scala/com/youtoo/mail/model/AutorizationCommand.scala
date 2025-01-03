@@ -5,7 +5,6 @@ package model
 import zio.prelude.*
 
 import com.youtoo.cqrs.*
-import com.youtoo.job.model.*
 
 enum AuthorizationCommand {
   case GrantAuthorization(token: TokenInfo, timestamp: Timestamp)

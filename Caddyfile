@@ -1,0 +1,7 @@
+:80 {
+	reverse_proxy /mail/* http://host.docker.internal:8181
+	reverse_proxy /jobs/* http://host.docker.internal:8282
+	reverse_proxy /locks/* http://host.docker.internal:8383
+	reverse_proxy /ingestion/* http://host.docker.internal:8484
+	reverse_proxy /migration/* http://host.docker.internal:8585
+}

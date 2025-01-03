@@ -129,23 +129,24 @@ object MailApp extends ZIOApp, JsonSupport {
 
   val routes: Routes[Scope & Environment, Response] = Routes(
     Method.GET / "mail" / "health" -> handler(Response.json(ProjectInfo.toJson)),
-    Method.GET / "mail-accounts" -> handler { (req: Request) =>
+    Method.GET / "mail" / "mail-accounts" -> handler { (req: Request) =>
       endpoint.boundary("get_mail_accounts", req) {
         getAllMailAccounts() map { mailAccounts => Response.json(mailAccounts.toJson) }
       }
     },
-    Method.POST / "mail-accounts" / long("accountId") / "authenticate" -> handler { (accountId: Long, req: Request) =>
-      endpoint.boundary("authenticate_mail_account", req) {
-        req.body.fromBody[String] flatMap { authorizationCode =>
-          authenticateMailAccount(MailAccount.Id(Key(accountId)), authorizationCode = authorizationCode) foldZIO (
-            success = _ => ZIO.succeed(Response.ok),
-            failure = e => Log.error(s"Authentication failed", e) as Response.badRequest,
-          )
-        }
+    Method.POST / "mail" / "mail-accounts" / long("accountId") / "authenticate" -> handler {
+      (accountId: Long, req: Request) =>
+        endpoint.boundary("authenticate_mail_account", req) {
+          req.body.fromBody[String] flatMap { authorizationCode =>
+            authenticateMailAccount(MailAccount.Id(Key(accountId)), authorizationCode = authorizationCode) foldZIO (
+              success = _ => ZIO.succeed(Response.ok),
+              failure = e => Log.error(s"Authentication failed", e) as Response.badRequest,
+            )
+          }
 
-      }
+        }
     },
-    Method.POST / "mail-accounts" / "gmail" -> handler { (req: Request) =>
+    Method.POST / "mail" / "mail-accounts" / "gmail" -> handler { (req: Request) =>
       endpoint.boundary("add_gmail_account", req) {
         for {
           account <- req.body.fromBody[CreateGmailAccountRequest]
@@ -153,7 +154,7 @@ object MailApp extends ZIOApp, JsonSupport {
         } yield Response.json(s"""{"id":"$accountId"}""")
       }
     },
-    Method.GET / "mail-accounts" / long("accountId") -> handler { (accountId: Long, req: Request) =>
+    Method.GET / "mail" / "mail-accounts" / long("accountId") -> handler { (accountId: Long, req: Request) =>
       endpoint.boundary("get_mail_account", req) {
         getMailAccount(MailAccount.Id(Key(accountId))) map {
           case Some(account) => Response.json(account.toJson)
@@ -161,7 +162,7 @@ object MailApp extends ZIOApp, JsonSupport {
         }
       }
     },
-    Method.PUT / "mail-accounts" / long("accountId") / "sync-settings" / "toggle-auto-sync" -> handler {
+    Method.PUT / "mail" / "mail-accounts" / long("accountId") / "sync-settings" / "toggle-auto-sync" -> handler {
       (accountId: Long, req: Request) =>
         endpoint.boundary("toggle_mail_account_sync_auto", req) {
           req.body.fromBody[Boolean] flatMap { autoSync =>
@@ -169,7 +170,7 @@ object MailApp extends ZIOApp, JsonSupport {
           }
         }
     },
-    Method.PUT / "mail-accounts" / long("accountId") / "sync-settings" / "auto-sync-schedule" -> handler {
+    Method.PUT / "mail" / "mail-accounts" / long("accountId") / "sync-settings" / "auto-sync-schedule" -> handler {
       (accountId: Long, req: Request) =>
         endpoint.boundary("update_mail_account_auto_sync_schedule", req) {
           req.body.fromBody[String] flatMap { schedule =>
@@ -187,7 +188,7 @@ object MailApp extends ZIOApp, JsonSupport {
         }
       }
     },
-    Method.GET / "mail-data" / string("mailId") -> handler { (mailId: String, req: Request) =>
+    Method.GET / "mail" / "mail-data" / string("mailId") -> handler { (mailId: String, req: Request) =>
       endpoint.boundary("get_mail_data", req) {
         getMailData(MailData.Id(mailId)) map {
           case Some(data) => Response.json(data.toJson)
@@ -195,7 +196,7 @@ object MailApp extends ZIOApp, JsonSupport {
         }
       }
     },
-    Method.GET / "mail-state" / long("accountId") -> handler { (accountId: Long, req: Request) =>
+    Method.GET / "mail" / "mail-state" / long("accountId") -> handler { (accountId: Long, req: Request) =>
       endpoint.boundary("get_mail_state", req) {
         getMailState(MailAccount.Id(Key(accountId))) map {
           case Some(state) => Response.json(state.toJson)
@@ -203,12 +204,12 @@ object MailApp extends ZIOApp, JsonSupport {
         }
       }
     },
-    Method.POST / "mail-sync" / long("accountId") -> handler { (accountId: Long, req: Request) =>
+    Method.POST / "mail" / "mail-sync" / long("accountId") -> handler { (accountId: Long, req: Request) =>
       endpoint.boundary("trigger_mail_sync", req) {
         triggerMailSync(MailAccount.Id(Key(accountId))) `as` Response.ok
       }
     },
-    Method.POST / "mail-download" / long("accountId") -> handler { (accountId: Long, req: Request) =>
+    Method.POST / "mail" / "mail-download" / long("accountId") -> handler { (accountId: Long, req: Request) =>
       endpoint.boundary("trigger_mail_download", req) {
         triggerMailDownload(MailAccount.Id(Key(accountId))) `as` Response.ok
       }

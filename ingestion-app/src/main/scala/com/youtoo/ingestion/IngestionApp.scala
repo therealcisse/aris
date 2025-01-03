@@ -5,6 +5,7 @@ import scala.language.future
 
 import zio.*
 import zio.jdbc.*
+import zio.prelude.*
 
 import cats.implicits.*
 
@@ -43,18 +44,29 @@ object IngestionApp extends ZIOApp, JsonSupport {
 
   inline val FetchSize = 1_000L
 
+  object Port extends Newtype[Int] {
+    extension (a: Type) def value: Int = unwrap(a)
+  }
+
+  given Config[Port.Type] = Config.int.nested("mail_app_port").withDefault(8181).map(Port(_))
+
   type Environment =
     FlywayMigration & ZConnectionPool & CQRSPersistence & SnapshotStore & IngestionEventStore & IngestionCQRS & Server & Server.Config & NettyConfig & IngestionService & IngestionRepository & SnapshotStrategy.Factory & Tracing & Baggage & Meter
 
   given environmentTag: EnvironmentTag[Environment] = EnvironmentTag[Environment]
 
-  private val config = Server.Config.default
-    .port(8181)
+  private val configLayer = ZLayer {
+    for {
+      port <- ZIO.config[Port.Type]
+
+      config = Server.Config.default.port(port.value)
+    } yield config
+
+  }
 
   private val nettyConfig = NettyConfig.default
     .leakDetection(NettyConfig.LeakDetectionLevel.DISABLED)
 
-  private val configLayer = ZLayer.succeed(config)
   private val nettyConfigLayer = ZLayer.succeed(nettyConfig)
 
   private val instrumentationScopeName = "com.youtoo.ingestion.IngestionApp"
@@ -128,7 +140,7 @@ object IngestionApp extends ZIOApp, JsonSupport {
 
   val routes: Routes[Environment, Response] = Routes(
     Method.GET / "ingestion" / "health" -> handler(Response.json(ProjectInfo.toJson)),
-    Method.POST / "dataload" / "ingestion" -> handler { (req: Request) =>
+    Method.POST / "ingestion" / "dataload" -> handler { (req: Request) =>
       endpoint.boundary("dataload_ingestions", req) {
 
         req.body.fromBody[List[Key]] flatMap (ids =>

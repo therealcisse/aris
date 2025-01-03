@@ -1,4 +1,19 @@
 services:
+  caddy:
+    image: caddy:latest
+    container_name: caddy-proxy
+    networks:
+      - caddy-proxy-network
+    ports:
+      - "8888:80"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+    environment:
+      - CADDY_HOST=host.docker.internal # Optional for host communication (useful on macOS/Windows)
+      - CADDY_LOG_LEVEL=DEBUG
+    extra_hosts: # Ensures `host.docker.internal` works on Linux
+      - "host.docker.internal:host-gateway"
+
   fluentbit:
     image: cr.fluentbit.io/fluent/fluent-bit:3.2.1
     container_name: fluentbit
@@ -199,4 +214,6 @@ volumes:
   opensearch-data:
 networks:
   app-network:
+    driver: bridge
+  caddy-proxy-network:
     driver: bridge

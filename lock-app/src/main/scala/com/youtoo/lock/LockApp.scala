@@ -8,6 +8,7 @@ import zio.http.{Version as _, *}
 import zio.http.netty.NettyConfig
 
 import zio.json.*
+import zio.prelude.*
 
 import com.youtoo.postgres.config.*
 
@@ -27,19 +28,29 @@ import zio.telemetry.opentelemetry.baggage.Baggage
 import com.youtoo.std.utils.*
 
 object LockApp extends ZIOApp with JsonSupport {
+  object Port extends Newtype[Int] {
+    extension (a: Type) def value: Int = unwrap(a)
+  }
+
+  given Config[Port.Type] = Config.int.nested("lock_app_port").withDefault(8181).map(Port(_))
+
   type Environment =
     LockManager & LockRepository & Server & Server.Config & Tracing & Baggage & Meter
 
   given environmentTag: EnvironmentTag[Environment] = EnvironmentTag[Environment]
 
-  private val config = Server.Config.default
-    .port(8181)
+  private val configLayer = ZLayer {
+    for {
+      port <- ZIO.config[Port.Type]
+
+      config = Server.Config.default.port(port.value)
+    } yield config
+
+  }
 
   private val nettyConfig = NettyConfig.default
     .leakDetection(NettyConfig.LeakDetectionLevel.DISABLED)
   private val nettyConfigLayer = ZLayer.succeed(nettyConfig)
-
-  private val configLayer = ZLayer.succeed(config)
 
   private val instrumentationScopeName = "com.youtoo.lock.LockApp"
   private val resourceName = "lock"

@@ -111,7 +111,7 @@ object JobApp extends ZIOApp, JsonSupport {
 
   val routes: Routes[Environment, Response] = Routes(
     Method.GET / "jobs" / "health" -> handler(Response.json(ProjectInfo.toJson)),
-    Method.GET / "job" -> handler { (req: Request) =>
+    Method.GET / "jobs" -> handler { (req: Request) =>
       endpoint.boundary("get_jobs", req) {
         val offset = req.queryParamTo[Long]("offset").toOption
         val limit = req.queryParamToOrElse[Long]("limit", FetchSize)
@@ -126,7 +126,7 @@ object JobApp extends ZIOApp, JsonSupport {
       }
 
     },
-    Method.GET / "job" / long("id") -> handler { (id: Long, req: Request) =>
+    Method.GET / "jobs" / long("id") -> handler { (id: Long, req: Request) =>
       endpoint.boundary("get_job", req) {
         val key = Key(id)
 
@@ -145,7 +145,7 @@ object JobApp extends ZIOApp, JsonSupport {
       }
 
     },
-    Method.DELETE / "job" / long("id") -> handler { (id: Long, req: Request) =>
+    Method.DELETE / "jobs" / long("id") -> handler { (id: Long, req: Request) =>
       endpoint.boundary("cancel_job", req) {
         val key = Key(id)
 

@@ -5,6 +5,7 @@ import scala.language.future
 
 import zio.*
 import zio.jdbc.*
+import zio.prelude.*
 import zio.stream.*
 import zio.logging.*
 import zio.logging.backend.SLF4J
@@ -45,6 +46,12 @@ object MigrationApp extends ZIOApp {
 
   inline val FetchSize = 1_000L
 
+  object Port extends Newtype[Int] {
+    extension (a: Type) def value: Int = unwrap(a)
+  }
+
+  given Config[Port.Type] = Config.int.nested("migration_app_port").withDefault(8181).map(Port(_))
+
   type Environment =
     FlywayMigration & ZConnectionPool & CQRSPersistence & SnapshotStore & MigrationEventStore & MigrationCQRS & Server & Server.Config & NettyConfig & MigrationService & MigrationRepository & SnapshotStrategy.Factory & DataMigration & Interrupter & Healthcheck & Tracing & Baggage & Meter
 
@@ -53,13 +60,18 @@ object MigrationApp extends ZIOApp {
   private val instrumentationScopeName = "com.youtoo.migration.MigrationApp"
   private val resourceName = "migration"
 
-  private val config = Server.Config.default
-    .port(8181)
+  private val configLayer = ZLayer {
+    for {
+      port <- ZIO.config[Port.Type]
+
+      config = Server.Config.default.port(port.value)
+    } yield config
+
+  }
 
   private val nettyConfig = NettyConfig.default
     .leakDetection(NettyConfig.LeakDetectionLevel.DISABLED)
 
-  private val configLayer = ZLayer.succeed(config)
   private val nettyConfigLayer = ZLayer.succeed(nettyConfig)
 
   val bootstrap: ZLayer[Any, Nothing, Environment] =
@@ -99,7 +111,7 @@ object MigrationApp extends ZIOApp {
   val endpoint = RestEndpoint(RestEndpoint.Service("migration"))
 
   val routes: Routes[Environment & Scope, Response] = Routes(
-    Method.POST / "dataload" / "migration" -> handler { (req: Request) =>
+    Method.POST / "migration" / "dataload" -> handler { (req: Request) =>
       endpoint.boundary("dataload_migrations", req) {
 
         req.body.fromBody[List[Key]] flatMap (ids =>

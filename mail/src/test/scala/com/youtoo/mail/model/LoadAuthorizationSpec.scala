@@ -41,7 +41,6 @@ object LoadAuthorizationSpec extends ZIOSpecDefault {
             assert(result)(equalTo(Authorization.Granted(token, timestamp)))
           case AuthorizationEvent.AuthorizationRevoked(timestamp) =>
             assert(result)(equalTo(Authorization.Revoked(timestamp)))
-          case _ => assert(result)(equalTo(Authorization.Pending()))
         }
       }
     },
