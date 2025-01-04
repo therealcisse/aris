@@ -8,6 +8,7 @@ case class CreateGmailAccountRequest(
   name: MailAccount.Name,
   email: MailAccount.Email,
   syncConfig: SyncConfig,
+  sinkConfig: Option[SinkConfig],
   authorizationCode: String,
 )
 

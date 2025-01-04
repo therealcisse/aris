@@ -76,11 +76,10 @@ object IngestionEventStore {
       ): RIO[ZConnection, Option[NonEmptyList[Change[IngestionEvent]]]] =
         self.readEvents(id, snapshotVersion) @@ tracing.aspects.span(
           "IngestionEventStore.readEvents.withSnapshotVersion",
-          attributes =
-            Attributes(
-              Attribute.long("ingestionId", id.value),
-              Attribute.long("snapshotVersion", snapshotVersion.value)
-            ),
+          attributes = Attributes(
+            Attribute.long("ingestionId", id.value),
+            Attribute.long("snapshotVersion", snapshotVersion.value),
+          ),
         )
 
       def readEvents(

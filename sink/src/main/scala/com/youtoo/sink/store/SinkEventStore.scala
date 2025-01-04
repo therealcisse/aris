@@ -73,11 +73,10 @@ object SinkEventStore {
       ): RIO[ZConnection, Option[NonEmptyList[Change[SinkEvent]]]] =
         self.readEvents(id, snapshotVersion) @@ tracing.aspects.span(
           "SinkEventStore.readEvents.withSnapshotVersion",
-          attributes =
-            Attributes(
-              Attribute.long("sinkId", id.value),
-              Attribute.long("snapshotVersion", snapshotVersion.value)
-            ),
+          attributes = Attributes(
+            Attribute.long("sinkId", id.value),
+            Attribute.long("snapshotVersion", snapshotVersion.value),
+          ),
         )
 
       def readEvents(

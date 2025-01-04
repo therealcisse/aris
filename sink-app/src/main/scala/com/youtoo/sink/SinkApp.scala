@@ -34,6 +34,8 @@ import zio.telemetry.opentelemetry.baggage.Baggage
 import com.youtoo.std.utils.*
 
 object SinkApp extends ZIOApp, JsonSupport {
+  import com.youtoo.cqrs.Codecs.json.given
+
   inline val FetchSize = 1_000L
 
   object Port extends Newtype[Int] {
@@ -104,6 +106,27 @@ object SinkApp extends ZIOApp, JsonSupport {
 
   val routes: Routes[Environment, Response] = Routes(
     Method.GET / "sinks" / "health" -> handler(Response.json(ProjectInfo.toJson)),
+    Method.POST / "sinks" -> handler { (req: Request) =>
+      endpoint.boundary("add_sink", req) {
+        for {
+          info <- req.body.fromBody[SinkType]
+          id <- SinkDefinition.Id.gen
+          _ <- SinkService.addSink(id, info)
+        } yield Response.json(s"""{"id":$id}""")
+      }
+
+    },
+    Method.PUT / "sinks" / long("sinkId") -> handler { (sinkId: Long, req: Request) =>
+      endpoint.boundary("update_sink", req) {
+        val id = SinkDefinition.Id(Key(sinkId))
+
+        for {
+          info <- req.body.fromBody[SinkType]
+          _ <- SinkService.addSink(id, info)
+        } yield Response.json(s"""{"id":$id}""")
+      }
+
+    },
     Method.GET / "sinks" -> handler { (req: Request) =>
       endpoint.boundary("get_sinks", req) {
         loadAll() map { sinks =>

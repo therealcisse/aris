@@ -74,11 +74,10 @@ object DownloadEventStore {
       ): RIO[ZConnection, Option[NonEmptyList[Change[DownloadEvent]]]] =
         self.readEvents(id, snapshotVersion) @@ tracing.aspects.span(
           "DownloadEventStore.readEvents.withSnapshotVersion",
-          attributes =
-            Attributes(
-              Attribute.long("downloadId", id.value),
-              Attribute.long("snapshotVersion", snapshotVersion.value)
-            ),
+          attributes = Attributes(
+            Attribute.long("downloadId", id.value),
+            Attribute.long("snapshotVersion", snapshotVersion.value),
+          ),
         )
 
       def readEvents(

@@ -74,11 +74,10 @@ object JobEventStore {
       ): RIO[ZConnection, Option[NonEmptyList[Change[JobEvent]]]] =
         self.readEvents(id, snapshotVersion) @@ tracing.aspects.span(
           "JobEventStore.readEvents.withSnapshotVersion",
-          attributes =
-            Attributes(
-              Attribute.long("jobId", id.value),
-              Attribute.long("snapshotVersion", snapshotVersion.value)
-            ),
+          attributes = Attributes(
+            Attribute.long("jobId", id.value),
+            Attribute.long("snapshotVersion", snapshotVersion.value),
+          ),
         )
 
       def readEvents(

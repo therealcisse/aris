@@ -25,6 +25,7 @@ import com.youtoo.job.repository.*
 import com.youtoo.job.*
 import com.youtoo.lock.*
 import com.youtoo.lock.repository.*
+import com.youtoo.sink.model.*
 
 import zio.json.*
 
@@ -162,6 +163,22 @@ object MailApp extends ZIOApp, JsonSupport {
         }
       }
     },
+    Method.PUT / "mail" / "mail-accounts" / long("accountId") / "sink-settings" / "add-sink" -> handler {
+      (accountId: Long, req: Request) =>
+        endpoint.boundary("add_mail_account_sink", req) {
+          req.body.fromBody[Long] flatMap { sinkId =>
+            addSink(MailAccount.Id(Key(accountId)), id = SinkDefinition.Id(Key(sinkId))) map { _ => Response.ok }
+          }
+        }
+    },
+    Method.DELETE / "mail" / "mail-accounts" / long("accountId") / "sink-settings" / "delete-sink" -> handler {
+      (accountId: Long, req: Request) =>
+        endpoint.boundary("delete_mail_account_sink", req) {
+          req.body.fromBody[Long] flatMap { sinkId =>
+            removeSink(MailAccount.Id(Key(accountId)), id = SinkDefinition.Id(Key(sinkId))) map { _ => Response.ok }
+          }
+        }
+    },
     Method.PUT / "mail" / "mail-accounts" / long("accountId") / "sync-settings" / "toggle-auto-sync" -> handler {
       (accountId: Long, req: Request) =>
         endpoint.boundary("toggle_mail_account_sync_auto", req) {
@@ -226,7 +243,11 @@ object MailApp extends ZIOApp, JsonSupport {
         accountType = AccountType.Gmail,
         name = request.name,
         email = request.email,
-        settings = MailSettings(authConfig = AuthConfig(), syncConfig = request.syncConfig),
+        settings = MailSettings(
+          authConfig = AuthConfig(),
+          syncConfig = request.syncConfig,
+          sinkConfig = request.sinkConfig.getOrElse(SinkConfig.empty),
+        ),
         timestamp = timestamp,
       )
 
@@ -246,6 +267,46 @@ object MailApp extends ZIOApp, JsonSupport {
     } yield id
 
   def getMailAccount(id: MailAccount.Id): RIO[Environment, Option[MailAccount]] = MailService.loadAccount(id)
+
+  def addSink(accountId: MailAccount.Id, id: SinkDefinition.Id) = for {
+    acc <- MailService.loadAccount(accountId)
+
+    _ <- acc match {
+      case Some(acc) =>
+        acc.accountType match {
+          case AccountType.Gmail =>
+            val sinkConfig = SinkConfig(
+              destinations = SinkConfig.Sinks(acc.settings.sinkConfig.destinations.value + id),
+            )
+
+            println((acc.settings.sinkConfig, sinkConfig))
+
+            MailService.updateMailSettings(acc.id, acc.settings.copy(sinkConfig = sinkConfig))
+        }
+
+      case None => Log.error(s"Account not found $id")
+    }
+
+  } yield ()
+
+  def removeSink(accountId: MailAccount.Id, id: SinkDefinition.Id) = for {
+    acc <- MailService.loadAccount(accountId)
+
+    _ <- acc match {
+      case Some(acc) =>
+        acc.accountType match {
+          case AccountType.Gmail =>
+            val sinkConfig = SinkConfig(
+              destinations = SinkConfig.Sinks(acc.settings.sinkConfig.destinations.value - id),
+            )
+
+            MailService.updateMailSettings(acc.id, acc.settings.copy(sinkConfig = sinkConfig))
+        }
+
+      case None => Log.error(s"Account not found $id")
+    }
+
+  } yield ()
 
   def authenticateMailAccount(
     id: MailAccount.Id,

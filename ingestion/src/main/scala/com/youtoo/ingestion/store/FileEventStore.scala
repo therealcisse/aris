@@ -76,11 +76,10 @@ object FileEventStore {
       ): RIO[ZConnection, Option[NonEmptyList[Change[FileEvent]]]] =
         self.readEvents(id, snapshotVersion) @@ tracing.aspects.span(
           "FileEventStore.readEvents.withSnapshotVersion",
-          attributes =
-            Attributes(
-              Attribute.long("fileId", id.value),
-              Attribute.long("snapshotVersion", snapshotVersion.value)
-            ),
+          attributes = Attributes(
+            Attribute.long("fileId", id.value),
+            Attribute.long("snapshotVersion", snapshotVersion.value),
+          ),
         )
 
       def readEvents(

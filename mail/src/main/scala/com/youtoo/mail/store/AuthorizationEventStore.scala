@@ -78,7 +78,7 @@ object AuthorizationEventStore {
           "AuthorizationEventStore.readEvents.withSnapshotVersion",
           attributes = Attributes(
             Attribute.long("authorizationId", id.value),
-            Attribute.long("snapshotVersion", snapshotVersion.value)
+            Attribute.long("snapshotVersion", snapshotVersion.value),
           ),
         )
 

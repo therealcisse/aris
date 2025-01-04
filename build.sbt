@@ -412,6 +412,7 @@ lazy val mail = (project in file("mail"))
   .enablePlugins(BuildInfoPlugin)
   .settings(buildInfoSettings("com.youtoo"))
   .dependsOn(
+    sink % "compile->compile;test->test",
     core % "compile->compile;test->compile",
     postgres % "compile->compile;test->compile;test->test",
     `cqrs-persistence-postgres` % "compile->compile;test->test",
@@ -445,6 +446,7 @@ lazy val mailApp = (project in file("mail-app"))
   .enablePlugins(BuildInfoPlugin)
   .settings(buildInfoSettings("com.youtoo"))
   .dependsOn(
+    sink % "compile->compile;test->test",
     std % "compile->compile;test->test",
     memory % "compile->compile;test->test",
     core % "compile->compile;test->compile",

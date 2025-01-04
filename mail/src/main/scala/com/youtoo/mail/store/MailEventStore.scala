@@ -74,11 +74,10 @@ object MailEventStore {
       ): RIO[ZConnection, Option[NonEmptyList[Change[MailEvent]]]] =
         self.readEvents(id, snapshotVersion) @@ tracing.aspects.span(
           "MailEventStore.readEvents.withSnapshotVersion",
-          attributes =
-            Attributes(
-              Attribute.long("mailId", id.value),
-              Attribute.long("snapshotVersion", snapshotVersion.value)
-            ),
+          attributes = Attributes(
+            Attribute.long("mailId", id.value),
+            Attribute.long("snapshotVersion", snapshotVersion.value),
+          ),
         )
 
       def readEvents(

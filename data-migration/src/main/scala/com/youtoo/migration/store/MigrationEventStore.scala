@@ -76,11 +76,10 @@ object MigrationEventStore {
       ): RIO[ZConnection, Option[NonEmptyList[Change[MigrationEvent]]]] =
         self.readEvents(id, snapshotVersion) @@ tracing.aspects.span(
           "MigrationEventStore.readEvents.withSnapshotVersion",
-          attributes =
-            Attributes(
-              Attribute.long("migrationId", id.value),
-              Attribute.long("snapshotVersion", snapshotVersion.value)
-            ),
+          attributes = Attributes(
+            Attribute.long("migrationId", id.value),
+            Attribute.long("snapshotVersion", snapshotVersion.value),
+          ),
         )
 
       def readEvents(
