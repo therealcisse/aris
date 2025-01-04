@@ -19,7 +19,9 @@ import com.youtoo.cqrs.domain.*
 import com.youtoo.cqrs.service.MockCQRSPersistence
 import com.youtoo.mail.model.*
 
-object MailEventStoreSpec extends MockSpecDefault {
+import zio.telemetry.opentelemetry.tracing.*
+
+object MailEventStoreSpec extends MockSpecDefault, TestSupport {
 
   def spec = suite("MailEventStoreSpec")(
     testReadEventsId,
@@ -28,7 +30,11 @@ object MailEventStoreSpec extends MockSpecDefault {
     testReadEventsQueryOptionsAggregate,
     testSaveEvent,
   ).provideSomeLayerShared(
-    ZConnectionMock.pool(),
+    ZLayer.make[Tracing & ZConnectionPool](
+      ZConnectionMock.pool(),
+      tracingMockLayer(),
+      zio.telemetry.opentelemetry.OpenTelemetry.contextZIO,
+    ),
   )
 
   val discriminator = MailEvent.discriminator
@@ -45,7 +51,7 @@ object MailEventStoreSpec extends MockSpecDefault {
         result <- store.readEvents(id).atomically
       } yield assert(result)(equalTo(events.some))
 
-      effect.provideSomeLayer[ZConnectionPool](mockEnv.toLayer >>> MailEventStore.live())
+      effect.provideSomeLayer[ZConnectionPool & Tracing](mockEnv.toLayer >>> MailEventStore.live())
     }
   }
 
@@ -61,7 +67,7 @@ object MailEventStoreSpec extends MockSpecDefault {
         result <- store.readEvents(id, version).atomically
       } yield assert(result)(equalTo(events.some))
 
-      effect.provideSomeLayer[ZConnectionPool](mockEnv.toLayer >>> MailEventStore.live())
+      effect.provideSomeLayer[ZConnectionPool & Tracing](mockEnv.toLayer >>> MailEventStore.live())
     }
   }
 
@@ -81,7 +87,7 @@ object MailEventStoreSpec extends MockSpecDefault {
         result <- store.readEvents(query, options).atomically
       } yield assert(result)(equalTo(events.some))
 
-      effect.provideSomeLayer[ZConnectionPool](mockEnv.toLayer >>> MailEventStore.live())
+      effect.provideSomeLayer[ZConnectionPool & Tracing](mockEnv.toLayer >>> MailEventStore.live())
     }
   }
 
@@ -101,7 +107,7 @@ object MailEventStoreSpec extends MockSpecDefault {
         result <- store.readEvents(id, query, options).atomically
       } yield assert(result)(equalTo(events.some))
 
-      effect.provideSomeLayer[ZConnectionPool](mockEnv.toLayer >>> MailEventStore.live())
+      effect.provideSomeLayer[ZConnectionPool & Tracing](mockEnv.toLayer >>> MailEventStore.live())
     }
   }
 
@@ -121,7 +127,7 @@ object MailEventStoreSpec extends MockSpecDefault {
         result <- store.save(id, change).atomically
       } yield assert(result)(equalTo(returnId))
 
-      effect.provideSomeLayer[ZConnectionPool](mockEnv.toLayer >>> MailEventStore.live())
+      effect.provideSomeLayer[ZConnectionPool & Tracing](mockEnv.toLayer >>> MailEventStore.live())
     }
   }
 }

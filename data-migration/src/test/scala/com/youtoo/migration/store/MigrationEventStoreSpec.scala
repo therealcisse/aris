@@ -17,7 +17,9 @@ import com.youtoo.cqrs.domain.*
 import com.youtoo.cqrs.service.MockCQRSPersistence
 import com.youtoo.migration.model.*
 
-object MigrationEventStoreSpec extends MockSpecDefault {
+import zio.telemetry.opentelemetry.tracing.*
+
+object MigrationEventStoreSpec extends MockSpecDefault, TestSupport {
 
   def spec = suite("MigrationEventStoreSpec")(
     testReadEventsId,
@@ -26,7 +28,11 @@ object MigrationEventStoreSpec extends MockSpecDefault {
     testReadEventsQueryOptionsAggregate,
     testSaveEvent,
   ).provideSomeLayerShared(
-    ZConnectionMock.pool(),
+    ZLayer.make[Tracing & ZConnectionPool](
+      ZConnectionMock.pool(),
+      tracingMockLayer(),
+      zio.telemetry.opentelemetry.OpenTelemetry.contextZIO,
+    ),
   )
 
   val discriminator = MigrationEvent.discriminator
@@ -43,7 +49,7 @@ object MigrationEventStoreSpec extends MockSpecDefault {
         result <- store.readEvents(id).atomically
       } yield assert(result)(equalTo(Option(events)))
 
-      effect.provideSomeLayer[ZConnectionPool](mockEnv.toLayer >>> MigrationEventStore.live())
+      effect.provideSomeLayer[ZConnectionPool & Tracing](mockEnv.toLayer >>> MigrationEventStore.live())
     }
   }
 
@@ -59,7 +65,7 @@ object MigrationEventStoreSpec extends MockSpecDefault {
         result <- store.readEvents(id, version).atomically
       } yield assert(result)(equalTo(Option(events)))
 
-      effect.provideSomeLayer[ZConnectionPool](mockEnv.toLayer >>> MigrationEventStore.live())
+      effect.provideSomeLayer[ZConnectionPool & Tracing](mockEnv.toLayer >>> MigrationEventStore.live())
     }
   }
 
@@ -78,7 +84,7 @@ object MigrationEventStoreSpec extends MockSpecDefault {
         result <- store.readEvents(query, options).atomically
       } yield assert(result)(equalTo(Option(events)))
 
-      effect.provideSomeLayer[ZConnectionPool](mockEnv.toLayer >>> MigrationEventStore.live())
+      effect.provideSomeLayer[ZConnectionPool & Tracing](mockEnv.toLayer >>> MigrationEventStore.live())
     }
   }
 
@@ -97,7 +103,7 @@ object MigrationEventStoreSpec extends MockSpecDefault {
         result <- store.readEvents(id, query, options).atomically
       } yield assert(result)(equalTo(Option(events)))
 
-      effect.provideSomeLayer[ZConnectionPool](mockEnv.toLayer >>> MigrationEventStore.live())
+      effect.provideSomeLayer[ZConnectionPool & Tracing](mockEnv.toLayer >>> MigrationEventStore.live())
     }
   }
 
@@ -116,7 +122,7 @@ object MigrationEventStoreSpec extends MockSpecDefault {
         result <- store.save(id, change).atomically
       } yield assert(result)(equalTo(returnId))
 
-      effect.provideSomeLayer[ZConnectionPool](mockEnv.toLayer >>> MigrationEventStore.live())
+      effect.provideSomeLayer[ZConnectionPool & Tracing](mockEnv.toLayer >>> MigrationEventStore.live())
     }
   }
 

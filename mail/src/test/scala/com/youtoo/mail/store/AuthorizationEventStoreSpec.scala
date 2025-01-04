@@ -1,5 +1,5 @@
 package com.youtoo
-package job
+package mail
 package store
 
 import cats.implicits.*
@@ -17,13 +17,13 @@ import com.youtoo.postgres.*
 import com.youtoo.cqrs.*
 import com.youtoo.cqrs.domain.*
 import com.youtoo.cqrs.service.MockCQRSPersistence
-import com.youtoo.job.model.*
+import com.youtoo.mail.model.*
 
 import zio.telemetry.opentelemetry.tracing.*
 
-object JobEventStoreSpec extends MockSpecDefault, TestSupport {
+object AuthorizationEventStoreSpec extends MockSpecDefault, TestSupport {
 
-  def spec = suite("JobEventStore")(
+  def spec = suite("AuthorizationEventStoreSpec")(
     testReadEventsId,
     testReadEventsByIdAndVersion,
     testReadEventsQueryOptions,
@@ -36,95 +36,95 @@ object JobEventStoreSpec extends MockSpecDefault, TestSupport {
     ),
   )
 
-  val discriminator = JobEvent.discriminator
+  val discriminator = AuthorizationEvent.discriminator
 
   val testReadEventsId = test("readEvents by Id") {
-    check(keyGen, eventSequenceGen) { (id, events) =>
+    check(keyGen, Gen.listOf(authorizationEventChangeGen)) { (id, events) =>
       val mockEnv = MockCQRSPersistence.ReadEvents.Full.of(
-        equalTo((id, discriminator, JobEventStore.Table)),
+        equalTo((id, discriminator, AuthorizationEventStore.Table)),
         value(events.toChunk),
       )
 
       val effect = for {
-        store <- ZIO.service[JobEventStore]
+        store <- ZIO.service[AuthorizationEventStore]
         result <- store.readEvents(id).atomically
-      } yield assert(result)(equalTo(Option(events)))
+      } yield assert(result)(equalTo(NonEmptyList.fromIterableOption(events)))
 
-      effect.provideSomeLayer[ZConnectionPool & Tracing](mockEnv.toLayer >>> JobEventStore.live())
+      effect.provideSomeLayer[ZConnectionPool & Tracing](mockEnv.toLayer >>> AuthorizationEventStore.live())
     }
   }
 
   val testReadEventsByIdAndVersion = test("readEvents by Id and Version") {
-    check(keyGen, versionGen, eventSequenceGen) { (id, version, events) =>
+    check(keyGen, versionGen, Gen.listOf(authorizationEventChangeGen)) { (id, version, events) =>
       val mockEnv = MockCQRSPersistence.ReadEvents.Snapshot.of(
-        equalTo((id, discriminator, version, JobEventStore.Table)),
+        equalTo((id, discriminator, version, AuthorizationEventStore.Table)),
         value(events.toChunk),
       )
 
       val effect = for {
-        store <- ZIO.service[JobEventStore]
+        store <- ZIO.service[AuthorizationEventStore]
         result <- store.readEvents(id, version).atomically
-      } yield assert(result)(equalTo(Option(events)))
+      } yield assert(result)(equalTo(NonEmptyList.fromIterableOption(events)))
 
-      effect.provideSomeLayer[ZConnectionPool & Tracing](mockEnv.toLayer >>> JobEventStore.live())
+      effect.provideSomeLayer[ZConnectionPool & Tracing](mockEnv.toLayer >>> AuthorizationEventStore.live())
     }
   }
 
   val testReadEventsQueryOptions = test("readEvents by Query and Options") {
-    check(eventSequenceGen) { events =>
+    check(Gen.listOf(authorizationEventChangeGen)) { events =>
       val query = PersistenceQuery.condition()
       val options = FetchOptions()
 
       val mockEnv = MockCQRSPersistence.ReadEvents.FullArgs.of(
-        equalTo((discriminator, query, options, JobEventStore.Table)),
+        equalTo((discriminator, query, options, AuthorizationEventStore.Table)),
         value(events.toChunk),
       )
 
       val effect = for {
-        store <- ZIO.service[JobEventStore]
+        store <- ZIO.service[AuthorizationEventStore]
         result <- store.readEvents(query, options).atomically
-      } yield assert(result)(equalTo(Option(events)))
+      } yield assert(result)(equalTo(NonEmptyList.fromIterableOption(events)))
 
-      effect.provideSomeLayer[ZConnectionPool & Tracing](mockEnv.toLayer >>> JobEventStore.live())
+      effect.provideSomeLayer[ZConnectionPool & Tracing](mockEnv.toLayer >>> AuthorizationEventStore.live())
     }
   }
 
   val testReadEventsQueryOptionsAggregate = test("readEvents by Query and Options aggregate") {
-    check(keyGen, eventSequenceGen) { (id, events) =>
+    check(keyGen, Gen.listOf(authorizationEventChangeGen)) { (id, events) =>
 
       val query = PersistenceQuery.condition()
       val options = FetchOptions()
 
       val mockEnv = MockCQRSPersistence.ReadEvents.FullArgsByAggregate.of(
-        equalTo((id, discriminator, query, options, JobEventStore.Table)),
+        equalTo((id, discriminator, query, options, AuthorizationEventStore.Table)),
         value(events.toChunk),
       )
 
       val effect = for {
-        store <- ZIO.service[JobEventStore]
+        store <- ZIO.service[AuthorizationEventStore]
         result <- store.readEvents(id, query, options).atomically
       } yield assert(result)(equalTo(events.some))
 
-      effect.provideSomeLayer[ZConnectionPool & Tracing](mockEnv.toLayer >>> JobEventStore.live())
+      effect.provideSomeLayer[ZConnectionPool & Tracing](mockEnv.toLayer >>> AuthorizationEventStore.live())
     }
   }
 
   val testSaveEvent = test("save an event") {
-    check(keyGen, versionGen, jobEventGen) { (id, version, event) =>
+    check(keyGen, versionGen, authorizationEventGen) { (id, version, event) =>
       val change = Change(version, event)
       val returnId = 1L
 
-      val mockEnv = MockCQRSPersistence.SaveEvent.of[(Key, Discriminator, Change[JobEvent], Catalog), Long](
-        equalTo((id, discriminator, change, JobEventStore.Table)),
+      val mockEnv = MockCQRSPersistence.SaveEvent.of[(Key, Discriminator, Change[AuthorizationEvent], Catalog), Long](
+        equalTo((id, discriminator, change, AuthorizationEventStore.Table)),
         value(returnId),
       )
 
       val effect = for {
-        store <- ZIO.service[JobEventStore]
+        store <- ZIO.service[AuthorizationEventStore]
         result <- store.save(id, change).atomically
       } yield assert(result)(equalTo(returnId))
 
-      effect.provideSomeLayer[ZConnectionPool & Tracing](mockEnv.toLayer >>> JobEventStore.live())
+      effect.provideSomeLayer[ZConnectionPool & Tracing](mockEnv.toLayer >>> AuthorizationEventStore.live())
     }
   }
 

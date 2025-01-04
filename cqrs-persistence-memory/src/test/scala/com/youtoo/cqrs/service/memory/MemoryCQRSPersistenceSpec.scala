@@ -7,6 +7,7 @@ import com.youtoo.postgres.*
 import com.youtoo.cqrs.service.*
 
 import com.youtoo.cqrs.domain.*
+
 import com.youtoo.cqrs.Codecs.given
 
 import cats.implicits.*

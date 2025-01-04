@@ -4,4 +4,5 @@
 	reverse_proxy /locks/* http://host.docker.internal:8383
 	reverse_proxy /ingestion/* http://host.docker.internal:8484
 	reverse_proxy /migration/* http://host.docker.internal:8585
+	reverse_proxy /sinks/* http://host.docker.internal:8686
 }

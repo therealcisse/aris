@@ -52,6 +52,8 @@ lazy val aggregatedProjects: Seq[ProjectReference] =
   Seq(
     mailApp,
     mail,
+    sinkApp,
+    sink,
     job,
     kernel,
     core,
@@ -463,6 +465,67 @@ lazy val mailApp = (project in file("mail-app"))
     dockerEnvVars ++= BuildHelper.getEnvVars(),
     bashScriptExtraDefines += """addJava "-Dlogback.configurationFile=logback-production.xml"""",
     mainClass := Some("com.youtoo.mail.MailApp"),
+  )
+  .settings(
+    testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
+    libraryDependencies ++= Seq(
+    ),
+  )
+
+lazy val sink = (project in file("sink"))
+  .settings(stdSettings("sink"))
+  // .settings(publishSetting(false))
+  .enablePlugins(BuildInfoPlugin)
+  .settings(buildInfoSettings("com.youtoo"))
+  .dependsOn(
+    core % "compile->compile;test->compile",
+    postgres % "compile->compile;test->compile;test->test",
+    `cqrs-persistence-postgres` % "compile->compile;test->test",
+    log % "compile->compile;test->compile",
+  )
+  .settings(
+    testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
+    libraryDependencies ++= Dependencies.`open-telemetry`,
+    libraryDependencies ++= Dependencies.db,
+    libraryDependencies ++= Seq(
+      `zio-interop-cats`,
+      mockito,
+      `zio-jdbc`,
+      zio,
+      cats,
+      `zio-prelude`,
+      `zio-schema`,
+      `zio-test`,
+      `zio-test-sbt`,
+      `zio-test-magnolia`,
+      `zio-mock`,
+    ),
+  )
+
+lazy val sinkApp = (project in file("sink-app"))
+  .settings(stdSettings("sink-app"))
+  // .settings(publishSetting(false))
+  .enablePlugins(BuildInfoPlugin)
+  .settings(buildInfoSettings("com.youtoo"))
+  .dependsOn(
+    sink % "compile->compile;test->test",
+    std % "compile->compile;test->test",
+    memory % "compile->compile;test->test",
+    core % "compile->compile;test->compile",
+    postgres % "compile->compile;test->compile;test->test",
+    `cqrs-persistence-postgres` % "compile->compile;test->test",
+    log % "compile->compile;test->compile",
+    observability % "compile->compile",
+  )
+  .enablePlugins(DockerPlugin, JavaAppPackaging)
+  .settings(
+    Docker / packageName := "youtoo-sink",
+    dockerBaseImage := "eclipse-temurin:17-jre",
+    dockerExposedPorts := Seq(8181),
+    dockerUpdateLatest := true,
+    dockerEnvVars ++= BuildHelper.getEnvVars(),
+    bashScriptExtraDefines += """addJava "-Dlogback.configurationFile=logback-production.xml"""",
+    mainClass := Some("com.youtoo.mail.SinkApp"),
   )
   .settings(
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
