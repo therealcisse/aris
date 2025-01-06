@@ -5,8 +5,6 @@ package repository
 import zio.*
 import zio.prelude.*
 
-import com.youtoo.cqrs.Codecs.given
-
 import com.youtoo.job.model.*
 import com.youtoo.mail.model.*
 import com.youtoo.cqrs.*
@@ -15,33 +13,30 @@ import com.youtoo.cqrs.service.postgres.*
 import zio.telemetry.opentelemetry.tracing.Tracing
 import zio.telemetry.opentelemetry.common.*
 
-import zio.schema.codec.*
-
 import zio.jdbc.*
 
 trait MailRepository {
   def loadMails(offset: Option[Long], limit: Long): RIO[ZConnection, Chunk[MailData.Id]]
-  def loadAccounts(): RIO[ZConnection, Chunk[MailAccount]]
-  def loadAccount(key: MailAccount.Id): RIO[ZConnection, Option[MailAccount]]
-  def save(account: MailAccount): RIO[ZConnection, Long]
+  def loadAccounts(): RIO[ZConnection, Chunk[MailAccount.Id]]
+  def loadAccount(key: MailAccount.Id): RIO[ZConnection, Option[MailAccount.Information]]
+  def save(id: MailAccount.Id, info: MailAccount.Information): RIO[ZConnection, Long]
   def loadMail(id: MailData.Id): RIO[ZConnection, Option[MailData]]
   def save(data: MailData): RIO[ZConnection, Long]
   def saveMails(data: NonEmptyList[MailData]): RIO[ZConnection, Long]
-  def updateMailSettings(id: MailAccount.Id, settings: MailSettings): RIO[ZConnection, Long]
 }
 
 object MailRepository {
   inline def loadMails(offset: Option[Long], limit: Long): RIO[MailRepository & ZConnection, Chunk[MailData.Id]] =
     ZIO.serviceWithZIO[MailRepository](_.loadMails(offset, limit))
 
-  inline def loadAccounts(): RIO[MailRepository & ZConnection, Chunk[MailAccount]] =
+  inline def loadAccounts(): RIO[MailRepository & ZConnection, Chunk[MailAccount.Id]] =
     ZIO.serviceWithZIO[MailRepository](_.loadAccounts())
 
-  inline def loadAccount(key: MailAccount.Id): RIO[MailRepository & ZConnection, Option[MailAccount]] =
+  inline def loadAccount(key: MailAccount.Id): RIO[MailRepository & ZConnection, Option[MailAccount.Information]] =
     ZIO.serviceWithZIO[MailRepository](_.loadAccount(key))
 
-  inline def save(account: MailAccount): RIO[MailRepository & ZConnection, Long] =
-    ZIO.serviceWithZIO[MailRepository](_.save(account))
+  inline def save(id: MailAccount.Id, info: MailAccount.Information): RIO[MailRepository & ZConnection, Long] =
+    ZIO.serviceWithZIO[MailRepository](_.save(id, info))
 
   inline def loadMail(id: MailData.Id): RIO[MailRepository & ZConnection, Option[MailData]] =
     ZIO.serviceWithZIO[MailRepository](_.loadMail(id))
@@ -52,9 +47,6 @@ object MailRepository {
   inline def saveMails(data: NonEmptyList[MailData]): RIO[MailRepository & ZConnection, Long] =
     ZIO.serviceWithZIO[MailRepository](_.saveMails(data))
 
-  inline def updateMailSettings(id: MailAccount.Id, settings: MailSettings): RIO[MailRepository & ZConnection, Long] =
-    ZIO.serviceWithZIO[MailRepository](_.updateMailSettings(id, settings))
-
   def live(): ZLayer[Tracing, Throwable, MailRepository] =
     ZLayer.fromFunction(tracing => new MailRepositoryLive().traced(tracing))
 
@@ -62,14 +54,14 @@ object MailRepository {
     def loadMails(offset: Option[Long], limit: Long): RIO[ZConnection, Chunk[MailData.Id]] =
       Queries.LOAD_MAILS(offset, limit).selectAll
 
-    def loadAccounts(): RIO[ZConnection, Chunk[MailAccount]] =
+    def loadAccounts(): RIO[ZConnection, Chunk[MailAccount.Id]] =
       Queries.LOAD_ACCOUNTS().selectAll
 
-    def loadAccount(key: MailAccount.Id): RIO[ZConnection, Option[MailAccount]] =
+    def loadAccount(key: MailAccount.Id): RIO[ZConnection, Option[MailAccount.Information]] =
       Queries.LOAD_ACCOUNT(key).selectOne
 
-    def save(account: MailAccount): RIO[ZConnection, Long] =
-      Queries.SAVE_ACCOUNT(account).insert
+    def save(id: MailAccount.Id, info: MailAccount.Information): RIO[ZConnection, Long] =
+      Queries.SAVE_ACCOUNT(id, info).insert
 
     def loadMail(id: MailData.Id): RIO[ZConnection, Option[MailData]] =
       Queries.LOAD_MAIL(id).selectOne
@@ -80,24 +72,21 @@ object MailRepository {
     def saveMails(data: NonEmptyList[MailData]): RIO[ZConnection, Long] =
       Queries.SAVE_MAILS(data).insert
 
-    def updateMailSettings(id: MailAccount.Id, settings: MailSettings): RIO[ZConnection, Long] =
-      Queries.UPDATE_MAIL_SETTINGS(id, settings).update
-
     def traced(tracing: Tracing): MailRepository =
       new MailRepository {
         def loadMails(offset: Option[Long], limit: Long): RIO[ZConnection, Chunk[MailData.Id]] =
           self.loadMails(offset, limit) @@ tracing.aspects.span("MailRepository.loadMails")
-        def loadAccounts(): RIO[ZConnection, Chunk[MailAccount]] =
+        def loadAccounts(): RIO[ZConnection, Chunk[MailAccount.Id]] =
           self.loadAccounts() @@ tracing.aspects.span("MailRepository.loadAccounts")
-        def loadAccount(key: MailAccount.Id): RIO[ZConnection, Option[MailAccount]] =
+        def loadAccount(key: MailAccount.Id): RIO[ZConnection, Option[MailAccount.Information]] =
           self.loadAccount(key) @@ tracing.aspects.span(
             "MailRepository.loadAccount",
             attributes = Attributes(Attribute.long("accountId", key.asKey.value)),
           )
-        def save(account: MailAccount): RIO[ZConnection, Long] =
-          self.save(account) @@ tracing.aspects.span(
+        def save(id: MailAccount.Id, info: MailAccount.Information): RIO[ZConnection, Long] =
+          self.save(id, info) @@ tracing.aspects.span(
             "MailRepository.save",
-            attributes = Attributes(Attribute.long("accountId", account.id.asKey.value)),
+            attributes = Attributes(Attribute.long("accountId", id.asKey.value)),
           )
         def loadMail(id: MailData.Id): RIO[ZConnection, Option[MailData]] =
           self.loadMail(id) @@ tracing.aspects.span(
@@ -115,18 +104,11 @@ object MailRepository {
             attributes = Attributes(Attribute.long("mails", data.size)),
           )
 
-        def updateMailSettings(id: MailAccount.Id, settings: MailSettings): RIO[ZConnection, Long] =
-          self.updateMailSettings(id, settings) @@ tracing.aspects.span(
-            "MailRepository.updateMailSettings",
-            attributes = Attributes(Attribute.long("accountId", id.asKey.value)),
-          )
       }
   }
 
   object Queries extends JdbcCodecs {
     import zio.jdbc.*
-
-    given JdbcDecoder[MailSettings] = byteArrayDecoder[MailSettings]
 
     given mailAccountIdSetter: SqlFragment.Setter[MailAccount.Id] = SqlFragment.Setter[Key].contramap(_.asKey)
     given mailDataIdSetter: SqlFragment.Setter[MailData.Id] = SqlFragment.Setter[String].contramap(_.value)
@@ -157,52 +139,38 @@ object MailRepository {
         FROM mail_data
         """ ++ sql" ORDER BY id DESC" ++ offsetQuery ++ limitQuery).query[MailData.Id]
 
-    def LOAD_ACCOUNTS(): Query[MailAccount] =
+    def LOAD_ACCOUNTS(): Query[MailAccount.Id] =
       (sql"""
-        SELECT key, type, name, email, settings, timestamp
+        SELECT key
         FROM mail_account
         """)
         .query[
-          (
-            MailAccount.Id,
-            AccountType,
-            MailAccount.Name,
-            MailAccount.Email,
-            MailSettings,
-            Timestamp,
-          ),
+          MailAccount.Id,
         ]
-        .map(MailAccount.apply)
 
-    def LOAD_ACCOUNT(key: MailAccount.Id): Query[MailAccount] =
+    def LOAD_ACCOUNT(key: MailAccount.Id): Query[MailAccount.Information] =
       sql"""
-    SELECT key, type, name, email, settings, timestamp
+    SELECT type, name, email, timestamp
     FROM mail_account
     WHERE key = $key
     """.query[
         (
-          MailAccount.Id,
           AccountType,
           MailAccount.Name,
           MailAccount.Email,
-          MailSettings,
           Timestamp,
         ),
-      ].map(MailAccount.apply)
+      ].map(MailAccount.Information.apply)
 
-    def SAVE_ACCOUNT(account: MailAccount): SqlFragment =
-      val payload =
-        java.util.Base64.getEncoder.encodeToString(summon[BinaryCodec[MailSettings]].encode(account.settings).toArray)
-
+    def SAVE_ACCOUNT(id: MailAccount.Id, info: MailAccount.Information): SqlFragment =
       sql"""
-    INSERT INTO mail_account (key, type, email, name, settings, timestamp)
+    INSERT INTO mail_account (key, type, email, name, timestamp)
     VALUES (
-      ${account.id},
-      ${account.accountType},
-      ${account.email},
-      ${account.name},
-      decode(${payload}, 'base64'),
-      ${account.timestamp}
+      ${id},
+      ${info.accountType},
+      ${info.email},
+      ${info.name},
+      ${info.timestamp}
     )
     """
 
@@ -255,16 +223,6 @@ object MailRepository {
             )
             .toSeq,
         )
-
-    def UPDATE_MAIL_SETTINGS(id: MailAccount.Id, settings: MailSettings): SqlFragment =
-      val payload =
-        java.util.Base64.getEncoder.encodeToString(summon[BinaryCodec[MailSettings]].encode(settings).toArray)
-
-      sql"""
-        UPDATE mail_account
-        SET settings = decode(${payload}, 'base64')
-        WHERE key = $id
-      """
 
   }
 

@@ -50,7 +50,6 @@ object FlywayMigration {
           val flyway = Flyway
             .configure()
             .dataSource(dataSource)
-            .outOfOrder(true)
             .locations(config.migrations)
             .load()
 

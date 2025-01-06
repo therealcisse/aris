@@ -4,6 +4,7 @@ package service
 
 import com.youtoo.mail.model.*
 import com.youtoo.job.model.*
+import com.youtoo.sink.model.*
 
 import zio.prelude.*
 import zio.mock.*
@@ -19,16 +20,21 @@ object MailServiceMock extends Mock[MailService] {
       extends Effect[(MailAccount.Id, Timestamp, NonEmptyList[MailData.Id], MailToken, Job.Id), Throwable, Unit]
   object CompleteSync extends Effect[(MailAccount.Id, Timestamp, Job.Id), Throwable, Unit]
 
+  object SetAutoSync extends Effect[(MailAccount.Id, SyncConfig.CronExpression), Throwable, Unit]
+  object DisableAutoSync extends Effect[MailAccount.Id, Throwable, Unit]
+  object SetAuthConfig extends Effect[(MailAccount.Id, AuthConfig), Throwable, Unit]
+  object LinkSink extends Effect[(MailAccount.Id, SinkDefinition.Id), Throwable, Unit]
+  object UnlinkSink extends Effect[(MailAccount.Id, SinkDefinition.Id), Throwable, Unit]
+
   object LoadAccounts extends Effect[Unit, Throwable, Chunk[MailAccount]]
   object LoadAccount extends Effect[MailAccount.Id, Throwable, Option[MailAccount]]
-  object SaveAccount extends Effect[MailAccount, Throwable, Long]
+  object SaveAccount extends Effect[(MailAccount.Id, MailAccount.Information), Throwable, Long]
   object LoadMail extends Effect[MailData.Id, Throwable, Option[MailData]]
   object LoadMails extends Effect[(Option[Long], Long), Throwable, Chunk[MailData.Id]]
   object SaveMail extends Effect[MailData, Throwable, Long]
   object SaveMails extends Effect[NonEmptyList[MailData], Throwable, Long]
   object LoadState extends Effect[MailAccount.Id, Throwable, Option[Mail]]
   object LoadDownloadState extends Effect[MailAccount.Id, Throwable, Option[Download]]
-  object UpdateMailSettings extends Effect[(MailAccount.Id, MailSettings), Throwable, Long]
 
   val compose: URLayer[Proxy, MailService] =
     ZLayer {
@@ -56,14 +62,29 @@ object MailServiceMock extends Mock[MailService] {
         def completeSync(accountKey: MailAccount.Id, timestamp: Timestamp, jobId: Job.Id): Task[Unit] =
           proxy(CompleteSync, (accountKey, timestamp, jobId))
 
+        def setAutoSync(accountId: MailAccount.Id, schedule: SyncConfig.CronExpression): Task[Unit] =
+          proxy(SetAutoSync, (accountId, schedule))
+
+        def disableAutoSync(accountId: MailAccount.Id): Task[Unit] =
+          proxy(DisableAutoSync, accountId)
+
+        def setAuthConfig(accountId: MailAccount.Id, config: AuthConfig): Task[Unit] =
+          proxy(SetAuthConfig, (accountId, config))
+
+        def linkSink(accountId: MailAccount.Id, sinkId: SinkDefinition.Id): Task[Unit] =
+          proxy(LinkSink, (accountId, sinkId))
+
+        def unlinkSink(accountId: MailAccount.Id, sinkId: SinkDefinition.Id): Task[Unit] =
+          proxy(UnlinkSink, (accountId, sinkId))
+
         def loadAccounts(): Task[Chunk[MailAccount]] =
           proxy(LoadAccounts)
 
         def loadAccount(key: MailAccount.Id): Task[Option[MailAccount]] =
           proxy(LoadAccount, key)
 
-        def save(account: MailAccount): Task[Long] =
-          proxy(SaveAccount, account)
+        def save(id: MailAccount.Id, info: MailAccount.Information): Task[Long] =
+          proxy(SaveAccount, (id, info))
 
         def loadMail(id: MailData.Id): Task[Option[MailData]] =
           proxy(LoadMail, id)
@@ -83,8 +104,6 @@ object MailServiceMock extends Mock[MailService] {
         def saveMails(data: NonEmptyList[MailData]): Task[Long] =
           proxy(SaveMails, data)
 
-        def updateMailSettings(id: MailAccount.Id, settings: MailSettings): Task[Long] =
-          proxy(UpdateMailSettings, (id, settings))
       }
     }
 }

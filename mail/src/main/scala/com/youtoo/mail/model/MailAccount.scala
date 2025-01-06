@@ -14,7 +14,7 @@ case class MailAccount(
   accountType: AccountType,
   name: MailAccount.Name,
   email: MailAccount.Email,
-  settings: MailSettings,
+  settings: MailConfig,
   timestamp: Timestamp,
 ) {
 
@@ -40,6 +40,20 @@ object MailAccount {
   object Email extends Newtype[String] {
     extension (a: Type) def value: String = unwrap(a)
     given Schema[Type] = derive
+  }
+
+  case class Information(
+    accountType: AccountType,
+    name: MailAccount.Name,
+    email: MailAccount.Email,
+    timestamp: Timestamp,
+  )
+
+  object Information {
+    extension (info: Information)
+      def toAccount(id: MailAccount.Id, config: MailConfig): MailAccount =
+        MailAccount(id, info.accountType, info.name, info.email, config, info.timestamp)
+
   }
 
   given Schema[MailAccount] = DeriveSchema.gen

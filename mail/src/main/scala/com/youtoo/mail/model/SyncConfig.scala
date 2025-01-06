@@ -27,4 +27,6 @@ object SyncConfig {
     given Schema[AutoSync] = DeriveSchema.gen
 
   }
+
+  def default: SyncConfig = SyncConfig(AutoSync.disabled(None))
 }

@@ -9,4 +9,5 @@ object AuthConfig {
 
   given Schema[AuthConfig] = DeriveSchema.gen
 
+  def default: AuthConfig = AuthConfig()
 }

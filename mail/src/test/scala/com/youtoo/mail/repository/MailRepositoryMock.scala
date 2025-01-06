@@ -12,13 +12,12 @@ import com.youtoo.mail.model.*
 object MailRepositoryMock extends Mock[MailRepository] {
 
   object LoadMails extends Effect[(Option[Long], Long), Throwable, Chunk[MailData.Id]]
-  object LoadAccounts extends Effect[Unit, Throwable, Chunk[MailAccount]]
-  object LoadAccount extends Effect[MailAccount.Id, Throwable, Option[MailAccount]]
-  object SaveAccount extends Effect[MailAccount, Throwable, Long]
+  object LoadAccounts extends Effect[Unit, Throwable, Chunk[MailAccount.Id]]
+  object LoadAccount extends Effect[MailAccount.Id, Throwable, Option[MailAccount.Information]]
+  object SaveAccount extends Effect[(MailAccount.Id, MailAccount.Information), Throwable, Long]
   object LoadMail extends Effect[MailData.Id, Throwable, Option[MailData]]
   object SaveMail extends Effect[MailData, Throwable, Long]
   object SaveMails extends Effect[NonEmptyList[MailData], Throwable, Long]
-  object UpdateMailSettings extends Effect[(MailAccount.Id, MailSettings), Throwable, Long]
 
   val compose: URLayer[Proxy, MailRepository] =
     ZLayer {
@@ -28,14 +27,14 @@ object MailRepositoryMock extends Mock[MailRepository] {
         def loadMails(offset: Option[Long], limit: Long): RIO[ZConnection, Chunk[MailData.Id]] =
           proxy(LoadMails, (offset, limit))
 
-        def loadAccounts(): RIO[ZConnection, Chunk[MailAccount]] =
+        def loadAccounts(): RIO[ZConnection, Chunk[MailAccount.Id]] =
           proxy(LoadAccounts)
 
-        def loadAccount(key: MailAccount.Id): RIO[ZConnection, Option[MailAccount]] =
+        def loadAccount(key: MailAccount.Id): RIO[ZConnection, Option[MailAccount.Information]] =
           proxy(LoadAccount, key)
 
-        def save(account: MailAccount): RIO[ZConnection, Long] =
-          proxy(SaveAccount, account)
+        def save(id: MailAccount.Id, info: MailAccount.Information): RIO[ZConnection, Long] =
+          proxy(SaveAccount, (id, info))
 
         def loadMail(id: MailData.Id): RIO[ZConnection, Option[MailData]] =
           proxy(LoadMail, id)
@@ -46,8 +45,6 @@ object MailRepositoryMock extends Mock[MailRepository] {
         def saveMails(data: NonEmptyList[MailData]): RIO[ZConnection, Long] =
           proxy(SaveMails, data)
 
-        def updateMailSettings(id: MailAccount.Id, settings: MailSettings): RIO[ZConnection, Long] =
-          proxy(UpdateMailSettings, (id, settings))
       }
     }
 }

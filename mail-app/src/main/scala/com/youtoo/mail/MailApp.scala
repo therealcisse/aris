@@ -58,7 +58,7 @@ object MailApp extends ZIOApp, JsonSupport {
   given Config[Port.Type] = Config.int.nested("mail_app_port").withDefault(8181).map(Port(_))
 
   type Environment =
-    FlywayMigration & ZConnectionPool & CQRSPersistence & SnapshotStore & MailEventStore & MailCQRS & Server & Server.Config & NettyConfig & MailService & SyncService & MailClient & GmailPool & MailRepository & JobService & JobRepository & JobEventStore & JobCQRS & DownloadService & DownloadCQRS & DownloadEventStore & AuthorizationCQRS & AuthorizationEventStore & LockManager & LockRepository & SnapshotStrategy.Factory & Tracing & Baggage & Meter & NetHttpTransport
+    FlywayMigration & ZConnectionPool & CQRSPersistence & SnapshotStore & MailEventStore & MailCQRS & MailConfigEventStore & MailConfigCQRS & Server & Server.Config & NettyConfig & MailService & SyncService & MailClient & GmailPool & MailRepository & JobService & JobRepository & JobEventStore & JobCQRS & DownloadService & DownloadCQRS & DownloadEventStore & AuthorizationCQRS & AuthorizationEventStore & LockManager & LockRepository & SnapshotStrategy.Factory & Tracing & Baggage & Meter & NetHttpTransport
 
   given environmentTag: EnvironmentTag[Environment] = EnvironmentTag[Environment]
 
@@ -88,6 +88,8 @@ object MailApp extends ZIOApp, JsonSupport {
       ZLayer
         .makeSome[Scope, Environment](
           zio.metrics.jvm.DefaultJvmMetrics.live.unit,
+          MailConfigEventStore.live(),
+          MailConfigCQRS.live(),
           DownloadCQRS.live(),
           DownloadService.live(),
           DownloadEventStore.live(),
@@ -183,7 +185,7 @@ object MailApp extends ZIOApp, JsonSupport {
       (accountId: Long, req: Request) =>
         endpoint.boundary("toggle_mail_account_sync_auto", req) {
           req.body.fromBody[Boolean] flatMap { autoSync =>
-            updateMailSettings(MailAccount.Id(Key(accountId)), autoSync = Some(autoSync)) map { _ => Response.ok }
+            updateMailConfig(MailAccount.Id(Key(accountId)), autoSync = Some(autoSync)) map { _ => Response.ok }
           }
         }
     },
@@ -191,7 +193,7 @@ object MailApp extends ZIOApp, JsonSupport {
       (accountId: Long, req: Request) =>
         endpoint.boundary("update_mail_account_auto_sync_schedule", req) {
           req.body.fromBody[String] flatMap { schedule =>
-            updateMailSettings(MailAccount.Id(Key(accountId)), schedule = Some(schedule)) map { _ => Response.ok }
+            updateMailConfig(MailAccount.Id(Key(accountId)), schedule = Some(schedule)) map { _ => Response.ok }
           }
         }
     },
@@ -238,20 +240,14 @@ object MailApp extends ZIOApp, JsonSupport {
       id <- MailAccount.Id.gen
       timestamp <- Timestamp.gen
 
-      account = MailAccount(
-        id = id,
+      info = MailAccount.Information(
         accountType = AccountType.Gmail,
         name = request.name,
         email = request.email,
-        settings = MailSettings(
-          authConfig = AuthConfig(),
-          syncConfig = request.syncConfig,
-          sinkConfig = request.sinkConfig.getOrElse(SinkConfig.empty),
-        ),
         timestamp = timestamp,
       )
 
-      _ <- MailService.save(account)
+      _ <- MailService.save(id, info)
 
       clientInfo <- ZIO.config[GoogleClientInfo]
 
@@ -259,9 +255,9 @@ object MailApp extends ZIOApp, JsonSupport {
 
       _ <- info match {
         case Left(e) =>
-          Log.error(s"Authentication failed for account ${account.id} : ${e.getMessage}", e) *> MailService
-            .revokeAuthorization(account.id, timestamp)
-        case Right(token) => MailService.grantAuthorization(account.id, token, timestamp)
+          Log.error(s"Authentication failed for account $id : ${e.getMessage}", e) *> MailService
+            .revokeAuthorization(id, timestamp)
+        case Right(token) => MailService.grantAuthorization(id, token, timestamp)
       }
 
     } yield id
@@ -272,18 +268,7 @@ object MailApp extends ZIOApp, JsonSupport {
     acc <- MailService.loadAccount(accountId)
 
     _ <- acc match {
-      case Some(acc) =>
-        acc.accountType match {
-          case AccountType.Gmail =>
-            val sinkConfig = SinkConfig(
-              destinations = SinkConfig.Sinks(acc.settings.sinkConfig.destinations.value + id),
-            )
-
-            println((acc.settings.sinkConfig, sinkConfig))
-
-            MailService.updateMailSettings(acc.id, acc.settings.copy(sinkConfig = sinkConfig))
-        }
-
+      case Some(acc) => MailService.linkSink(acc.id, id)
       case None => Log.error(s"Account not found $id")
     }
 
@@ -293,16 +278,7 @@ object MailApp extends ZIOApp, JsonSupport {
     acc <- MailService.loadAccount(accountId)
 
     _ <- acc match {
-      case Some(acc) =>
-        acc.accountType match {
-          case AccountType.Gmail =>
-            val sinkConfig = SinkConfig(
-              destinations = SinkConfig.Sinks(acc.settings.sinkConfig.destinations.value - id),
-            )
-
-            MailService.updateMailSettings(acc.id, acc.settings.copy(sinkConfig = sinkConfig))
-        }
-
+      case Some(acc) => MailService.unlinkSink(acc.id, id)
       case None => Log.error(s"Account not found $id")
     }
 
@@ -343,7 +319,7 @@ object MailApp extends ZIOApp, JsonSupport {
 
   } yield ()
 
-  def updateMailSettings(
+  def updateMailConfig(
     id: MailAccount.Id,
     schedule: Option[String] = None,
     autoSync: Option[Boolean] = None,
@@ -354,28 +330,15 @@ object MailApp extends ZIOApp, JsonSupport {
       case Some(acc) =>
         (schedule, autoSync) match {
           case (Some(cron), None) =>
-            val syncConfig = SyncConfig(
-              autoSync = SyncConfig.AutoSync.enabled(SyncConfig.CronExpression(cron)),
-            )
-
-            MailService.updateMailSettings(acc.id, acc.settings.copy(syncConfig = syncConfig))
+            MailService.setAutoSync(acc.id, SyncConfig.CronExpression(cron))
 
           case (None, Some(autoSync)) =>
-            val syncConfig = SyncConfig(
-              autoSync =
-                if autoSync then
-                  (acc.settings.syncConfig match {
-                    case SyncConfig(SyncConfig.AutoSync.disabled(Some(cron))) => SyncConfig.AutoSync.enabled(cron)
-                    case SyncConfig(autoSync) => autoSync
-                  })
-                else
-                  SyncConfig.AutoSync.disabled(acc.settings.syncConfig match {
-                    case SyncConfig(SyncConfig.AutoSync.enabled(cron)) => Some(cron)
-                    case _ => None
-                  }),
-            )
-
-            MailService.updateMailSettings(acc.id, acc.settings.copy(syncConfig = syncConfig))
+            if autoSync then
+              (acc.settings.syncConfig match {
+                case SyncConfig(SyncConfig.AutoSync.disabled(Some(cron))) => MailService.setAutoSync(acc.id, cron)
+                case _ => ZIO.unit
+              })
+            else MailService.disableAutoSync(acc.id)
 
           case _ => ZIO.unit
         }

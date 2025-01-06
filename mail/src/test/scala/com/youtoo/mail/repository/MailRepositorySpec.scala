@@ -21,14 +21,13 @@ object MailRepositorySpec extends PgSpec, TestSupport {
     suite("MailRepositorySpec")(
       loadMailIsOptimized,
       loadAccountIsOptimized,
-      shouldUpdateMailSettingsForAnExistingAccount,
       shouldSaveAndLoadAMail,
       shouldSaveMailsAndLoadAMail,
       shouldSaveAndLoadAnAccount,
       shouldLoadMultipleAccountsWithLoadMany,
       loadShouldReturnNoneForNonExistentMail,
       loadShouldReturnNoneForNonExistentAccount,
-      // shouldLoadMultipleMailsWithLoadMany,
+      shouldLoadMultipleMailsWithLoadMany,
     ).provideSomeLayerShared(
       ZLayer.make[MailRepository](
         MailRepository.live(),
@@ -73,19 +72,6 @@ object MailRepositorySpec extends PgSpec, TestSupport {
       }
     }
 
-  def shouldUpdateMailSettingsForAnExistingAccount =
-    test("should update mail settings for an existing account") {
-      check(mailAccountGen, mailSettingsGen) { case (account, newSettings) =>
-        atomically {
-          for {
-            _ <- MailRepository.save(account)
-            _ <- MailRepository.updateMailSettings(account.id, newSettings)
-            result <- MailRepository.loadAccount(account.id)
-          } yield assert(result.map(_.settings))(isSome(equalTo(newSettings)))
-        }
-      }
-    }
-
   def shouldSaveAndLoadAMail =
     test("should save and load a mail") {
       check(mailDataGen) { mail =>
@@ -115,12 +101,15 @@ object MailRepositorySpec extends PgSpec, TestSupport {
 
   def shouldSaveAndLoadAnAccount =
     test("should save and load an account") {
-      check(mailAccountGen) { account =>
+      check(
+        mailAccountIdGen,
+        mailAccountInformationGen,
+      ) { (id, info) =>
         atomically {
           for {
-            _ <- MailRepository.save(account)
-            result <- MailRepository.loadAccount(account.id)
-          } yield assert(result)(isSome(equalTo(account)))
+            _ <- MailRepository.save(id, info)
+            result <- MailRepository.loadAccount(id)
+          } yield assert(result)(isSome(equalTo(info.toAccount(id, MailConfig.default))))
         }
       }
     }
@@ -138,15 +127,28 @@ object MailRepositorySpec extends PgSpec, TestSupport {
 
   def shouldLoadMultipleAccountsWithLoadMany =
     test("should load multiple accounts with loadMany") {
-      check(mailAccountGen, mailAccountGen) { case (account1, account2) =>
-        atomically {
+      check(
+        mailAccountIdGen,
+        mailAccountInformationGen,
+        mailAccountIdGen,
+        mailAccountInformationGen,
+      ) {
+        case (
+              id1,
+              info1,
+              id2,
+              info2,
+            ) =>
+          atomically {
 
-          for {
-            _ <- MailRepository.save(account1)
-            _ <- MailRepository.save(account2)
-            accounts <- MailRepository.loadAccounts()
-          } yield assert(accounts)(contains(account1) && contains(account2))
-        }
+            for {
+              _ <- MailRepository.save(id1, info1)
+              _ <- MailRepository.save(id2, info2)
+              accounts <- MailRepository.loadAccounts()
+            } yield assert(accounts)(
+              contains(id1) && contains(id2),
+            )
+          }
       }
     }
 

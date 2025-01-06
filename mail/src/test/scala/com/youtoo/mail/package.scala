@@ -4,10 +4,12 @@ package mail
 import zio.*
 import zio.test.*
 import zio.prelude.*
+
 import com.youtoo.cqrs.domain.*
 import com.youtoo.cqrs.*
 import com.youtoo.mail.model.*
 import com.youtoo.job.model.*
+import com.youtoo.sink.*
 
 import com.youtoo.cqrs.Codecs.given
 
@@ -59,27 +61,75 @@ val tokenInfoGen: Gen[Any, TokenInfo] = for {
 val accountTypeGen: Gen[Any, AccountType] =
   Gen.oneOf(Gen.const(AccountType.Gmail))
 
-val syncConfigCronGen: Gen[Any, SyncConfig.CronExpression] =
+val cronExpressionGen: Gen[Any, SyncConfig.CronExpression] =
   Gen.const("0/1 * * * * ?").map(SyncConfig.CronExpression.apply)
-val syncConfigEnabledGen: Gen[Any, Boolean] = Gen.boolean
-val syncConfigGen: Gen[Any, SyncConfig] =
-  Gen
-    .oneOf(
-      Gen
-        .option(Gen.alphaNumericStringBounded(4, 16))
-        .map(s => SyncConfig.AutoSync.disabled(s.map(SyncConfig.CronExpression(_)))),
-      Gen.alphaNumericStringBounded(4, 16).map(s => SyncConfig.AutoSync.enabled(SyncConfig.CronExpression(s))),
-    )
-    .map(SyncConfig.apply)
 
-val mailSettingsGen: Gen[Any, MailSettings] =
-  (authConfigGen <*> syncConfigGen).map(MailSettings.apply)
+val autoSyncGen: Gen[Any, SyncConfig.AutoSync] =
+  Gen.oneOf(
+    cronExpressionGen.map(SyncConfig.AutoSync.enabled(_)),
+    Gen.option(cronExpressionGen).map(SyncConfig.AutoSync.disabled(_)),
+  )
+
+val syncConfigGen: Gen[Any, SyncConfig] = autoSyncGen.map(SyncConfig(_))
+
+val sinkConfigGen: Gen[Any, SinkConfig] = Gen.setOf(sinkIdGen).map(SinkConfig.Sinks(_)).map(SinkConfig(_))
+
+val mailConfigGen: Gen[Any, MailConfig] =
+  for {
+    authConfig <- authConfigGen
+    syncConfig <- syncConfigGen
+    sinkConfig <- sinkConfigGen
+  } yield MailConfig(authConfig, syncConfig, sinkConfig)
+
+val mailConfigCommandGen: Gen[Any, MailConfigCommand] =
+  Gen.oneOf(
+    cronExpressionGen.map(MailConfigCommand.EnableAutoSync(_)),
+    Gen.const(MailConfigCommand.DisableAutoSync()),
+    authConfigGen.map(MailConfigCommand.SetAuthConfig(_)),
+    (sinkIdGen).map(MailConfigCommand.LinkSink(_)),
+    (sinkIdGen).map(MailConfigCommand.UnlinkSink(_)),
+  )
+
+val mailConfigEventChangeGen: Gen[Any, Change[MailConfigEvent]] =
+  for {
+    version <- versionGen
+    event <- mailConfigEventGen
+  } yield Change(version, event)
+
+val mailConfigEventGen: Gen[Any, MailConfigEvent] =
+  Gen.oneOf(
+    cronExpressionGen.map(MailConfigEvent.AutoSyncEnabled(_)),
+    Gen.option(cronExpressionGen).map(MailConfigEvent.AutoSyncDisabled(_)),
+    authConfigGen.map(MailConfigEvent.AuthConfigSet(_)),
+    sinkIdGen.map(MailConfigEvent.SinkLinked(_)),
+    sinkIdGen.map(MailConfigEvent.SinkUnlinked(_)),
+  )
+
+val syncConfigEnabledGen: Gen[Any, Boolean] = Gen.boolean
 
 val mailAccountGen: Gen[Any, MailAccount] =
   (
-    mailAccountIdGen <*> accountTypeGen <*> mailAccountNameGen <*> mailAccountEmailGen <*> mailSettingsGen <*> timestampGen
+    mailAccountIdGen <*> accountTypeGen <*> mailAccountNameGen <*> mailAccountEmailGen <*> mailConfigGen <*> timestampGen
   ) map { case (id, accountType, name, email, settings, timestamp) =>
     MailAccount(id, accountType, name, email, settings, timestamp)
+  }
+
+val mailAccountInformationGen: Gen[Any, MailAccount.Information] =
+  (
+    accountTypeGen <*> mailAccountNameGen <*> mailAccountEmailGen <*> timestampGen
+  ) map {
+    case (
+          accountType,
+          name,
+          email,
+          timestamp,
+        ) =>
+      MailAccount.Information(
+        accountType,
+        name,
+        email,
+        timestamp,
+      )
   }
 
 val startSyncGen: Gen[Any, MailCommand] =
