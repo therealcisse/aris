@@ -216,7 +216,9 @@ lazy val std = (project in file("std"))
     Test / parallelExecution := false,
     testFrameworks += new TestFramework("zio.test.sbt.ztestframework"),
     libraryDependencies ++= Dependencies.`open-telemetry`,
+    excludeDependencies += "org.scala-lang.modules" % "scala-collection-compat_2.13",
     libraryDependencies ++= Seq(
+      `hadoop-client`,
       cronUtils,
       cats,
       zio,
@@ -412,6 +414,7 @@ lazy val mail = (project in file("mail"))
   .enablePlugins(BuildInfoPlugin)
   .settings(buildInfoSettings("com.youtoo"))
   .dependsOn(
+    std % "compile->compile;test->test",
     sink % "compile->compile;test->test",
     core % "compile->compile;test->compile",
     postgres % "compile->compile;test->compile;test->test",

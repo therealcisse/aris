@@ -18,12 +18,6 @@ object SinkType {
   given Schema[SinkType] = DeriveSchema.gen
 
   object Info {
-    case class InternalTableInfo()
-
-    object InternalTableInfo {
-      given Schema[InternalTableInfo] = DeriveSchema.gen
-    }
-
     case class FileSystemInfo(path: FileSystemInfo.Path)
 
     object FileSystemInfo {

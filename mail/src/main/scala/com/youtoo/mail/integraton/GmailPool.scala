@@ -42,14 +42,14 @@ object GmailPool {
 
               clientInfo <- ZIO.config[GoogleClientInfo]
 
-              gmail <- state.fold(ZIO.fail(IllegalArgumentException("Accounts state not found"))) {
+              gmail <- state.fold(ZIO.fail(new IllegalArgumentException("Accounts state not found"))) {
                 case Mail(_, _, Authorization.Granted(token, _)) =>
                   GmailSupport.getClient(clientInfo, token)
                 case _ => ZIO.fail(new IllegalArgumentException("Account not authorized"))
               }
 
             } yield gmail,
-          range = _ => Range(1, 1),
+          range = _ => Range(0, 1),
           timeToLive = _ => poolTTL.value,
         )
 

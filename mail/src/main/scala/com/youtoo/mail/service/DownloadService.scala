@@ -48,7 +48,7 @@ object DownloadService {
     ZIO.serviceWithZIO(_.download(accountKey, options))
 
   def live(): ZLayer[
-    ZConnectionPool & LockManager & JobService & MailClient & MailService & DownloadCQRS & MailEventStore & Tracing,
+    ZConnectionPool & LockManager & JobService & MailClient & MailService & MailSinkPool & DownloadCQRS & MailEventStore & Tracing,
     Throwable,
     DownloadService,
   ] =
@@ -61,6 +61,7 @@ object DownloadService {
         mailService: MailService,
         downloadCQRS: DownloadCQRS,
         mailStore: MailEventStore,
+        sinkPool: MailSinkPool,
         tracing: Tracing,
       ) =>
         new DownloadServiceLive(
@@ -71,6 +72,7 @@ object DownloadService {
           mailService,
           downloadCQRS,
           mailStore,
+          sinkPool,
         ).traced(tracing)
     }
 
@@ -82,6 +84,7 @@ object DownloadService {
     mailService: MailService,
     cqrs: DownloadCQRS,
     mailStore: MailEventStore,
+    sinkPool: MailSinkPool,
   ) extends DownloadService { self =>
 
     def download(accountKey: MailAccount.Id, options: DownloadOptions): ZIO[Scope & Tracing, Throwable, Unit] =
@@ -185,8 +188,21 @@ object DownloadService {
                   .grouped(BatchSize)
                   .mapZIO { batch =>
                     val mails = batch.sequence flatMap NonEmptyList.fromIterableOption
+
                     mails match {
-                      case Some(nel) => mailService.saveMails(nel)
+                      case Some(nel) =>
+                        for {
+                          runners <- ZIO.foreach(account.settings.sinkConfig.destinations.value) { sinkId =>
+                            sinkPool.get(sinkId)
+
+                          }
+
+                          _ <- ZIO.foreach(runners) { runner =>
+                            runner.process(nel)
+                          }
+
+                        } yield ()
+
                       case None => ZIO.unit
                     }
                   }
@@ -231,7 +247,7 @@ object DownloadService {
           _ <- interruption.set(true).fork
 
           _ <- fiber.join
-            .timeoutFail(new IllegalStateException("timout"))(Duration(30L, ChronoUnit.SECONDS))
+            .timeoutFail(new IllegalStateException("timeout"))(Duration(30L, ChronoUnit.SECONDS))
             .ignoreLogged
 
         } yield ()
@@ -240,7 +256,7 @@ object DownloadService {
     private def withLock(account: MailAccount)(
       action: => ZIO[Scope & Tracing, Throwable, Unit],
     ): ZIO[Scope & Tracing, Throwable, Unit] =
-      val lock = lockManager.acquireScoped(account.lock)
+      val lock = lockManager.acquireScoped(account.downloadLock)
       ZIO.ifZIO(lock)(
         onTrue = action,
         onFalse = Log.info(s"Download already in progress for account"),

@@ -111,7 +111,7 @@ object SyncService {
             _ <- interruption.set(true).fork
 
             _ <- fiber.join
-              .timeoutFail(new IllegalStateException("timout"))(Duration(30L, ChronoUnit.SECONDS))
+              .timeoutFail(new IllegalStateException("timeout"))(Duration(30L, ChronoUnit.SECONDS))
               .ignoreLogged
 
           } yield ()
@@ -126,7 +126,7 @@ object SyncService {
     private def withLock(account: MailAccount)(
       action: => ZIO[Scope & Tracing, Throwable, Unit],
     ): ZIO[Scope & Tracing, Throwable, Unit] =
-      val lock = lockManager.acquireScoped(account.lock)
+      val lock = lockManager.acquireScoped(account.syncLock)
       ZIO.ifZIO(lock)(
         onTrue = action,
         onFalse = Log.info(s"Sync already in progress for account"),

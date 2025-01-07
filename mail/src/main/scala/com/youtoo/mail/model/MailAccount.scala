@@ -18,7 +18,8 @@ case class MailAccount(
   timestamp: Timestamp,
 ) {
 
-  inline def lock: Lock = Lock(String.valueOf(id.asKey.value))
+  inline def downloadLock: Lock = Lock("Download." ++ String.valueOf(id.asKey.value))
+  inline def syncLock: Lock = Lock("Sync." ++ String.valueOf(id.asKey.value))
 }
 
 object MailAccount {
