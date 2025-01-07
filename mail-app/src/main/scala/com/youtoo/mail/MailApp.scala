@@ -25,7 +25,11 @@ import com.youtoo.job.repository.*
 import com.youtoo.job.*
 import com.youtoo.lock.*
 import com.youtoo.lock.repository.*
+
+import com.youtoo.sink.*
 import com.youtoo.sink.model.*
+import com.youtoo.sink.service.*
+import com.youtoo.sink.store.*
 
 import zio.json.*
 
@@ -58,7 +62,7 @@ object MailApp extends ZIOApp, JsonSupport {
   given Config[Port.Type] = Config.int.nested("mail_app_port").withDefault(8181).map(Port(_))
 
   type Environment =
-    FlywayMigration & ZConnectionPool & CQRSPersistence & SnapshotStore & MailEventStore & MailCQRS & MailConfigEventStore & MailConfigCQRS & Server & Server.Config & NettyConfig & MailService & SyncService & MailClient & GmailPool & MailRepository & JobService & JobRepository & JobEventStore & JobCQRS & DownloadService & DownloadCQRS & DownloadEventStore & AuthorizationCQRS & AuthorizationEventStore & LockManager & LockRepository & SnapshotStrategy.Factory & Tracing & Baggage & Meter & NetHttpTransport
+    FlywayMigration & ZConnectionPool & CQRSPersistence & SnapshotStore & MailEventStore & MailCQRS & MailConfigEventStore & MailConfigCQRS & Server & Server.Config & NettyConfig & MailService & SyncService & MailClient & GmailPool & MailRepository & JobService & JobRepository & JobEventStore & JobCQRS & DownloadService & DownloadCQRS & DownloadEventStore & AuthorizationCQRS & AuthorizationEventStore & LockManager & LockRepository & SnapshotStrategy.Factory & Tracing & Baggage & Meter & NetHttpTransport & SinkCQRS & SinkEventStore & SinkService & MailSinkPool & HadoopFsClient & HadoopFsClient.HadoopFileSystem
 
   given environmentTag: EnvironmentTag[Environment] = EnvironmentTag[Environment]
 
@@ -88,6 +92,12 @@ object MailApp extends ZIOApp, JsonSupport {
       ZLayer
         .makeSome[Scope, Environment](
           zio.metrics.jvm.DefaultJvmMetrics.live.unit,
+          SinkCQRS.live(),
+          SinkEventStore.live(),
+          SinkService.live(),
+          MailSinkPool.live(),
+          HadoopFsClient.live(),
+          HadoopFsClient.fs(),
           MailConfigEventStore.live(),
           MailConfigCQRS.live(),
           DownloadCQRS.live(),
