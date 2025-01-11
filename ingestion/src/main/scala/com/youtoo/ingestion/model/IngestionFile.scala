@@ -20,26 +20,18 @@ object IngestionFile {
   given Schema[IngestionFile] = DeriveSchema.gen
 
   type Id = Id.Type
-
   object Id extends Newtype[Key] {
     import zio.schema.*
-
     def gen: Task[Id] = Key.gen.map(wrap)
-
     def apply(value: Long): Id = Id(Key(value))
-
     extension (a: Id) inline def asKey: Key = Id.unwrap(a)
-
     given Schema[Id] = derive
-
   }
 
   type Name = Name.Type
   object Name extends Newtype[String] {
     import zio.schema.*
-
     extension (a: Name) inline def value: String = Name.unwrap(a)
-
     given Schema[Name] = derive
 
   }
@@ -47,9 +39,7 @@ object IngestionFile {
   type Sig = Sig.Type
   object Sig extends Newtype[String] {
     import zio.schema.*
-
     extension (a: Sig) inline def value: String = Sig.unwrap(a)
-
     given Schema[Sig] = derive
 
   }

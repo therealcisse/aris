@@ -10,6 +10,8 @@ import com.youtoo.cqrs.*
 import com.youtoo.cqrs.domain.*
 
 import com.youtoo.ingestion.model.*
+import com.youtoo.sink.*
+import com.youtoo.source.*
 
 import com.youtoo.cqrs.Codecs.given
 
@@ -300,3 +302,33 @@ val fileEventSequenceGen: Gen[Any, NonEmptyList[Change[FileEvent]]] =
       }
     }
   } yield NonEmptyList.fromIterable(changes.head, changes.tail)
+
+val connectionIdGen: Gen[Any, IngestionConfig.Connection.Id] = keyGen.map(IngestionConfig.Connection.Id.apply)
+
+val connectionGen: Gen[Any, IngestionConfig.Connection] =
+  (
+    connectionIdGen <*> sourceIdGen <*> (sinkIdGen <*> Gen.listOf(sinkIdGen)).map(NonEmptySet(_, _*))
+  ) map (IngestionConfig.Connection.apply)
+
+val ingestionConfigGen: Gen[Any, IngestionConfig] =
+  for {
+    conns <- Gen.chunkOf(connectionGen)
+  } yield IngestionConfig(conns)
+
+val ingestionConfigCommandGen: Gen[Any, IngestionConfigCommand] =
+  Gen.oneOf(
+    (
+      connectionIdGen <*> sourceIdGen <*> (sinkIdGen <*> Gen.listOf(sinkIdGen)).map(NonEmptySet(_, _*))
+    ).map(IngestionConfigCommand.AddConnection.apply),
+  )
+
+val ingestionConfigEventGen: Gen[Any, IngestionConfigEvent] =
+  Gen.oneOf(
+    connectionGen.map(IngestionConfigEvent.ConnectionAdded.apply),
+  )
+
+val ingestionConfigEventChangeGen: Gen[Any, Change[IngestionConfigEvent]] =
+  for {
+    version <- versionGen
+    event <- ingestionConfigEventGen
+  } yield Change(version, event)

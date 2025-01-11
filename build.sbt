@@ -273,6 +273,8 @@ lazy val memory = (project in file("cqrs-persistence-memory"))
 
 lazy val ingestion = (project in file("ingestion"))
   .dependsOn(
+    sink % "compile->compile;test->test",
+    source % "compile->compile;test->test",
     memory % "compile->compile;test->test",
     `cqrs-persistence-postgres` % "compile->compile;test->test",
     core % "compile->compile;test->test",

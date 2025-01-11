@@ -18,13 +18,9 @@ object Provider {
 
   object Id extends Newtype[Key] {
     import zio.schema.*
-
     def gen: Task[Id] = Key.gen.map(wrap)
-
     def apply(value: Long): Id = Id(Key(value))
-
     extension (a: Id) inline def asKey: Key = Id.unwrap(a)
-
     given Schema[Id] = derive
 
   }
@@ -32,9 +28,7 @@ object Provider {
   type Name = Name.Type
   object Name extends Newtype[String] {
     import zio.schema.*
-
     extension (a: Name) inline def value: String = Name.unwrap(a)
-
     given Schema[Name] = derive
 
   }
