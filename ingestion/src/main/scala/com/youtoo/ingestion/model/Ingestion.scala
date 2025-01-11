@@ -15,16 +15,11 @@ object Ingestion {
   given Schema[Ingestion] = DeriveSchema.gen
 
   type Id = Id.Type
-
   object Id extends Newtype[Key] {
     import zio.schema.*
-
     def gen: Task[Id] = Key.gen.map(wrap)
-
     def apply(value: Long): Id = Id(Key(value))
-
     extension (a: Id) inline def asKey: Key = Id.unwrap(a)
-
     given Schema[Id] = derive
 
   }

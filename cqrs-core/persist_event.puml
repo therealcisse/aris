@@ -1,0 +1,8 @@
+JobApp->JobService: startJob(id, timestamp, total, tag)
+JobService->JobCQRS: add(id, cmd)
+JobCQRS->CmdHandler: applyCmd(cmd)
+CmdHandler->JobCommand: StartJob(id, timestamp, total, tag)
+JobCQRS->Version: gen
+JobCQRS->JobEventStore: save(id, event)
+JobEventStore->CQRSPersistence: saveEvent(id, discriminator, event, JobEventStore.Table)
+

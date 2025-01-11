@@ -16,4 +16,7 @@
 
 	reverse_proxy /sinks http://host.docker.internal:8686
 	reverse_proxy /sinks/* http://host.docker.internal:8686
+
+	reverse_proxy /sources http://host.docker.internal:8787
+	reverse_proxy /sources/* http://host.docker.internal:8787
 }

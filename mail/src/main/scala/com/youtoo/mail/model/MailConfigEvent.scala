@@ -59,7 +59,7 @@ object MailConfigEvent {
       case (Some(mc), MailConfigEvent.AuthConfigSet(config)) => mc.copy(authConfig = config).some
       case (None, MailConfigEvent.SinkLinked(sinkId)) => MailConfig(AuthConfig.default, SyncConfig(SyncConfig.AutoSync.disabled(None)), SinkConfig(SinkConfig.Sinks(Set(sinkId)))).some
       case (Some(mc), MailConfigEvent.SinkLinked(sinkId)) => mc.copy(sinkConfig = mc.sinkConfig.copy(destinations = SinkConfig.Sinks(mc.sinkConfig.destinations.value + sinkId))).some
-      case (None, MailConfigEvent.SinkUnlinked(sinkId)) => MailConfig(AuthConfig.default, SyncConfig(SyncConfig.AutoSync.disabled(None)), SinkConfig(SinkConfig.Sinks(Set(sinkId)))).some
+      case (None, MailConfigEvent.SinkUnlinked(sinkId)) => None
       case (Some(mc), MailConfigEvent.SinkUnlinked(sinkId)) => mc.copy(sinkConfig = mc.sinkConfig.copy(destinations = SinkConfig.Sinks(mc.sinkConfig.destinations.value - sinkId))).some
     }
 

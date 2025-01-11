@@ -37,19 +37,16 @@ Stores a snapshot of an entity’s state to optimize future event retrievals. Ho
 
 Handles event storage and retrieval from the database. Events can be loaded either fully or from a specific snapshot version.
 
-	6.	Checkpointer:
 
-Manages saving the entity’s state and updating the snapshot version via the SnapshotStore.
-
-	7.	CQRSPersistence (PostgreSQL Implementation):
+	6.	CQRSPersistence (PostgreSQL Implementation):
 
 Implements the persistence interface using PostgreSQL as the underlying storage system. It handles atomic transactions, event persistence, and snapshot management.
 
-	8.	Provider:
+	7.	Provider:
 
 Responsible for loading entity data. This component is implemented by end-users and provides an initial entity state before event replay.
 
-	9.	Key:
+	8.	Key:
 
 Represents the entity’s primary key, which must be a string.
 
@@ -106,7 +103,9 @@ Step 1: Define the Domain - Entity, Events, and Commands
       •	IngestionCreated
       •	ItemAdded
       •	ItemRemoved
-      •	Commands:
+
+    •	Commands:
+
       •	CreateIngestion
       •	AddItem
       •	RemoveItem
@@ -171,6 +170,6 @@ result.provideLayer(cqrsLayer)
 
 5. # Conclusion
 
-This example illustrates how the cqrs-core library can be used to implement an ingestion system with PostgreSQL persistence. The core concepts of CQRS, including events, commands, checkpointing, and the addition of a Provider for loading entity data, are seamlessly integrated with database-backed storage. The system can easily be extended with more entity types, events, or persistence mechanisms.
+This example illustrates how the cqrs-core library can be used to implement an ingestion system with PostgreSQL persistence. The core concepts of CQRS, including events, commands, and the addition of a Provider for loading entity data, are seamlessly integrated with database-backed storage. The system can easily be extended with more entity types, events, or persistence mechanisms.
 
 
