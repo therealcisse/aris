@@ -1,5 +1,5 @@
 package com.youtoo
-package sink
+package source
 package model
 
 import com.youtoo.cqrs.Codecs.given
@@ -11,17 +11,17 @@ import zio.prelude.*
 import com.youtoo.cqrs.*
 import com.youtoo.cqrs.domain.*
 
-object SinkEventHandlerSpec extends ZIOSpecDefault {
-  given EventHandler[SinkEvent, Option[SinkDefinition]] = new SinkEvent.LoadSink()
+object SourceEventHandlerSpec extends ZIOSpecDefault {
+  given EventHandler[SourceEvent, Option[SourceDefinition]] = new SourceEvent.LoadSource()
 
-  def spec = suite("SinkEventHandlerSpec")(
+  def spec = suite("SourceEventHandlerSpec")(
     test("Applying Added event initializes the state") {
-      check(sinkIdGen, versionGen, sinkTypeGen) { (sinkId, v1, info) =>
-        val event = Change(v1, SinkEvent.Added(sinkId, info))
+      check(sourceIdGen, versionGen, sourceTypeGen) { (sourceId, v1, info) =>
+        val event = Change(v1, SourceEvent.Added(sourceId, info))
         val state = EventHandler.applyEvents(NonEmptyList(event))
 
-        val expectedState = SinkDefinition(
-          sinkId,
+        val expectedState = SourceDefinition(
+          sourceId,
           info,
           created = v1.timestamp,
           updated = None,
@@ -30,34 +30,34 @@ object SinkEventHandlerSpec extends ZIOSpecDefault {
       }
     },
     test("Applying the same Added event multiple times should return the same state") {
-      check(sinkIdGen, versionGen, sinkTypeGen) { (sinkId, v1, info) =>
-        val event = Change(v1, SinkEvent.Added(sinkId, info))
+      check(sourceIdGen, versionGen, sourceTypeGen) { (sourceId, v1, info) =>
+        val event = Change(v1, SourceEvent.Added(sourceId, info))
         val state1 = EventHandler.applyEvents(NonEmptyList(event))
         val state2 = EventHandler.applyEvents(state1, NonEmptyList(event))
         assert(state1)(equalTo(state2.map(_.copy(updated = None))))
       }
     },
-    test("Applying a Deleted event after an Added event should delete the sink") {
-      check(sinkIdGen, versionGen, versionGen, sinkTypeGen) { (sinkId, v1, v2, info) =>
+    test("Applying a Deleted event after an Added event should delete the source") {
+      check(sourceIdGen, versionGen, versionGen, sourceTypeGen) { (sourceId, v1, v2, info) =>
         val events = NonEmptyList(
-          Change(v1, SinkEvent.Added(sinkId, info)),
-          Change(v2, SinkEvent.Deleted(sinkId)),
+          Change(v1, SourceEvent.Added(sourceId, info)),
+          Change(v2, SourceEvent.Deleted(sourceId)),
         )
         val state = EventHandler.applyEvents(events)
         assert(state)(equalTo(None))
       }
     },
-    test("Applying a Added event after an Added event should reflect the sink was updated") {
-      check(sinkIdGen, versionGen, versionGen, sinkTypeGen) { (sinkId, v1, v2, info) =>
+    test("Applying a Added event after an Added event should reflect the source was updated") {
+      check(sourceIdGen, versionGen, versionGen, sourceTypeGen) { (sourceId, v1, v2, info) =>
         val events = NonEmptyList(
-          Change(v1, SinkEvent.Added(sinkId, info)),
-          Change(v2, SinkEvent.Added(sinkId, info)),
+          Change(v1, SourceEvent.Added(sourceId, info)),
+          Change(v2, SourceEvent.Added(sourceId, info)),
         )
 
         val state = EventHandler.applyEvents(events)
 
-        val expectedState = SinkDefinition(
-          sinkId,
+        val expectedState = SourceDefinition(
+          sourceId,
           info,
           created = v1.timestamp,
           updated = Some(v2.timestamp),
