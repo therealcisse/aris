@@ -26,10 +26,10 @@ trait JobEventStore extends EventStore[JobEvent] {
 
 ```scala
 enum JobCommand {
-  case StartJob(id: Job.Id, timestamp: Timestamp, total: JobMeasurement, tag: Job.Tag)
-  case ReportProgress(id: Job.Id, timestamp: Timestamp, progress: Progress)
-  case CancelJob(id: Job.Id, timestamp: Timestamp)
-  case CompleteJob(id: Job.Id, timestamp: Timestamp, reason: Job.CompletionReason)
+  case StartJob(id: Job.Id, total: JobMeasurement, tag: Job.Tag)
+  case ReportProgress(id: Job.Id, progress: Progress)
+  case CancelJob(id: Job.Id)
+  case CompleteJob(id: Job.Id, reason: Job.CompletionReason)
 }
 ```
 
@@ -37,9 +37,9 @@ enum JobCommand {
 
 ```scala
 enum JobEvent {
-  case JobStarted(id: Job.Id, timestamp: Timestamp, total: JobMeasurement, tag: Job.Tag)
-  case ProgressReported(id: Job.Id, timestamp: Timestamp, progress: Progress)
-  case JobCompleted(id: Job.Id, timestamp: Timestamp, reason: Job.CompletionReason)
+  case JobStarted(id: Job.Id, total: JobMeasurement, tag: Job.Tag)
+  case ProgressReported(id: Job.Id, progress: Progress)
+  case JobCompleted(id: Job.Id, reason: Job.CompletionReason)
 }
 ```
 
@@ -53,10 +53,10 @@ trait JobService {
   def loadMany(offset: Option[Key], limit: Long): Task[Chunk[Job]]
   def save(job: Job): Task[Long]
 
-  def cancelJob(id: Job.Id, timestamp: Timestamp): Task[Unit]
-  def startJob(id: Job.Id, timestamp: Timestamp, total: JobMeasurement, tag: Job.Tag): Task[Unit]
-  def reportProgress(id: Job.Id, timestamp: Timestamp, progress: Progress): Task[Unit]
-  def completeJob(id: Job.Id, timestamp: Timestamp, reason: Job.CompletionReason): Task[Unit]
+  def cancelJob(id: Job.Id): Task[Unit]
+  def startJob(id: Job.Id, total: JobMeasurement, tag: Job.Tag): Task[Unit]
+  def reportProgress(id: Job.Id, progress: Progress): Task[Unit]
+  def completeJob(id: Job.Id, reason: Job.CompletionReason): Task[Unit]
 }
 ```
 * **Job:** A case class representing the state of a job. It includes the job ID, tag, total measurement, and status.
@@ -68,26 +68,6 @@ case class Job(
   total: JobMeasurement,
   status: JobStatus,
 )
-```
-
-**Sequence Diagrams**
-
-The following sequence diagrams illustrate how these components interact for key operations:
-
-* **Persisting a command:**
-[Persisting a command](https://tinyurl.com/223ffvse)<!--[Persisting a command](./load_state.puml)-->
-
-* **Loading and reconstructing the state from events:**
-
-[Loading and reconstructing the state from events](https://tinyurl.com/223ffvse)<!--[Loading and reconstructing the state from events](./load_state.puml)-->
-
-```sequence
-JobApp->JobService: load(id)
-JobService->JobRepository: load(id)
-JobService->SnapshotStore: readSnapshot(id)
-JobService->JobEventStore: readEvents(id)
-JobEventStore->CQRSPersistence: readEvents(id, discriminator, JobEventStore.Table)
-JobService->EventHandler: applyEvents(events)
 ```
 **Snapshots and Strategy**
 

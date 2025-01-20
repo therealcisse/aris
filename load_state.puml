@@ -1,7 +1,0 @@
-JobApp->JobService: load(id)
-JobService->JobRepository: load(id)
-JobService->SnapshotStore: readSnapshot(id)
-JobService->JobEventStore: readEvents(id)
-JobEventStore->CQRSPersistence: readEvents(id, discriminator, JobEventStore.Table)
-JobService->EventHandler: applyEvents(events)
-
