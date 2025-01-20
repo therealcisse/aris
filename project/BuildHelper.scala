@@ -108,9 +108,6 @@ object BuildHelper extends ScalaSettings {
        |
        |import com.youtoo.*
        |
-       |import zio.http.{Version as _, *}
-       |import zio.http.netty.NettyConfig
-       |import zio.http.netty.NettyConfig.LeakDetectionLevel
        |import zio.schema.codec.*
     """.stripMargin
   }

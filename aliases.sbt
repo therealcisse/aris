@@ -11,12 +11,14 @@ onLoadMessage := {
   def subItem(text: String): String = s"  ${YELLOW}> ${CYAN}$text${RESET}"
 
   s"""|
-      |${header("_________  ________ __________  _________")}
-      |${header("\\_   ___ \\ \\_____  \\\\______   \\/   _____/")}
-      |${header("/    \\  \\/  /  / \\  \\|       _/\\_____  \\")}
-      |${header("\\     \\____/   \\_/.  \\    |   \\/        \\")}
-      |${header(" \\______  /\\_____\\ \\_/____|_  /_______  /")}
-      |${header("        \\/        \\__>      \\/        \\/")}
+      |${header("""
+                    _
+     /\            (_)
+    /  \     _ __   _   ___
+   / /\ \   | '__| | | / __|
+  / ____ \  | |    | | \__ \
+ /_/    \_\ |_|    |_| |___/"""
+      )}
       |
       |Useful sbt tasks:
       |${item("fmt")}: Prepares source files using scalafix and scalafmt.

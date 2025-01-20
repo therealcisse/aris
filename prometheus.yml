@@ -1,9 +1,0 @@
-global:
-  scrape_interval: 5s
-  evaluation_interval: 15s
-
-scrape_configs:
-  - job_name: 'youtoo'
-    static_configs:
-      - targets: ['spm_metrics_source:8889', 'fluentbit:2021', 'opensearch:9600']
-
