@@ -144,7 +144,7 @@ object BuildHelper extends ScalaSettings {
       "-Dlogback.configurationFile=logback-test.xml",
     ),
     ThisBuild / javaOptions ++= Seq(
-      s"-DYOUTOO_LOG_LEVEL=${sys.env.getOrElse("YOUTOO_LOG_LEVEL", Debug.LogLevel)}",
+      s"-DARIS_LOG_LEVEL=${sys.env.getOrElse("ARIS_LOG_LEVEL", Debug.LogLevel)}",
     ),
     Compile / run / javaOptions ++= Seq(
       "--add-exports=java.base/jdk.internal.misc=ALL-UNNAMED",
@@ -165,10 +165,10 @@ object BuildHelper extends ScalaSettings {
   )
 
   def meta = Seq(
-    ThisBuild / homepage := Some(url("https://youtoogroup.com/cqrs")),
+    ThisBuild / homepage := Some(url("https://youtoogroup.com/aris")),
     ThisBuild / scmInfo :=
       Some(
-        ScmInfo(url("https://github.com/therealcisse/cqrs"), "scm:git@github.com:therealcisse/cqrs.git"),
+        ScmInfo(url("https://github.com/therealcisse/aris"), "scm:git@github.com:therealcisse/aris.git"),
       ),
     ThisBuild / developers := List(
       Developer(

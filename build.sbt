@@ -13,7 +13,7 @@ import sbt.Keys.*
 
 ThisBuild / resolvers ++= Resolver.sonatypeOssRepos("snapshots")
 
-ThisBuild / version := git.gitHeadCommit.value.map(commit => s"0.1.0-${commit.take(7)}").getOrElse("0.1.0-SNAPSHOT")
+ThisBuild / version := git.gitHeadCommit.value.map(commit => s"1.0.0-${commit.take(7)}").getOrElse("1.0.0-SNAPSHOT")
 ThisBuild / git.useGitDescribe := true
 
 ThisBuild / Test / javaOptions ++= Seq(
@@ -50,7 +50,6 @@ onLoad in Global := {
 }
 lazy val aggregatedProjects: Seq[ProjectReference] =
   Seq(
-    kernel,
     core,
     postgres,
     memory,
@@ -66,30 +65,7 @@ lazy val root = (project in file("."))
   .settings(meta)
   .aggregate(aggregatedProjects *)
 
-lazy val kernel = (project in file("kernel"))
-  .settings(stdSettings("kernel"))
-  // .settings(publishSetting(false))
-  .enablePlugins(BuildInfoPlugin)
-  .settings(buildInfoSettings("com.youtoo"))
-  .settings(
-    testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
-    libraryDependencies ++= Seq(
-      `scala-collection-contrib`,
-      // pprint,
-      zio,
-      cats,
-      `zio-prelude`,
-      `zio-schema`,
-      zio,
-      `zio-test`,
-      `zio-test-sbt`,
-      `zio-test-magnolia`,
-      `zio-mock`,
-    ),
-  )
-
 lazy val core = (project in file("core"))
-  .dependsOn(kernel)
   .settings(stdSettings("core"))
   // .settings(publishSetting(false))
   .enablePlugins(BuildInfoPlugin)
@@ -97,8 +73,8 @@ lazy val core = (project in file("core"))
   .settings(
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
     libraryDependencies ++= Seq(
+      cats,
       // pprint,
-      `zio-jdbc`,
       `zio-schema-protobuf`,
       `zio-schema-json`,
       `zio-test`,
@@ -107,16 +83,19 @@ lazy val core = (project in file("core"))
       `zio-mock`,
     ),
   )
-  .dependsOn(kernel)
 
 lazy val postgres = (project in file("postgres"))
-  .dependsOn(core)
+  .dependsOn(core % "compile->compile;test->test")
   .settings(stdSettings("postgres"))
   // .settings(publishSetting(false))
   .settings(
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
     Test / unmanagedResourceDirectories ++= (Compile / unmanagedResourceDirectories).value,
+    libraryDependencies ++= db,
     libraryDependencies ++= Seq(
+      cats,
+      mockito,
+      `zio-jdbc`,
       `zio-test`,
       `zio-test-sbt`,
       `zio-test-magnolia`,
@@ -125,7 +104,7 @@ lazy val postgres = (project in file("postgres"))
   )
 
 lazy val memory = (project in file("memory"))
-  .dependsOn(core)
+  .dependsOn(core % "compile->compile;test->test")
   .settings(stdSettings("memory"))
   // .settings(publishSetting(false))
   .settings(
@@ -133,6 +112,7 @@ lazy val memory = (project in file("memory"))
     Test / unmanagedResourceDirectories ++= (Compile / unmanagedResourceDirectories).value,
     libraryDependencies += `scala-collection-contrib`,
     libraryDependencies ++= Seq(
+      cats,
       `zio-jdbc`,
       `zio-test`,
       `zio-test-sbt`,

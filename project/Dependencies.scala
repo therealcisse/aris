@@ -61,6 +61,8 @@ object Dependencies {
   val logback = "ch.qos.logback" % "logback-classic" % "1.5.14"
   val `logback-core` = "ch.qos.logback" % "logback-core" % "1.5.14"
 
+  val mockito = "org.mockito" % "mockito-core" % "5.14.2" % Test
+
   val `scala-collection-compat` =
     "org.scala-lang.modules" %% "scala-collection-compat" % "2.12.0" cross CrossVersion.for3Use2_13
 

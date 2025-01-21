@@ -1,13 +1,12 @@
 package com.youtoo
-package cqrs
-package service
+package aris
 
 import zio.mock.*
 
-import com.youtoo.cqrs.domain.*
+import com.youtoo.aris.domain.*
+import com.youtoo.aris.service.*
 
 import zio.*
-import zio.jdbc.*
 import zio.schema.codec.*
 
 object MockCQRSPersistence extends Mock[CQRSPersistence] {
@@ -122,7 +121,7 @@ object MockCQRSPersistence extends Mock[CQRSPersistence] {
           query: PersistenceQuery,
           interval: TimeInterval,
           catalog: Catalog,
-          ): RIO[ZConnection, Chunk[Change[Event]]] =
+          ): Task[Chunk[Change[Event]]] =
           proxy(
             ReadEvents.FullInterval.of[Chunk[Change[Event]]],
             (
