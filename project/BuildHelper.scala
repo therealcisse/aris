@@ -47,12 +47,12 @@ object BuildHelper extends ScalaSettings {
 
   def publishSetting(publishArtifacts: Boolean) = {
     val publishSettings = Seq(
-      organization := "com.youtoo",
+      organization := "com.github",
       organizationName := "youtoo",
       licenses := Seq(),
       sonatypeCredentialHost := "oss.sonatype.org",
       sonatypeRepository := "https://oss.sonatype.org/service/local",
-      sonatypeProfileName := "com.youtoo",
+      sonatypeProfileName := "com.github",
       publishTo := sonatypePublishToBundle.value,
       sonatypeTimeoutMillis := 300 * 60 * 1000,
       publishMavenStyle := true,
@@ -106,7 +106,7 @@ object BuildHelper extends ScalaSettings {
        |      Runtime.default.unsafe.run(io).getOrThrowFiberFailure()
        |    }
        |
-       |import com.youtoo.*
+       |import com.github.*
        |
        |import zio.schema.codec.*
     """.stripMargin

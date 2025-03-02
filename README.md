@@ -10,43 +10,43 @@ Checkpointing occurs after a predefined number of events have been processed for
 
 2. # Key Concepts
 
-	1.	Change (Event):
+ 1. Change (Event):
 
 Represents an event stored in the events table, with the following attributes:
-	•	Version (Snowflake ID): Used to order events.
-	•	Payload (Binary): Serialized event data using zio-schema. These events are part of sealed trait event types and are transformed into entities using EventHandlers.
+ • Version (Snowflake ID): Used to order events.
+ • Payload (Binary): Serialized event data using zio-schema. These events are part of sealed trait event types and are transformed into entities using EventHandlers.
 
-	2.	Command:
+ 2. Command:
 
 Commands trigger actions within the system and are converted into events using CmdHandlers. Typically, there’s a one-to-one correspondence between commands and events.
 
-	3.	EventHandler:
+ 3. EventHandler:
 
 Responsible for transforming events into entities. There are two main scenarios:
-	•	If an entity already exists, the event alters the entity’s state.
-	•	If no entity exists, the first event creates an initial entity.
+ • If an entity already exists, the event alters the entity’s state.
+ • If no entity exists, the first event creates an initial entity.
 Additional functions for applying multiple events:
-	•	def applyEvents(events: NonEmptyList[Change[Event]]): T: This function transforms a list of events into an entity.
-	•	def applyEvents(zero: T, events: NonEmptyList[Change[Event]]): T: This function applies the list of events starting from a provided initial state (zero).
+ • def applyEvents(events: NonEmptyList[Change[Event]]): T: This function transforms a list of events into an entity.
+ • def applyEvents(zero: T, events: NonEmptyList[Change[Event]]): T: This function applies the list of events starting from a provided initial state (zero).
 
-	4.	SnapshotStore:
+ 4. SnapshotStore:
 
 Stores a snapshot of an entity’s state to optimize future event retrievals. However, it does not store entity data, which is managed by the Checkpointer.
 
-	5.	EventStore:
+ 5. EventStore:
 
 Handles event storage and retrieval from the database. Events can be loaded either fully or from a specific snapshot version.
 
 
-	6.	CQRSPersistence (PostgreSQL Implementation):
+ 6. CQRSPersistence (PostgreSQL Implementation):
 
 Implements the persistence interface using PostgreSQL as the underlying storage system. It handles atomic transactions, event persistence, and snapshot management.
 
-	7.	Provider:
+ 7. Provider:
 
 Responsible for loading entity data. This component is implemented by end-users and provides an initial entity state before event replay.
 
-	8.	Key:
+ 8. Key:
 
 Represents the entity’s primary key, which must be a string.
 
@@ -54,14 +54,14 @@ Represents the entity’s primary key, which must be a string.
 
 The library uses a PostgresCQRSPersistence service to persist events and snapshots using PostgreSQL. This implementation includes:
 
-	Events Table:
+ Events Table:
 
-	•	Stores serialized event data using zio-schema.
-	•	Supports multiple entity types using a discriminator column.
+ • Stores serialized event data using zio-schema.
+ • Supports multiple entity types using a discriminator column.
 
-	Snapshots Table:
+ Snapshots Table:
 
-	•	Tracks the snapshot versions for entities.
+ • Tracks the snapshot versions for entities.
 
 PostgreSQL Schema Setup:
 
@@ -87,8 +87,8 @@ CREATE INDEX idx_events_aggregate_id ON events (aggregate_id);
 
 Core Components:
 
-	•	PostgresCQRSPersistence: Implements event and snapshot storage with atomic transaction support.
-	•	Queries: SQL queries handle reading and writing events and snapshots.
+ • PostgresCQRSPersistence: Implements event and snapshot storage with atomic transaction support.
+ • Queries: SQL queries handle reading and writing events and snapshots.
 
 4. # Example Tutorial (Ingestion System)
 
@@ -96,19 +96,19 @@ This example demonstrates a simple ingestion system implemented using the cqrs-c
 
 Step 1: Define the Domain - Entity, Events, and Commands
 
-	•	Entity (Ingestion): Represents an ingestion process.
+ • Entity (Ingestion): Represents an ingestion process.
 
-	•	Events:
+ • Events:
 
-      •	IngestionCreated
-      •	ItemAdded
-      •	ItemRemoved
+      • IngestionCreated
+      • ItemAdded
+      • ItemRemoved
 
-    •	Commands:
+    • Commands:
 
-      •	CreateIngestion
-      •	AddItem
-      •	RemoveItem
+      • CreateIngestion
+      • AddItem
+      • RemoveItem
 
 ```scala
 sealed trait IngestionCommand

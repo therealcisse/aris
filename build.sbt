@@ -69,7 +69,7 @@ lazy val core = (project in file("core"))
   .settings(stdSettings("core"))
   // .settings(publishSetting(false))
   .enablePlugins(BuildInfoPlugin)
-  .settings(buildInfoSettings("com.youtoo"))
+  .settings(buildInfoSettings("com.github"))
   .settings(
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
     libraryDependencies ++= Seq(
@@ -94,8 +94,8 @@ lazy val postgres = (project in file("postgres"))
     libraryDependencies ++= db,
     libraryDependencies ++= Seq(
       cats,
+      `zio-interop-cats`,
       mockito,
-      `zio-jdbc`,
       `zio-test`,
       `zio-test-sbt`,
       `zio-test-magnolia`,
@@ -113,7 +113,6 @@ lazy val memory = (project in file("memory"))
     libraryDependencies += `scala-collection-contrib`,
     libraryDependencies ++= Seq(
       cats,
-      `zio-jdbc`,
       `zio-test`,
       `zio-test-sbt`,
       `zio-test-magnolia`,

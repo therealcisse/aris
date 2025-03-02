@@ -16,12 +16,15 @@ object Dependencies {
   val CatsVersion = "2.12.0"
   val CatsEffectKernelVersion = "3.5.4"
   val FlywayVersion = "11.1.0"
+  val DOOBIE_VERSION = "1.0.0-RC5"
 
   val db = Seq(
     "org.flywaydb" % "flyway-core" % FlywayVersion,
     "org.flywaydb" % "flyway-database-postgresql" % FlywayVersion,
     "com.zaxxer" % "HikariCP" % HikariCPVersion,
     "org.postgresql" % "postgresql" % PostgresVersion,
+    "org.tpolecat" %% "doobie-core" % DOOBIE_VERSION,
+    "org.tpolecat" %% "doobie-postgres" % DOOBIE_VERSION,
     "com.dimafeng" %% "testcontainers-scala-postgresql" % "0.41.5" % Test,
   )
 
@@ -35,7 +38,6 @@ object Dependencies {
   val `zio-metrics-connectors-prometheus` = "dev.zio" %% "zio-metrics-connectors-prometheus" % "2.3.1"
   val `zio-metrics` = "dev.zio" %% "zio-metrics" % "2.0.1"
   val `zio-json` = "dev.zio" %% "zio-json" % ZioJsonVersion
-  val `zio-jdbc` = "dev.zio" %% "zio-jdbc" % ZioJdbcVersion
   val `zio-prelude` = "dev.zio" %% "zio-prelude" % ZioPreludeVersion
   val `zio-interop-cats` = "dev.zio" %% "zio-interop-cats" % ZioInteropsCats
   val zio = "dev.zio" %% "zio" % ZioVersion
@@ -73,5 +75,4 @@ object Dependencies {
   val jansi = "org.fusesource.jansi" % "jansi" % "2.4.1"
 
   val `logstash-logback-encoder` = "net.logstash.logback" % "logstash-logback-encoder" % "8.0"
-
 }
