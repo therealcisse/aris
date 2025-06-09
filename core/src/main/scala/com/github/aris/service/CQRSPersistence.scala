@@ -25,31 +25,31 @@ trait CQRSPersistence {
     ): Task[Chunk[Change[Event]]]
   def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
     discriminator: Discriminator,
-    query: PersistenceQuery,
+    namespace: Namespace,
     options: FetchOptions,
     catalog: Catalog,
     ): Task[Chunk[Change[Event]]]
   def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
     id: Key,
     discriminator: Discriminator,
-    query: PersistenceQuery,
+    namespace: Namespace,
     options: FetchOptions,
     catalog: Catalog,
-    ): Task[Chunk[Change[Event]]]
+  ): Task[Chunk[Change[Event]]]
 
   def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
     discriminator: Discriminator,
-    query: PersistenceQuery,
+    namespace: Namespace,
     interval: TimeInterval,
     catalog: Catalog,
-    ): Task[Chunk[Change[Event]]]
+  ): Task[Chunk[Change[Event]]]
   def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
     id: Key,
     discriminator: Discriminator,
-    query: PersistenceQuery,
+    namespace: Namespace,
     interval: TimeInterval,
     catalog: Catalog,
-    ): Task[Chunk[Change[Event]]]
+  ): Task[Chunk[Change[Event]]]
 
 
   def saveEvent[Event: {BinaryCodec, MetaInfo, Tag}](

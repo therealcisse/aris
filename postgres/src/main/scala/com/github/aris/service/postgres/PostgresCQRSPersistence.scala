@@ -46,37 +46,37 @@ object PostgresCQRSPersistence {
 
     def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
       discriminator: Discriminator,
-      query: PersistenceQuery,
+      namespace: Namespace,
       options: FetchOptions,
       catalog: Catalog,
     ): Task[Chunk[Change[Event]]] =
-      Queries.READ_EVENTS(discriminator, query, options, catalog).to[Chunk].transact(xa)
+      Queries.READ_EVENTS(discriminator, namespace, options, catalog).to[Chunk].transact(xa)
 
     def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
       id: Key,
       discriminator: Discriminator,
-      query: PersistenceQuery,
+      namespace: Namespace,
       options: FetchOptions,
       catalog: Catalog,
     ): Task[Chunk[Change[Event]]] =
-      Queries.READ_EVENTS(id, discriminator, query, options, catalog).to[Chunk].transact(xa)
+      Queries.READ_EVENTS(id, discriminator, namespace, options, catalog).to[Chunk].transact(xa)
 
     def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
       discriminator: Discriminator,
-      query: PersistenceQuery,
+      namespace: Namespace,
       interval: TimeInterval,
       catalog: Catalog,
       ): Task[Chunk[Change[Event]]] =
-      Queries.READ_EVENTS(discriminator, query, interval, catalog).to[Chunk].transact(xa)
+      Queries.READ_EVENTS(discriminator, namespace, interval, catalog).to[Chunk].transact(xa)
 
     def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
       id: Key,
       discriminator: Discriminator,
-      query: PersistenceQuery,
+      namespace: Namespace,
       interval: TimeInterval,
       catalog: Catalog,
       ): Task[Chunk[Change[Event]]] =
-      Queries.READ_EVENTS(id, discriminator, query, interval, catalog).to[Chunk].transact(xa)
+      Queries.READ_EVENTS(id, discriminator, namespace, interval, catalog).to[Chunk].transact(xa)
 
     def saveEvent[Event: {BinaryCodec, MetaInfo, Tag}](
       id: Key,
@@ -129,7 +129,7 @@ object PostgresCQRSPersistence {
 
     def READ_EVENTS[Event: BinaryCodec](
       discriminator: Discriminator,
-      query: PersistenceQuery,
+      namespace: Namespace,
       options: FetchOptions,
       catalog: Catalog,
     ): Query0[Change[Event]] =
@@ -142,7 +142,7 @@ object PostgresCQRSPersistence {
       ) = options.toSql
 
       (
-        sql"""SELECT version, payload FROM ${Fragment.const(catalog.tableName)} WHERE discriminator = $discriminator""" ++ query.toSql.fold(Fragment.empty)(ql => sql" AND " ++ ql) ++ offsetQuery.fold(Fragment.empty)(ql => sql" AND " ++ ql) ++
+        fr"""SELECT version, payload FROM ${Fragment.const(catalog.tableName)} WHERE discriminator = $discriminator AND """ ++ namespace.toSql ++ offsetQuery.fold(Fragment.empty)(ql => sql" AND " ++ ql) ++
         orderQuery ++ limitQuery.fold(Fragment.empty)(ql => sql" " ++ ql)
       ).query[
       (
@@ -154,7 +154,7 @@ object PostgresCQRSPersistence {
     def READ_EVENTS[Event: BinaryCodec](
       id: Key,
       discriminator: Discriminator,
-      query: PersistenceQuery,
+      namespace: Namespace,
       options: FetchOptions,
       catalog: Catalog,
     ): Query0[Change[Event]] =
@@ -167,7 +167,7 @@ object PostgresCQRSPersistence {
       ) = options.toSql
 
       (
-        fr"""SELECT version, payload FROM ${Fragment.const(catalog.tableName)} WHERE aggregate_id = $id AND discriminator = $discriminator""" ++ query.toSql.fold(Fragment.empty)(ql => sql" AND " ++ ql) ++ offsetQuery.fold(Fragment.empty)(ql => sql" AND " ++ ql) ++
+        fr"""SELECT version, payload FROM ${Fragment.const(catalog.tableName)} WHERE aggregate_id = $id AND discriminator = $discriminator AND """ ++ namespace.toSql ++ offsetQuery.fold(Fragment.empty)(ql => sql" AND " ++ ql) ++
         orderQuery ++ limitQuery.fold(Fragment.empty)(ql => sql" " ++ ql)
       ).query[
       (
@@ -179,14 +179,14 @@ object PostgresCQRSPersistence {
     def READ_EVENTS[Event: BinaryCodec](
       id: Key,
       discriminator: Discriminator,
-      query: PersistenceQuery,
+      namespace: Namespace,
       interval: TimeInterval,
       catalog: Catalog,
     ): Query0[Change[Event]] =
       given Read[Event] = byteArrayReader[Event]
 
       (
-        fr"""SELECT version, payload FROM ${Fragment.const(catalog.tableName)} WHERE aggregate_id = $id AND discriminator = $discriminator AND """ ++ interval.toSql ++ query.toSql.fold(Fragment.empty)(ql => sql" AND " ++ ql) ++ sql" ORDER BY version ASC"
+        fr"""SELECT version, payload FROM ${Fragment.const(catalog.tableName)} WHERE aggregate_id = $id AND discriminator = $discriminator AND """ ++ interval.toSql ++ sql" AND " ++ namespace.toSql ++ sql" ORDER BY version ASC"
       ).query[
       (
         Version,
@@ -196,14 +196,14 @@ object PostgresCQRSPersistence {
 
     def READ_EVENTS[Event: BinaryCodec](
       discriminator: Discriminator,
-      query: PersistenceQuery,
+      namespace: Namespace,
       interval: TimeInterval,
       catalog: Catalog,
     ): Query0[Change[Event]] =
       given Read[Event] = byteArrayReader[Event]
 
       (
-        fr"""SELECT version, payload FROM ${Fragment.const(catalog.tableName)} WHERE discriminator = $discriminator AND """ ++ interval.toSql ++ query.toSql.fold(Fragment.empty)(ql => sql" AND " ++ ql) ++ sql" ORDER BY version ASC"
+        fr"""SELECT version, payload FROM ${Fragment.const(catalog.tableName)} WHERE discriminator = $discriminator AND """ ++ interval.toSql ++ sql" AND " ++ namespace.toSql ++ sql" ORDER BY version ASC"
       ).query[
       (
         Version,

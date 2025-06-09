@@ -51,42 +51,6 @@ trait JdbcCodecs {
       }
       (offsetQuery, limitQuery, orderQuery)
 
-  extension (q: PersistenceQuery)
-    def toSql: Option[Fragment] =
-      q match {
-        case q: PersistenceQuery.Condition => q.toSql
-        case PersistenceQuery.any(condition, more*) =>
-          val qs = more.foldLeft(condition.toSql.toList) { case (qs, n) =>
-            n.toSql match {
-              case Some(q) => (q :: qs)
-              case _ => qs
-            }
-          }
-
-          if qs.isEmpty then None
-          else
-            (
-              fr"(" ++ qs.intercalate(fr" OR ") ++ fr")"
-            ).some
-
-        case PersistenceQuery.forall(query, more*) =>
-          val qs = more.foldLeft(query.toSql.toList) { case (qs, n) =>
-            n.toSql match {
-              case Some(q) => (q :: qs)
-              case _ => qs
-            }
-          }
-
-          if qs.isEmpty then None else (fr"(" ++ qs.intercalate(fr" AND ") ++ fr")").some
-      }
-
-  extension (q: PersistenceQuery.Condition)
-    def toSql: Option[Fragment] =
-      val nsQuery: Fragment = q.namespace.fold(Fragment.empty)(_.toSql)
-      val qss = List(nsQuery).filterNot(_.isEmpty)
-
-      if qss.isEmpty then None
-      else (fr"(" ++ qss.intercalate(fr"AND") ++ fr")").some
 
 
   extension (o: NonEmptyList[Namespace])
