@@ -27,7 +27,7 @@ object MemoryCQRSPersistence {
       events: Map[EntryKey, MultiDict[Key, Version]],
       snapshots: Map[Key, Version],
       data: Map[Version, Change[?]],
-      tags: Map[aris.EventTag, Set[Version]]
+      tags: Map[EvenTag, Set[Version]]
     )
 
     def empty: State = State(Info(Map.empty, Map.empty, Map.empty, Map.empty))
@@ -70,7 +70,7 @@ object MemoryCQRSPersistence {
         p.data.get(version).asInstanceOf[Option[Change[Event]]]
 
     extension (s: State)
-      def fetch[Event: MetaInfo](id: Key, discriminator: Discriminator, tag: Option[aris.EventTag], catalog: Catalog): Chunk[Change[Event]] =
+      def fetch[Event: MetaInfo](id: Key, discriminator: Discriminator, tag: Option[EvenTag], catalog: Catalog): Chunk[Change[Event]] =
         val p = State.unwrap(s)
 
         p.events.get(EntryKey(catalog, discriminator)) match {
@@ -87,7 +87,7 @@ object MemoryCQRSPersistence {
         id: Key,
         discriminator: Discriminator,
         snapshotVersion: Version,
-        tag: Option[aris.EventTag],
+        tag: Option[EvenTag],
         catalog: Catalog,
       ): Chunk[Change[Event]] =
         val p = s.fetch[Event](id, discriminator, tag, catalog)
@@ -98,7 +98,7 @@ object MemoryCQRSPersistence {
         id: Option[Key],
         discriminator: Discriminator,
         namespace: Namespace,
-        tag: Option[aris.EventTag],
+        tag: Option[EvenTag],
         options: FetchOptions,
         catalog: Catalog,
       ): Chunk[Change[Event]] =
@@ -160,7 +160,7 @@ object MemoryCQRSPersistence {
         id: Option[Key],
         discriminator: Discriminator,
         namespace: Namespace,
-        tag: Option[aris.EventTag],
+        tag: Option[EvenTag],
         interval: TimeInterval,
         catalog: Catalog,
       ): Chunk[Change[Event]] =
@@ -208,7 +208,7 @@ object MemoryCQRSPersistence {
   def readEvents[Event:{ BinaryCodec, EventTag, MetaInfo}](
     id: Key,
     discriminator: Discriminator,
-    tag: Option[aris.EventTag],
+    tag: Option[EvenTag],
     catalog: Catalog,
   ): Task[Chunk[Change[Event]]] =
       ref.get.map(_.fetch(id, discriminator, tag, catalog))
@@ -217,7 +217,7 @@ object MemoryCQRSPersistence {
     id: Key,
     discriminator: Discriminator,
     snapshotVersion: Version,
-    tag: Option[aris.EventTag],
+    tag: Option[EvenTag],
     catalog: Catalog,
   ): Task[Chunk[Change[Event]]] =
       ref.get.map(_.fetch(id, discriminator, snapshotVersion, tag, catalog))
@@ -225,7 +225,7 @@ object MemoryCQRSPersistence {
   def readEvents[Event:{ BinaryCodec, EventTag, MetaInfo}](
     discriminator: Discriminator,
     namespace: Namespace,
-    tag: Option[aris.EventTag],
+    tag: Option[EvenTag],
     options: FetchOptions,
     catalog: Catalog,
   ): Task[Chunk[Change[Event]]] =
@@ -235,7 +235,7 @@ object MemoryCQRSPersistence {
     id: Key,
     discriminator: Discriminator,
     namespace: Namespace,
-    tag: Option[aris.EventTag],
+    tag: Option[EvenTag],
     options: FetchOptions,
     catalog: Catalog,
   ): Task[Chunk[Change[Event]]] =
@@ -245,7 +245,7 @@ object MemoryCQRSPersistence {
     id: Key,
     discriminator: Discriminator,
     namespace: Namespace,
-    tag: Option[aris.EventTag],
+    tag: Option[EvenTag],
     interval: TimeInterval,
     catalog: Catalog
   ): Task[Chunk[Change[Event]]] =
@@ -254,7 +254,7 @@ object MemoryCQRSPersistence {
   def readEvents[Event: {BinaryCodec, EventTag, MetaInfo}](
     discriminator: Discriminator,
     namespace: Namespace,
-    tag: Option[aris.EventTag],
+    tag: Option[EvenTag],
     interval: TimeInterval,
     catalog: Catalog,
   ): Task[Chunk[Change[Event]]] =

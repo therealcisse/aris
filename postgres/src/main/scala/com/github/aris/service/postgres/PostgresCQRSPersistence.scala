@@ -32,7 +32,7 @@ object PostgresCQRSPersistence {
   def readEvents[Event: {BinaryCodec, EventTag, MetaInfo}](
     id: Key,
     discriminator: Discriminator,
-    tag: Option[aris.EventTag],
+    tag: Option[EvenTag],
     catalog: Catalog,
   ): Task[Chunk[Change[Event]]] =
       Queries.READ_EVENTS(id, discriminator, tag, catalog).to[Chunk].transact(xa)
@@ -41,7 +41,7 @@ object PostgresCQRSPersistence {
     id: Key,
     discriminator: Discriminator,
     snapshotVersion: Version,
-    tag: Option[aris.EventTag],
+    tag: Option[EvenTag],
     catalog: Catalog,
   ): Task[Chunk[Change[Event]]] =
       Queries.READ_EVENTS(id, discriminator, snapshotVersion, tag, catalog).to[Chunk].transact(xa)
@@ -49,7 +49,7 @@ object PostgresCQRSPersistence {
   def readEvents[Event: {BinaryCodec, EventTag, MetaInfo}](
     discriminator: Discriminator,
     namespace: Namespace,
-    tag: Option[aris.EventTag],
+    tag: Option[EvenTag],
     options: FetchOptions,
     catalog: Catalog,
   ): Task[Chunk[Change[Event]]] =
@@ -59,7 +59,7 @@ object PostgresCQRSPersistence {
     id: Key,
     discriminator: Discriminator,
     namespace: Namespace,
-    tag: Option[aris.EventTag],
+    tag: Option[EvenTag],
     options: FetchOptions,
     catalog: Catalog,
   ): Task[Chunk[Change[Event]]] =
@@ -68,7 +68,7 @@ object PostgresCQRSPersistence {
   def readEvents[Event: {BinaryCodec, EventTag, MetaInfo}](
     discriminator: Discriminator,
     namespace: Namespace,
-    tag: Option[aris.EventTag],
+    tag: Option[EvenTag],
     interval: TimeInterval,
     catalog: Catalog,
     ): Task[Chunk[Change[Event]]] =
@@ -78,7 +78,7 @@ object PostgresCQRSPersistence {
     id: Key,
     discriminator: Discriminator,
     namespace: Namespace,
-    tag: Option[aris.EventTag],
+    tag: Option[EvenTag],
     interval: TimeInterval,
     catalog: Catalog,
     ): Task[Chunk[Change[Event]]] =
@@ -114,7 +114,7 @@ object PostgresCQRSPersistence {
         case event => Change(version, event)
       }
 
-    def READ_EVENTS[Event: BinaryCodec](id: Key, discriminator: Discriminator, tag: Option[aris.EventTag], catalog: Catalog): Query0[Change[Event]] =
+    def READ_EVENTS[Event: BinaryCodec](id: Key, discriminator: Discriminator, tag: Option[EvenTag], catalog: Catalog): Query0[Change[Event]] =
       given Read[Event] = byteArrayReader[Event]
 
       val tagJoin = tag.fold(Fragment.empty)(_ => fr" JOIN tags t ON e.version = t.version")
@@ -128,7 +128,7 @@ object PostgresCQRSPersistence {
       id: Key,
       discriminator: Discriminator,
       snapshotVersion: Version,
-      tag: Option[aris.EventTag],
+      tag: Option[EvenTag],
       catalog: Catalog,
     ): Query0[Change[Event]] =
       given Read[Event] = byteArrayReader[Event]
@@ -145,7 +145,7 @@ object PostgresCQRSPersistence {
     def READ_EVENTS[Event: BinaryCodec](
       discriminator: Discriminator,
       namespace: Namespace,
-      tag: Option[aris.EventTag],
+      tag: Option[EvenTag],
       options: FetchOptions,
       catalog: Catalog,
     ): Query0[Change[Event]] =
@@ -174,7 +174,7 @@ object PostgresCQRSPersistence {
       id: Key,
       discriminator: Discriminator,
       namespace: Namespace,
-      tag: Option[aris.EventTag],
+      tag: Option[EvenTag],
       options: FetchOptions,
       catalog: Catalog,
     ): Query0[Change[Event]] =
@@ -203,7 +203,7 @@ object PostgresCQRSPersistence {
       id: Key,
       discriminator: Discriminator,
       namespace: Namespace,
-      tag: Option[aris.EventTag],
+      tag: Option[EvenTag],
       interval: TimeInterval,
       catalog: Catalog,
     ): Query0[Change[Event]] =
@@ -224,7 +224,7 @@ object PostgresCQRSPersistence {
     def READ_EVENTS[Event: BinaryCodec](
       discriminator: Discriminator,
       namespace: Namespace,
-      tag: Option[aris.EventTag],
+      tag: Option[EvenTag],
       interval: TimeInterval,
       catalog: Catalog,
     ): Query0[Change[Event]] =
