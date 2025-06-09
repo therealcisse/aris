@@ -66,7 +66,7 @@ The library uses a PostgresCQRSPersistence service to persist events and snapsho
 PostgreSQL Schema Setup:
 
 ```sql
--- Create tables for events and snapshots
+-- Create tables for events, snapshots, and tags
 CREATE TABLE IF NOT EXISTS snapshots (
   aggregate_id TEXT NOT NULL,
   version INT NOT NULL,
@@ -77,11 +77,20 @@ CREATE TABLE IF NOT EXISTS events (
   version TEXT NOT NULL PRIMARY KEY,
   aggregate_id TEXT NOT NULL,
   discriminator TEXT NOT NULL,
+  namespace TEXT NOT NULL,
   payload BYTEA NOT NULL
 );
 
-CREATE INDEX idx_events_discriminator ON events (discriminator);
-CREATE INDEX idx_events_aggregate_id ON events (aggregate_id);
+CREATE TABLE IF NOT EXISTS tags (
+  version TEXT NOT NULL,
+  tag TEXT NOT NULL,
+  PRIMARY KEY (version, tag)
+);
+
+-- Recommended indexes
+CREATE INDEX idx_events_discriminator_namespace_version ON events (discriminator, namespace, version);
+CREATE INDEX idx_events_aggregate_id_version ON events (aggregate_id, version);
+CREATE INDEX idx_tags_version_tag ON tags (version, tag);
 ```
 
 
