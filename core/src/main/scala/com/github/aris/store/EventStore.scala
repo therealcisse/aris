@@ -7,7 +7,7 @@ import com.github.aris.domain.*
 import zio.*
 import zio.prelude.*
 
-  transparent trait EventStore[Event] {
+transparent trait EventStore[Event] {
   def readEvents(id: Key): Task[Option[NonEmptyList[Change[Event]]]]
   def readEvents(id: Key, snapshotVersion: Version): Task[Option[NonEmptyList[Change[Event]]]]
   def readEvents(

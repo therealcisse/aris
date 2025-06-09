@@ -52,8 +52,6 @@ trait JdbcCodecs {
       }
       (offsetQuery, limitQuery, orderQuery)
 
-
-
   extension (o: NonEmptyList[Namespace])
     @scala.annotation.targetName("toSql_NonEmptyList_Namespace")
     def toSql: Fragment = o match {
@@ -61,7 +59,6 @@ trait JdbcCodecs {
       case NonEmptyList.Cons(n, ns) =>
         fr0"namespace IN (" ++ (n :: ns).toList.map(n => fr0"$n").intercalate(fr",") ++ fr")"
     }
-
 
   extension (o: Namespace)
     @scala.annotation.targetName("toSql_Namespace")
@@ -72,7 +69,6 @@ trait JdbcCodecs {
   extension (t: EventTag)
     @scala.annotation.targetName("toSql_EventTag")
     def toSql: Fragment = fr"t.tag = $t"
-
 
   extension (f: Fragment) inline def isEmpty: Boolean = f.internals.elements.isEmpty
 

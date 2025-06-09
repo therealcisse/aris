@@ -253,12 +253,12 @@ object PostgresCQRSPersistence {
       val q =
         fr"""
         INSERT INTO ${Fragment.const(catalog.tableName)}(
-          'version',
-          'aggregate_id',
-          'discriminator',
-          'namespace',
-          'payload',
-          'timestamp'
+          version,
+          aggregate_id,
+          discriminator,
+          namespace,
+          payload,
+          timestamp
         )
         VALUES (
           ${event.version},
