@@ -15,24 +15,28 @@ trait CQRSPersistence {
   def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
     id: Key,
     discriminator: Discriminator,
+    tag: Option[Tag],
     catalog: Catalog,
-    ): Task[Chunk[Change[Event]]]
+  ): Task[Chunk[Change[Event]]]
   def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
     id: Key,
     discriminator: Discriminator,
     snapshotVersion: Version,
+    tag: Option[Tag],
     catalog: Catalog,
-    ): Task[Chunk[Change[Event]]]
+  ): Task[Chunk[Change[Event]]]
   def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
     discriminator: Discriminator,
     namespace: Namespace,
+    tag: Option[Tag],
     options: FetchOptions,
     catalog: Catalog,
-    ): Task[Chunk[Change[Event]]]
+  ): Task[Chunk[Change[Event]]]
   def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
     id: Key,
     discriminator: Discriminator,
     namespace: Namespace,
+    tag: Option[Tag],
     options: FetchOptions,
     catalog: Catalog,
   ): Task[Chunk[Change[Event]]]
@@ -40,6 +44,7 @@ trait CQRSPersistence {
   def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
     discriminator: Discriminator,
     namespace: Namespace,
+    tag: Option[Tag],
     interval: TimeInterval,
     catalog: Catalog,
   ): Task[Chunk[Change[Event]]]
@@ -47,6 +52,7 @@ trait CQRSPersistence {
     id: Key,
     discriminator: Discriminator,
     namespace: Namespace,
+    tag: Option[Tag],
     interval: TimeInterval,
     catalog: Catalog,
   ): Task[Chunk[Change[Event]]]

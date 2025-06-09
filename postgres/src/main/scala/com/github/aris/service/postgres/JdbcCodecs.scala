@@ -9,6 +9,7 @@ import zio.schema.*
 import zio.schema.codec.*
 
 import zio.*
+import com.github.aris.Tag as ArisTag
 import zio.prelude.*
 
 import doobie.*
@@ -23,6 +24,7 @@ trait JdbcCodecs {
   given Meta[Key] = Meta[Long].timap(Key.wrap)(Key.unwrap)
   given Meta[Namespace] = Meta[Int].timap(Namespace.wrap)(Namespace.unwrap)
   given Meta[Discriminator] = Meta[String].timap(Discriminator.wrap)(Discriminator.unwrap)
+  given Meta[ArisTag] = Meta[String].timap(ArisTag.wrap)(ArisTag.unwrap)
 
   inline def byteArrayReader[Event: BinaryCodec]: Read[Event] =
     Read[Array[Byte]].map { case (bytes) =>
@@ -67,6 +69,10 @@ trait JdbcCodecs {
     def toSql: Fragment = o match {
       case n => fr"namespace = $n"
     }
+
+  extension (t: ArisTag)
+    @scala.annotation.targetName("toSql_Tag")
+    def toSql: Fragment = fr"t.tag = $t"
 
 
   extension (f: Fragment) inline def isEmpty: Boolean = f.internals.elements.isEmpty

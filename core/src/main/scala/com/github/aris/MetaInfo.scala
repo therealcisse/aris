@@ -4,6 +4,7 @@ package aris
 trait MetaInfo[Event] {
   extension (self: Event) def namespace: Namespace
   extension (self: Event) def timestamp: Option[Timestamp]
+  extension (self: Event) def tags: Set[Tag] = Set.empty
 
 }
 
