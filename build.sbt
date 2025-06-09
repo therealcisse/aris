@@ -51,7 +51,7 @@ onLoad in Global := {
 lazy val aggregatedProjects: Seq[ProjectReference] =
   Seq(
     core,
-    postgres,
+    doobie,
     memory,
   )
 
@@ -84,9 +84,9 @@ lazy val core = (project in file("core"))
     ),
   )
 
-lazy val postgres = (project in file("postgres"))
+lazy val doobie = (project in file("doobie"))
   .dependsOn(core % "compile->compile;test->test")
-  .settings(stdSettings("postgres"))
+  .settings(stdSettings("doobie"))
   // .settings(publishSetting(false))
   .settings(
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
