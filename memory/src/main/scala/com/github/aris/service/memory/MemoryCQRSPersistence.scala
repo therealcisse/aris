@@ -19,40 +19,7 @@ object MemoryCQRSPersistence {
   import zio.schema.*
 
   extension [Event: MetaInfo](q: PersistenceQuery.Condition) def isMatch(ch: Change[Event]): Boolean =
-    val refMatch = q.reference match {
-      case None => true
-      case Some(value) => ch.payload.reference.contains(value)
-    }
-
-    val nsMatch = q.namespace match {
-      case None => true
-      case Some(value) => ch.payload.namespace == value
-    }
-
-    val hierarchyMatch = q.hierarchy match {
-      case None => true
-      case h =>
-        (ch.payload.hierarchy, h).tupled match {
-          case None => false
-
-          case Some(Hierarchy.Descendant(gpId0, pId0), Hierarchy.Descendant(gpId1, pId1)) =>
-            gpId0 == gpId1 && pId0 == pId1
-          case Some(Hierarchy.Descendant(_, pId0), Hierarchy.Child(pId1)) => pId0 == pId1
-          case Some(Hierarchy.Descendant(gpId0, _), Hierarchy.GrandChild(gpId1)) => gpId0 == gpId1
-
-          case Some(Hierarchy.Child(pId0), Hierarchy.Child(pId1)) => pId0 == pId1
-          case Some(Hierarchy.GrandChild(gpId0), Hierarchy.GrandChild(gpId1)) => gpId0 == gpId1
-
-          case _ => false
-        }
-    }
-
-    val propsMatch = q.props match {
-      case None => true
-      case Some(p) => p.toChunk == ch.payload.props
-    }
-
-    refMatch && nsMatch && hierarchyMatch && propsMatch
+    q.namespace.forall(ch.payload.namespace == _)
 
   extension [Event: MetaInfo](q: PersistenceQuery) def isMatch(ch: Change[Event]): Boolean = q match {
     case condition: PersistenceQuery.Condition => condition.isMatch(ch)

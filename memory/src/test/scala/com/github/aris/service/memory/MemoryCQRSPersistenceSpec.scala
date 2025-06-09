@@ -30,223 +30,12 @@ object MemoryCQRSPersistenceSpec extends ZIOSpecDefault {
 
   given MetaInfo[DummyEvent]  {
     extension (self: DummyEvent) def namespace: Namespace = Namespace(0)
-    extension (self: DummyEvent) def hierarchy: Option[Hierarchy] = Hierarchy.Descendant(Key(1L), Key(2L)).some
-    extension (self: DummyEvent) def props: Chunk[EventProperty] = Chunk(EventProperty("type", "DummyEvent"))
-    extension (self: DummyEvent) def reference: Option[ReferenceKey] = None
-    extension (self: DummyEvent) def timestamp: Option[Timestamp] = None
 
   }
 
   def spec =
     suite("MemoryCQRSPersistenceSpec")(
-      test("should save and retrieve events correctly by hierarchy : Descendant") {
-        check(namespaceGen, keyGen, versionGen, keyGen, keyGen, discriminatorGen, dummyEventGen) {
-          (ns, key, version, grandParentId, parentId, discriminator, event) =>
-            given MetaInfo[DummyEvent]  {
-              extension (self: DummyEvent) def namespace: Namespace = ns
-              extension (self: DummyEvent)
-                def hierarchy: Option[Hierarchy] = Hierarchy.Descendant(grandParentId, parentId).some
-              extension (self: DummyEvent) def props: Chunk[EventProperty] = Chunk()
-              extension (self: DummyEvent) def reference: Option[ReferenceKey] = None
-              extension (self: DummyEvent) def timestamp: Option[Timestamp] = None
 
-            }
-
-            for {
-              persistence <- ZIO.service[CQRSPersistence]
-
-              ch = Change(version = version, event)
-
-              saveResult <- (persistence.saveEvent(key, discriminator, ch, Catalog.Default))
-
-              a = assert(saveResult)(equalTo(1L))
-
-              events0 <- (persistence.readEvents[DummyEvent](key, discriminator, Catalog.Default))
-              b = assert(events0)(isNonEmpty)
-
-              c <- (
-                for {
-                  events0 <- (persistence.readEvents[DummyEvent](key, discriminator, Catalog.Default))
-                  events1 <- (
-                    persistence.readEvents[DummyEvent](
-                      discriminator,
-                      query = PersistenceQuery.hierarchy(Hierarchy.Descendant(grandParentId, parentId)),
-                      options = FetchOptions(),
-                      catalog = Catalog.Default,
-                    )
-                  )
-                  events2 <- (
-                    persistence.readEvents[DummyEvent](
-                      discriminator,
-                      query = PersistenceQuery.hierarchy(Hierarchy.Descendant(Key(grandParentIdXXX), parentId)),
-                      options = FetchOptions(),
-                      catalog = Catalog.Default,
-                    )
-                  )
-                  events3 <- (
-                    persistence.readEvents[DummyEvent](
-                      discriminator,
-                      query = PersistenceQuery.hierarchy(Hierarchy.Descendant(grandParentId, Key(parentIdXXX))),
-                      options = FetchOptions(),
-                      catalog = Catalog.Default,
-                    )
-                  )
-
-                } yield assert(events0)(isNonEmpty) && assert(events1)(isNonEmpty) && assert(events2)(
-                  isEmpty,
-                ) && assert(
-                  events3,
-                )(isEmpty) && assert(
-                  events1,
-                )(hasSubset(events0))
-              )
-
-            } yield a && b && c
-        }
-      },
-      test("should save and retrieve events correctly by hierarchy : Child") {
-        check(namespaceGen, keyGen, versionGen, keyGen, keyGen, discriminatorGen, dummyEventGen) {
-          (ns, key, version, grandParentId, parentId, discriminator, event) =>
-            given MetaInfo[DummyEvent]  {
-              extension (self: DummyEvent) def namespace: Namespace = ns
-              extension (self: DummyEvent)
-                def hierarchy: Option[Hierarchy] = Hierarchy.Descendant(grandParentId, parentId).some
-              extension (self: DummyEvent) def props: Chunk[EventProperty] = Chunk(EventProperty("type", "DummyEvent"))
-              extension (self: DummyEvent) def reference: Option[ReferenceKey] = None
-              extension (self: DummyEvent) def timestamp: Option[Timestamp] = None
-
-            }
-
-            for {
-              persistence <- ZIO.service[CQRSPersistence]
-
-              ch = Change(version = version, event)
-
-              saveResult <- (persistence.saveEvent(key, discriminator, ch, Catalog.Default))
-
-              a = assert(saveResult)(equalTo(1L))
-
-              events0 <- (persistence.readEvents[DummyEvent](key, discriminator, Catalog.Default))
-              b = assert(events0)(isNonEmpty)
-
-              e <- (
-                for {
-                  events0 <- (persistence.readEvents[DummyEvent](key, discriminator, Catalog.Default))
-                  events1 <- (
-                    persistence.readEvents[DummyEvent](
-                      discriminator,
-                      query = PersistenceQuery.hierarchy(Hierarchy.Child(parentId)),
-                      options = FetchOptions(),
-                      catalog = Catalog.Default,
-                    )
-                  )
-                  events2 <- (
-                    persistence.readEvents[DummyEvent](
-                      discriminator,
-                      query = PersistenceQuery.hierarchy(Hierarchy.Child(Key(parentIdXXX))),
-                      options = FetchOptions(),
-                      catalog = Catalog.Default,
-                    )
-                  )
-
-                } yield assert(events0)(isNonEmpty) && assert(events1)(isNonEmpty) && assert(events2)(
-                  isEmpty,
-                ) && assert(
-                  events1,
-                )(hasSubset(events0))
-              )
-
-            } yield a && b && e
-        }
-      },
-      test("should save and retrieve events correctly by hierarchy : GrandChild") {
-        check(namespaceGen, keyGen, versionGen, keyGen, keyGen, discriminatorGen, dummyEventGen) {
-          (ns, key, version, grandParentId, parentId, discriminator, event) =>
-            given MetaInfo[DummyEvent]  {
-              extension (self: DummyEvent) def namespace: Namespace = ns
-              extension (self: DummyEvent)
-                def hierarchy: Option[Hierarchy] = Hierarchy.Descendant(grandParentId, parentId).some
-              extension (self: DummyEvent) def props: Chunk[EventProperty] = Chunk(EventProperty("type", "DummyEvent"))
-              extension (self: DummyEvent) def reference: Option[ReferenceKey] = None
-              extension (self: DummyEvent) def timestamp: Option[Timestamp] = None
-
-            }
-
-            for {
-              persistence <- ZIO.service[CQRSPersistence]
-
-              ch = Change(version = version, event)
-
-              saveResult <- (persistence.saveEvent(key, discriminator, ch, Catalog.Default))
-
-              a = assert(saveResult)(equalTo(1L))
-
-              events0 <- (persistence.readEvents[DummyEvent](key, discriminator, Catalog.Default))
-              b = assert(events0)(isNonEmpty)
-
-              d <- (
-                for {
-                  events0 <- (persistence.readEvents[DummyEvent](key, discriminator, Catalog.Default))
-                  events1 <- (
-                    persistence.readEvents[DummyEvent](
-                      discriminator,
-                      query = PersistenceQuery.hierarchy(Hierarchy.GrandChild(grandParentId)),
-                      options = FetchOptions(),
-                      catalog = Catalog.Default,
-                    )
-                  )
-                  events2 <- (
-                    persistence.readEvents[DummyEvent](
-                      discriminator,
-                      query = PersistenceQuery.hierarchy(Hierarchy.GrandChild(Key(grandParentIdXXX))),
-                      options = FetchOptions(),
-                      catalog = Catalog.Default,
-                    )
-                  )
-
-                } yield assert(events0)(isNonEmpty) && assert(events1)(isNonEmpty) && assert(events2)(
-                  isEmpty,
-                ) && assert(
-                  events1,
-                )(hasSubset(events0))
-              )
-
-            } yield a && b && d
-        }
-      },
-      test("should save and retrieve events correctly by props") {
-        check(keyGen, versionGen, discriminatorGen) { (key, version, discriminator) =>
-          for {
-            persistence <- ZIO.service[CQRSPersistence]
-
-            event = Change(version = version, DummyEvent("test"))
-
-            saveResult <- (persistence.saveEvent(key, discriminator, event, Catalog.Default))
-
-            a = assert(saveResult)(equalTo(1L))
-
-            events0 <- (persistence.readEvents[DummyEvent](key, discriminator, Catalog.Default))
-            events1 <- (
-              persistence.readEvents[DummyEvent](
-                discriminator,
-                query = PersistenceQuery.props(EventProperty("type", "DummyEvent")),
-                options = FetchOptions(),
-                catalog = Catalog.Default,
-              )
-            )
-            events2 <- (
-              persistence.readEvents[DummyEvent](
-                discriminator,
-                query = PersistenceQuery.props(EventProperty("type", "DummyEventXXX")),
-                options = FetchOptions(),
-                catalog = Catalog.Default,
-              )
-            )
-            b = assert(events0)(isNonEmpty) && assert(events1)(isNonEmpty) && assert(events2)(isEmpty)
-
-          } yield a && b
-        }
-      },
       test("should save and retrieve events correctly") {
         check(keyGen, versionGen, discriminatorGen) { (key, version, discriminator) =>
           for {
@@ -263,7 +52,7 @@ object MemoryCQRSPersistenceSpec extends ZIOSpecDefault {
 
           } yield a && b
         }
-      },
+
       test("should save and retrieve an event correctly") {
         check(keyGen, versionGen, discriminatorGen) { (key, version, discriminator) =>
           for {
@@ -274,7 +63,7 @@ object MemoryCQRSPersistenceSpec extends ZIOSpecDefault {
             result <- (persistence.readEvent[DummyEvent](version = event.version, Catalog.Default))
           } yield assert(result)(isSome(equalTo(event)))
         }
-      },
+
       test("should save and retrieve events by namespace correctly") {
         check(keyGen, versionGen, discriminatorGen) { (key, version, discriminator) =>
           for {
@@ -310,7 +99,7 @@ object MemoryCQRSPersistenceSpec extends ZIOSpecDefault {
 
           } yield a && b
         }
-      },
+
       test("should retrieve events in sorted order") {
         check(keyGen, Gen.listOfN(100)(versionGen), discriminatorGen) { (key, versions, discriminator) =>
           for {
@@ -331,7 +120,7 @@ object MemoryCQRSPersistenceSpec extends ZIOSpecDefault {
 
           } yield a
         }
-      },
+
       test("should retrieve events from given version") {
         check(keyGen, Gen.listOfN(100)(versionGen), Gen.listOfN(100)(versionGen), discriminatorGen) {
           (key, versions, moreVersions, discriminator) =>
@@ -381,7 +170,7 @@ object MemoryCQRSPersistenceSpec extends ZIOSpecDefault {
               d = assert(es3)(isEmpty)
             } yield a && b && c && d
         }
-      },
+
       test("should handle snapshot storage correctly") {
         check(keyGen, versionGen) { (key, version) =>
           for {
@@ -395,7 +184,7 @@ object MemoryCQRSPersistenceSpec extends ZIOSpecDefault {
 
           } yield a && b
         }
-      },
+
     ).provideSomeLayerShared(MemoryCQRSPersistence.live()) @@ TestAspect.withLiveClock
 
   val dummyEventGen: Gen[Any, DummyEvent] =

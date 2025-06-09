@@ -219,141 +219,28 @@ object PostgresCQRSPersistence {
     ): Update0 =
       val payload = java.util.Base64.getEncoder.encodeToString(summon[BinaryCodec[Event]].encode(event.payload).toArray)
 
-      val props = toJson(event.payload.props)
-
-      val q = event.payload.hierarchy match {
-        case None =>
-
-          fr"""
-          INSERT INTO ${Fragment.const(catalog.tableName)}(
-            'version',
-            'aggregate_id',
-            'discriminator',
-            'namespace',
-            'props',
-            'payload',
-            'timestamp'
-
-
-            )
-          VALUES (
-            ${event.version},
-            ${id},
-            ${discriminator},
-            ${event.payload.namespace},
-            (
-              SELECT COALESCE(
-                jsonb_object_agg(each.key, each.value),
-                '{}'::jsonb
-              ) AS props
-              FROM jsonb_array_elements($props::jsonb) AS elem,
-              LATERAL jsonb_each(elem) each
-            ),
-            decode(${payload}, 'base64'),
-            ${event.payload.timestamp `getOrElse` event.version.timestamp}
-          )
-          """
-
-        case Some(Hierarchy.GrandChild(grandParentId)) =>
-          fr"""
-          INSERT INTO ${Fragment.const(catalog.tableName)}(
-            'version',
-            'aggregate_id',
-            'discriminator',
-            'namespace',
-            'grand_parent_id',
-            'props',
-            'payload',
-            'timestamp'
-            )
-          VALUES (
-            ${event.version},
-            ${id},
-            ${discriminator},
-            ${event.payload.namespace},
-            $grandParentId,
-            (
-              SELECT COALESCE(
-                jsonb_object_agg(each.key, each.value),
-                '{}'::jsonb
-              ) AS props
-              FROM jsonb_array_elements($props::jsonb) AS elem,
-              LATERAL jsonb_each(elem) each
-            ),
-            decode(${payload}, 'base64'),
-            ${event.payload.timestamp `getOrElse` event.version.timestamp}
-          )
-          """
-
-        case Some(Hierarchy.Child(parentId)) =>
-          fr"""
-          INSERT INTO ${Fragment.const(catalog.tableName)}(
-            'version',
-            'aggregate_id',
-            'discriminator',
-            'namespace',
-            'parent_id',
-            'props',
-            'payload',
-            'timestamp'
-            )
-          VALUES (
-            ${event.version},
-            ${id},
-            ${discriminator},
-            ${event.payload.namespace},
-            $parentId,
-            (
-              SELECT COALESCE(
-                jsonb_object_agg(each.key, each.value),
-                '{}'::jsonb
-              ) AS props
-              FROM jsonb_array_elements($props::jsonb) AS elem,
-              LATERAL jsonb_each(elem) each
-            ),
-            decode(${payload}, 'base64'),
-            ${event.payload.timestamp `getOrElse` event.version.timestamp}
-          )
-          """
-
-        case Some(Hierarchy.Descendant(grandParentId, parentId)) =>
-          fr"""
-          INSERT INTO ${Fragment.const(catalog.tableName)}(
-            'version",
-            'aggregate_id",
-            'discriminator",
-            'namespace",
-            'parent_id",
-            'grand_parent_id",
-            'props",
-            'payload",
-            'timestamp"
-            )
-          VALUES (
-            ${event.version},
-            ${id},
-            ${discriminator},
-            ${event.payload.namespace},
-            $parentId,
-            $grandParentId,
-            (
-              SELECT COALESCE(
-                jsonb_object_agg(each.key, each.value),
-                '{}'::jsonb
-              ) AS props
-              FROM jsonb_array_elements($props::jsonb) AS elem,
-              LATERAL jsonb_each(elem) each
-            ),
-
-            decode(${payload}, 'base64'),
-            ${event.payload.timestamp `getOrElse` event.version.timestamp}
-          )
-          """
-
-
-      }
+      val q =
+        fr"""
+        INSERT INTO ${Fragment.const(catalog.tableName)}(
+          'version',
+          'aggregate_id',
+          'discriminator',
+          'namespace',
+          'payload',
+          'timestamp'
+        )
+        VALUES (
+          ${event.version},
+          ${id},
+          ${discriminator},
+          ${event.payload.namespace},
+          decode(${payload}, 'base64'),
+          ${event.payload.timestamp `getOrElse` event.version.timestamp}
+        )
+        """
 
       q.update
+
 
     def READ_SNAPSHOT(id: Key): Query0[Version] =
       sql"""

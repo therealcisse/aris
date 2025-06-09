@@ -23,7 +23,6 @@ trait JdbcCodecs {
   given Meta[Key] = Meta[Long].timap(Key.wrap)(Key.unwrap)
   given Meta[Namespace] = Meta[Int].timap(Namespace.wrap)(Namespace.unwrap)
   given Meta[Discriminator] = Meta[String].timap(Discriminator.wrap)(Discriminator.unwrap)
-  given Meta[ReferenceKey] = Meta[Long].timap(ReferenceKey.apply)(_.asKey.value)
 
   inline def byteArrayReader[Event: BinaryCodec]: Read[Event] =
     Read[Array[Byte]].map { case (bytes) =>
@@ -84,26 +83,11 @@ trait JdbcCodecs {
   extension (q: PersistenceQuery.Condition)
     def toSql: Option[Fragment] =
       val nsQuery: Fragment = q.namespace.fold(Fragment.empty)(_.toSql)
-      val hierarchyQuery: Fragment = q.hierarchy.fold(Fragment.empty)(_.toSql)
-      val referenceQuery: Fragment = q.reference.fold(Fragment.empty)(_.toSql)
-
-      val propQueries: List[Fragment] =
-        q.props
-          .map(_.toList.map(_.toSql))
-          .getOrElse(Nil)
-
-      val qss = (nsQuery :: hierarchyQuery :: referenceQuery :: propQueries)
-        .filterNot(_.isEmpty)
+      val qss = List(nsQuery).filterNot(_.isEmpty)
 
       if qss.isEmpty then None
       else (fr"(" ++ qss.intercalate(fr"AND") ++ fr")").some
 
-  extension (o: NonEmptyList[EventProperty])
-    @scala.annotation.targetName("toSql_NonEmptyList_EventProperty")
-    def toSql: Fragment = o match {
-      case NonEmptyList.Single(p) => p.toSql
-      case NonEmptyList.Cons(p, ps) => ps.foldLeft(p.toSql) { case (a, n) => a ++ fr" AND " ++ n.toSql }
-    }
 
   extension (o: NonEmptyList[Namespace])
     @scala.annotation.targetName("toSql_NonEmptyList_Namespace")
@@ -113,13 +97,6 @@ trait JdbcCodecs {
         fr0"namespace IN (" ++ (n :: ns).toList.map(n => fr0"$n").intercalate(fr",") ++ fr")"
     }
 
-  extension (o: Hierarchy)
-    def toSql: Fragment = o match {
-      case Hierarchy.Child(parentId) => fr"parent_id = $parentId"
-      case Hierarchy.GrandChild(grandParentId) => fr"grand_parent_id = $grandParentId"
-      case Hierarchy.Descendant(grandParentId, parentId) =>
-        fr"parent_id = $parentId AND grand_parent_id = $grandParentId"
-    }
 
   extension (o: Namespace)
     @scala.annotation.targetName("toSql_Namespace")
@@ -127,16 +104,6 @@ trait JdbcCodecs {
       case n => fr"namespace = $n"
     }
 
-  extension (o: ReferenceKey)
-    @scala.annotation.targetName("toSql_ReferenceKey")
-    def toSql: Fragment = o match {
-      case r => fr"reference = $r"
-    }
-
-  extension (o: EventProperty)
-    def toSql: Fragment =
-      val value = toJson(o)
-      fr"props @> $value :: jsonb"
 
   extension (f: Fragment) inline def isEmpty: Boolean = f.internals.elements.isEmpty
 

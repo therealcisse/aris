@@ -14,14 +14,6 @@ object PostgresPersistenceQuerySpec extends ZIOSpecDefault, JdbcCodecs {
 
   def spec = suite("PostgresPersistenceQuerySpec")(
     suite("PersistenceQuery.toSql")(
-      test("EventProperty.toSql should produce correct SQL fragment") {
-        check(eventPropertyGen) { prop =>
-          val sqlFragment = prop.toSql
-          val expectedFragment = sql"props @> ${toJson(prop).asString} :: jsonb"
-
-          assert(sqlFragment.toString)(equalTo(expectedFragment.toString))
-        }
-      },
       test("Namespace.toSql should produce correct SQL fragment") {
         check(namespaceGen) { ns =>
           val sqlFragment = ns.toSql
@@ -48,27 +40,6 @@ object PostgresPersistenceQuerySpec extends ZIOSpecDefault, JdbcCodecs {
         check(namespaceListGen) { namespaces =>
           val result = namespaces.toSql
           val expected = expectedNamespaceSql(namespaces)
-          assert(result.toString)(equalTo(expected.toString))
-        }
-      },
-      test("Hierarchy toSql conversion") {
-        check(hierarchyGen) { hierarchy =>
-          val result = hierarchy.toSql
-          val expected = expectedHierarchySql(hierarchy)
-          assert(result.toString)(equalTo(expected.toString))
-        }
-      },
-      test("ReferenceKey toSql conversion") {
-        check(referenceGen) { ref =>
-          val result = ref.toSql
-          val expected = expectedReferenceKeySql(ref)
-          assert(result.toString)(equalTo(expected.toString))
-        }
-      },
-      test("EventProperty toSql conversion") {
-        check(eventPropertyGen) { prop =>
-          val result = prop.toSql
-          val expected = expectedEventPropertySql(prop)
           assert(result.toString)(equalTo(expected.toString))
         }
       },
@@ -113,18 +84,5 @@ object PostgresPersistenceQuerySpec extends ZIOSpecDefault, JdbcCodecs {
     case NonEmptyList.Cons(n, ns) => sql"namespace IN (${n :: ns.toList})"
   }
 
-  def expectedHierarchySql(hierarchy: Hierarchy): SqlFragment = hierarchy match {
-    case Hierarchy.Child(parentId) => sql"parent_id = $parentId"
-    case Hierarchy.GrandChild(grandParentId) => sql"grand_parent_id = $grandParentId"
-    case Hierarchy.Descendant(grandParentId, parentId) =>
-      sql"parent_id = $parentId AND grand_parent_id = $grandParentId"
-  }
-
-  def expectedReferenceKeySql(ref: ReferenceKey): SqlFragment =
-    sql"reference = $ref"
-
-  def expectedEventPropertySql(prop: EventProperty): SqlFragment =
-    val value = toJson(prop).asString
-    sql"props @> $value :: jsonb"
 
 }
