@@ -23,7 +23,7 @@ trait JdbcCodecs {
   given Meta[Key] = Meta[Long].timap(Key.wrap)(Key.unwrap)
   given Meta[Namespace] = Meta[Int].timap(Namespace.wrap)(Namespace.unwrap)
   given Meta[Discriminator] = Meta[String].timap(Discriminator.wrap)(Discriminator.unwrap)
-  given Meta[ReferenceKey] = Meta[Long].timap(ReferenceKey.apply)(_.asKey.value)
+  given Meta[EventTag] = Meta[String].timap(EventTag.wrap)(EventTag.unwrap)
 
   inline def byteArrayReader[Event: BinaryCodec]: Read[Event] =
     Read[Array[Byte]].map { case (bytes) =>
@@ -52,59 +52,6 @@ trait JdbcCodecs {
       }
       (offsetQuery, limitQuery, orderQuery)
 
-  extension (q: PersistenceQuery)
-    def toSql: Option[Fragment] =
-      q match {
-        case q: PersistenceQuery.Condition => q.toSql
-        case PersistenceQuery.any(condition, more*) =>
-          val qs = more.foldLeft(condition.toSql.toList) { case (qs, n) =>
-            n.toSql match {
-              case Some(q) => (q :: qs)
-              case _ => qs
-            }
-          }
-
-          if qs.isEmpty then None
-          else
-            (
-              fr"(" ++ qs.intercalate(fr" OR ") ++ fr")"
-            ).some
-
-        case PersistenceQuery.forall(query, more*) =>
-          val qs = more.foldLeft(query.toSql.toList) { case (qs, n) =>
-            n.toSql match {
-              case Some(q) => (q :: qs)
-              case _ => qs
-            }
-          }
-
-          if qs.isEmpty then None else (fr"(" ++ qs.intercalate(fr" AND ") ++ fr")").some
-      }
-
-  extension (q: PersistenceQuery.Condition)
-    def toSql: Option[Fragment] =
-      val nsQuery: Fragment = q.namespace.fold(Fragment.empty)(_.toSql)
-      val hierarchyQuery: Fragment = q.hierarchy.fold(Fragment.empty)(_.toSql)
-      val referenceQuery: Fragment = q.reference.fold(Fragment.empty)(_.toSql)
-
-      val propQueries: List[Fragment] =
-        q.props
-          .map(_.toList.map(_.toSql))
-          .getOrElse(Nil)
-
-      val qss = (nsQuery :: hierarchyQuery :: referenceQuery :: propQueries)
-        .filterNot(_.isEmpty)
-
-      if qss.isEmpty then None
-      else (fr"(" ++ qss.intercalate(fr"AND") ++ fr")").some
-
-  extension (o: NonEmptyList[EventProperty])
-    @scala.annotation.targetName("toSql_NonEmptyList_EventProperty")
-    def toSql: Fragment = o match {
-      case NonEmptyList.Single(p) => p.toSql
-      case NonEmptyList.Cons(p, ps) => ps.foldLeft(p.toSql) { case (a, n) => a ++ fr" AND " ++ n.toSql }
-    }
-
   extension (o: NonEmptyList[Namespace])
     @scala.annotation.targetName("toSql_NonEmptyList_Namespace")
     def toSql: Fragment = o match {
@@ -113,30 +60,15 @@ trait JdbcCodecs {
         fr0"namespace IN (" ++ (n :: ns).toList.map(n => fr0"$n").intercalate(fr",") ++ fr")"
     }
 
-  extension (o: Hierarchy)
-    def toSql: Fragment = o match {
-      case Hierarchy.Child(parentId) => fr"parent_id = $parentId"
-      case Hierarchy.GrandChild(grandParentId) => fr"grand_parent_id = $grandParentId"
-      case Hierarchy.Descendant(grandParentId, parentId) =>
-        fr"parent_id = $parentId AND grand_parent_id = $grandParentId"
-    }
-
   extension (o: Namespace)
     @scala.annotation.targetName("toSql_Namespace")
     def toSql: Fragment = o match {
       case n => fr"namespace = $n"
     }
 
-  extension (o: ReferenceKey)
-    @scala.annotation.targetName("toSql_ReferenceKey")
-    def toSql: Fragment = o match {
-      case r => fr"reference = $r"
-    }
-
-  extension (o: EventProperty)
-    def toSql: Fragment =
-      val value = toJson(o)
-      fr"props @> $value :: jsonb"
+  extension (t: EventTag)
+    @scala.annotation.targetName("toSql_EventTag")
+    def toSql: Fragment = fr"t.tag = $t"
 
   extension (f: Fragment) inline def isEmpty: Boolean = f.internals.elements.isEmpty
 

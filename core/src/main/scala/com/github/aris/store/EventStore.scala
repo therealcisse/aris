@@ -11,22 +11,22 @@ transparent trait EventStore[Event] {
   def readEvents(id: Key): Task[Option[NonEmptyList[Change[Event]]]]
   def readEvents(id: Key, snapshotVersion: Version): Task[Option[NonEmptyList[Change[Event]]]]
   def readEvents(
-    query: PersistenceQuery,
+    namespace: Namespace,
     options: FetchOptions,
   ): Task[Option[NonEmptyList[Change[Event]]]]
   def readEvents(
     id: Key,
-    query: PersistenceQuery,
+    namespace: Namespace,
     options: FetchOptions,
   ): Task[Option[NonEmptyList[Change[Event]]]]
 
   def readEvents(
     id: Key,
-    query: PersistenceQuery,
+    namespace: Namespace,
     interval: TimeInterval,
   ): Task[Option[NonEmptyList[Change[Event]]]]
   def readEvents(
-    query: PersistenceQuery,
+    namespace: Namespace,
     interval: TimeInterval,
   ): Task[Option[NonEmptyList[Change[Event]]]]
 

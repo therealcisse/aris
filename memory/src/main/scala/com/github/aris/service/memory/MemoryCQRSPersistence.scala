@@ -4,7 +4,6 @@ package service
 package memory
 
 import cats.implicits.*
-
 import com.github.aris.domain.*
 
 import zio.schema.codec.*
@@ -18,58 +17,6 @@ object MemoryCQRSPersistence {
   import zio.*
   import zio.schema.*
 
-  extension [Event: MetaInfo](q: PersistenceQuery.Condition) def isMatch(ch: Change[Event]): Boolean =
-    val refMatch = q.reference match {
-      case None => true
-      case Some(value) => ch.payload.reference.contains(value)
-    }
-
-    val nsMatch = q.namespace match {
-      case None => true
-      case Some(value) => ch.payload.namespace == value
-    }
-
-    val hierarchyMatch = q.hierarchy match {
-      case None => true
-      case h =>
-        (ch.payload.hierarchy, h).tupled match {
-          case None => false
-
-          case Some(Hierarchy.Descendant(gpId0, pId0), Hierarchy.Descendant(gpId1, pId1)) =>
-            gpId0 == gpId1 && pId0 == pId1
-          case Some(Hierarchy.Descendant(_, pId0), Hierarchy.Child(pId1)) => pId0 == pId1
-          case Some(Hierarchy.Descendant(gpId0, _), Hierarchy.GrandChild(gpId1)) => gpId0 == gpId1
-
-          case Some(Hierarchy.Child(pId0), Hierarchy.Child(pId1)) => pId0 == pId1
-          case Some(Hierarchy.GrandChild(gpId0), Hierarchy.GrandChild(gpId1)) => gpId0 == gpId1
-
-          case _ => false
-        }
-    }
-
-    val propsMatch = q.props match {
-      case None => true
-      case Some(p) => p.toChunk == ch.payload.props
-    }
-
-    refMatch && nsMatch && hierarchyMatch && propsMatch
-
-  extension [Event: MetaInfo](q: PersistenceQuery) def isMatch(ch: Change[Event]): Boolean = q match {
-    case condition: PersistenceQuery.Condition => condition.isMatch(ch)
-    case PersistenceQuery.any(condition, more*) =>
-      more.foldLeft(condition.isMatch(ch)) {
-        case (a, n) => a || n.isMatch(ch)
-
-      }
-
-    case PersistenceQuery.forall(query, more*) =>
-      more.foldLeft(query.isMatch(ch)) {
-        case (a, n) => a && n.isMatch(ch)
-
-      }
-
-
-  }
 
   type State = State.Type
 
@@ -79,10 +26,11 @@ object MemoryCQRSPersistence {
     case class Info(
       events: Map[EntryKey, MultiDict[Key, Version]],
       snapshots: Map[Key, Version],
-      data: Map[Version, Change[?]]
+      data: Map[Version, Change[?]],
+      tags: Map[EvenTag, Set[Version]]
     )
 
-    def empty: State = State(Info(Map.empty, Map.empty, Map.empty))
+    def empty: State = State(Info(Map.empty, Map.empty, Map.empty, Map.empty))
 
     extension (s: State)
       def getSnapshot(id: Key): Option[Version] =
@@ -96,7 +44,7 @@ object MemoryCQRSPersistence {
         State(p.copy(snapshots = p.snapshots + (id -> version)))
 
     extension (s: State)
-      def add[Event](id: Key, discriminator: Discriminator, event: Change[Event], catalog: Catalog): State =
+      def add[Event: MetaInfo](id: Key, discriminator: Discriminator, event: Change[Event], catalog: Catalog): State =
         val p = State.unwrap(s)
 
         val r = p.events.updatedWith(EntryKey(catalog, discriminator)) {
@@ -105,7 +53,16 @@ object MemoryCQRSPersistence {
 
         }
 
-        State(p.copy(events = r, data = p.data + (event.version -> event)))
+        val tagMap = summon[MetaInfo[Event]]
+          .tags(event.payload)
+          .foldLeft(p.tags) { (acc, t) =>
+            acc.updatedWith(t) {
+              case None       => Some(Set(event.version))
+              case Some(set)  => Some(set + event.version)
+            }
+          }
+
+        State(p.copy(events = r, data = p.data + (event.version -> event), tags = tagMap))
 
     extension (s: State)
       def get[Event](version: Version, catalog: Catalog): Option[Change[Event]] =
@@ -113,7 +70,7 @@ object MemoryCQRSPersistence {
         p.data.get(version).asInstanceOf[Option[Change[Event]]]
 
     extension (s: State)
-      def fetch[Event](id: Key, discriminator: Discriminator, catalog: Catalog): Chunk[Change[Event]] =
+      def fetch[Event: MetaInfo](id: Key, discriminator: Discriminator, tag: Option[EvenTag], catalog: Catalog): Chunk[Change[Event]] =
         val p = State.unwrap(s)
 
         p.events.get(EntryKey(catalog, discriminator)) match {
@@ -121,24 +78,27 @@ object MemoryCQRSPersistence {
           case Some(map) =>
             val versions = map.get(id)
             val changes = versions.toList.mapFilter { version => p.data.get(version) }
-            Chunk.fromIterable(changes.asInstanceOf[List[Change[Event]]]).sorted
+            val filtered = changes.asInstanceOf[List[Change[Event]]].filter(ch => tag.forall(t => p.tags.get(t).exists(_.contains(ch.version))))
+            Chunk.fromIterable(filtered).sorted
         }
 
     extension (s: State)
-      def fetch[Event](
+      def fetch[Event: MetaInfo](
         id: Key,
         discriminator: Discriminator,
         snapshotVersion: Version,
+        tag: Option[EvenTag],
         catalog: Catalog,
       ): Chunk[Change[Event]] =
-        val p = s.fetch[Event](id, discriminator, catalog)
+        val p = s.fetch[Event](id, discriminator, tag, catalog)
         p.filter(_.version.value > snapshotVersion.value)
 
     extension (s: State)
       def fetch[Event: MetaInfo](
         id: Option[Key],
         discriminator: Discriminator,
-        query: PersistenceQuery,
+        namespace: Namespace,
+        tag: Option[EvenTag],
         options: FetchOptions,
         catalog: Catalog,
       ): Chunk[Change[Event]] =
@@ -158,7 +118,7 @@ object MemoryCQRSPersistence {
             }
 
             val matches = all.filter { ch =>
-                query.isMatch(ch)
+                ch.payload.namespace == namespace && tag.forall(t => p.tags.get(t).exists(_.contains(ch.version)))
             }
 
             val ch = Chunk.fromIterable(matches)
@@ -199,7 +159,8 @@ object MemoryCQRSPersistence {
       def fetch[Event: MetaInfo](
         id: Option[Key],
         discriminator: Discriminator,
-        query: PersistenceQuery,
+        namespace: Namespace,
+        tag: Option[EvenTag],
         interval: TimeInterval,
         catalog: Catalog,
       ): Chunk[Change[Event]] =
@@ -219,7 +180,8 @@ object MemoryCQRSPersistence {
             }
 
             val matches = all.filter { ch =>
-                query.isMatch(ch) && interval.contains(ch.payload.timestamp `getOrElse` ch.version.timestamp)
+                ch.payload.namespace == namespace && interval.contains(ch.payload.timestamp `getOrElse` ch.version.timestamp) &&
+                  tag.forall(t => p.tags.get(t).exists(_.contains(ch.version)))
             }
 
             Chunk.fromIterable(matches)
@@ -237,62 +199,68 @@ object MemoryCQRSPersistence {
     }
 
   class MemoryCQRSPersistenceLive(ref: Ref.Synchronized[State]) extends CQRSPersistence { self =>
-    def readEvent[Event: {BinaryCodec, Tag, MetaInfo}](
+    def readEvent[Event: {BinaryCodec, EventTag, MetaInfo}](
       version: Version,
       catalog: Catalog,
       ): Task[Option[Change[Event]]] =
       ref.get.map(_.get(version, catalog))
 
-    def readEvents[Event:{ BinaryCodec, Tag, MetaInfo}](
-      id: Key,
-      discriminator: Discriminator,
-      catalog: Catalog,
-    ): Task[Chunk[Change[Event]]] =
-      ref.get.map(_.fetch(id, discriminator, catalog))
+  def readEvents[Event:{ BinaryCodec, EventTag, MetaInfo}](
+    id: Key,
+    discriminator: Discriminator,
+    tag: Option[EvenTag],
+    catalog: Catalog,
+  ): Task[Chunk[Change[Event]]] =
+      ref.get.map(_.fetch(id, discriminator, tag, catalog))
 
-    def readEvents[Event:{ BinaryCodec, Tag, MetaInfo}](
-      id: Key,
-      discriminator: Discriminator,
-      snapshotVersion: Version,
-      catalog: Catalog,
-    ): Task[Chunk[Change[Event]]] =
-      ref.get.map(_.fetch(id, discriminator, snapshotVersion, catalog))
+  def readEvents[Event:{ BinaryCodec, EventTag, MetaInfo}](
+    id: Key,
+    discriminator: Discriminator,
+    snapshotVersion: Version,
+    tag: Option[EvenTag],
+    catalog: Catalog,
+  ): Task[Chunk[Change[Event]]] =
+      ref.get.map(_.fetch(id, discriminator, snapshotVersion, tag, catalog))
 
-    def readEvents[Event:{ BinaryCodec, Tag, MetaInfo}](
-      discriminator: Discriminator,
-      query: PersistenceQuery,
-      options: FetchOptions,
-      catalog: Catalog,
-    ): Task[Chunk[Change[Event]]] =
-      ref.get.map(_.fetch(id = None, discriminator, query, options, catalog))
+  def readEvents[Event:{ BinaryCodec, EventTag, MetaInfo}](
+    discriminator: Discriminator,
+    namespace: Namespace,
+    tag: Option[EvenTag],
+    options: FetchOptions,
+    catalog: Catalog,
+  ): Task[Chunk[Change[Event]]] =
+      ref.get.map(_.fetch(id = None, discriminator, namespace, tag, options, catalog))
 
-    def readEvents[Event:{ BinaryCodec, Tag, MetaInfo}](
-      id: Key,
-      discriminator: Discriminator,
-      query: PersistenceQuery,
-      options: FetchOptions,
-      catalog: Catalog,
-    ): Task[Chunk[Change[Event]]] =
-      ref.get.map(_.fetch(id = id.some, discriminator, query, options, catalog))
+  def readEvents[Event:{ BinaryCodec, EventTag, MetaInfo}](
+    id: Key,
+    discriminator: Discriminator,
+    namespace: Namespace,
+    tag: Option[EvenTag],
+    options: FetchOptions,
+    catalog: Catalog,
+  ): Task[Chunk[Change[Event]]] =
+      ref.get.map(_.fetch(id = id.some, discriminator, namespace, tag, options, catalog))
 
-    def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
-      id: Key,
-      discriminator: Discriminator,
-      query: PersistenceQuery,
-      interval: TimeInterval,
-      catalog: Catalog
-    ): Task[Chunk[Change[Event]]] =
-      ref.get.map(_.fetch(id = id.some, discriminator, query, interval, catalog))
+  def readEvents[Event: {BinaryCodec, EventTag, MetaInfo}](
+    id: Key,
+    discriminator: Discriminator,
+    namespace: Namespace,
+    tag: Option[EvenTag],
+    interval: TimeInterval,
+    catalog: Catalog
+  ): Task[Chunk[Change[Event]]] =
+      ref.get.map(_.fetch(id = id.some, discriminator, namespace, tag, interval, catalog))
 
-    def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
-      discriminator: Discriminator,
-      query: PersistenceQuery,
-      interval: TimeInterval,
-      catalog: Catalog,
-      ): Task[Chunk[Change[Event]]] =
-      ref.get.map(_.fetch(id = None, discriminator, query, interval, catalog))
+  def readEvents[Event: {BinaryCodec, EventTag, MetaInfo}](
+    discriminator: Discriminator,
+    namespace: Namespace,
+    tag: Option[EvenTag],
+    interval: TimeInterval,
+    catalog: Catalog,
+  ): Task[Chunk[Change[Event]]] =
+      ref.get.map(_.fetch(id = None, discriminator, namespace, tag, interval, catalog))
 
-    def saveEvent[Event: {BinaryCodec, MetaInfo, Tag}](
+    def saveEvent[Event: {BinaryCodec, MetaInfo, EventTag}](
       id: Key,
       discriminator: Discriminator,
       event: Change[Event],

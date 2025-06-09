@@ -8,51 +8,57 @@ import zio.*
 import zio.schema.codec.*
 
 trait CQRSPersistence {
-  def readEvent[Event: {BinaryCodec, Tag, MetaInfo}](
+  def readEvent[Event: {BinaryCodec, EventTag, MetaInfo}](
     version: Version,
     catalog: Catalog,
     ): Task[Option[Change[Event]]]
-  def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
+  def readEvents[Event: {BinaryCodec, EventTag, MetaInfo}](
     id: Key,
     discriminator: Discriminator,
+    tag: Option[EventTag],
     catalog: Catalog,
-    ): Task[Chunk[Change[Event]]]
-  def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
+  ): Task[Chunk[Change[Event]]]
+  def readEvents[Event: {BinaryCodec, EventTag, MetaInfo}](
     id: Key,
     discriminator: Discriminator,
     snapshotVersion: Version,
+    tag: Option[EventTag],
     catalog: Catalog,
-    ): Task[Chunk[Change[Event]]]
-  def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
+  ): Task[Chunk[Change[Event]]]
+  def readEvents[Event: {BinaryCodec, EventTag, MetaInfo}](
     discriminator: Discriminator,
-    query: PersistenceQuery,
+    namespace: Namespace,
+    tag: Option[EventTag],
     options: FetchOptions,
     catalog: Catalog,
-    ): Task[Chunk[Change[Event]]]
-  def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
+  ): Task[Chunk[Change[Event]]]
+  def readEvents[Event: {BinaryCodec, EventTag, MetaInfo}](
     id: Key,
     discriminator: Discriminator,
-    query: PersistenceQuery,
+    namespace: Namespace,
+    tag: Option[EventTag],
     options: FetchOptions,
     catalog: Catalog,
-    ): Task[Chunk[Change[Event]]]
+  ): Task[Chunk[Change[Event]]]
 
-  def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
+  def readEvents[Event: {BinaryCodec, EventTag, MetaInfo}](
     discriminator: Discriminator,
-    query: PersistenceQuery,
+    namespace: Namespace,
+    tag: Option[EventTag],
     interval: TimeInterval,
     catalog: Catalog,
-    ): Task[Chunk[Change[Event]]]
-  def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
+  ): Task[Chunk[Change[Event]]]
+  def readEvents[Event: {BinaryCodec, EventTag, MetaInfo}](
     id: Key,
     discriminator: Discriminator,
-    query: PersistenceQuery,
+    namespace: Namespace,
+    tag: Option[EventTag],
     interval: TimeInterval,
     catalog: Catalog,
-    ): Task[Chunk[Change[Event]]]
+  ): Task[Chunk[Change[Event]]]
 
 
-  def saveEvent[Event: {BinaryCodec, MetaInfo, Tag}](
+  def saveEvent[Event: {BinaryCodec, MetaInfo, EventTag}](
     id: Key,
     discriminator: Discriminator,
     event: Change[Event],

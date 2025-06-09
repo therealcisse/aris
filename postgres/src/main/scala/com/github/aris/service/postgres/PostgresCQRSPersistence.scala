@@ -23,68 +23,79 @@ object PostgresCQRSPersistence {
     ZLayer.succeed(new PostgresCQRSPersistenceLive(xa))
 
   class PostgresCQRSPersistenceLive(xa: Transactor[Task]) extends CQRSPersistence { self =>
-    def readEvent[Event: {BinaryCodec, Tag, MetaInfo}](
+    def readEvent[Event: {BinaryCodec, EventTag, MetaInfo}](
       version: Version,
       catalog: Catalog,
       ): Task[Option[Change[Event]]] =
         Queries.READ_EVENT[Event](version, catalog).option.transact(xa)
 
-    def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
-      id: Key,
-      discriminator: Discriminator,
-      catalog: Catalog,
+  def readEvents[Event: {BinaryCodec, EventTag, MetaInfo}](
+    id: Key,
+    discriminator: Discriminator,
+    tag: Option[EvenTag],
+    catalog: Catalog,
+  ): Task[Chunk[Change[Event]]] =
+      Queries.READ_EVENTS(id, discriminator, tag, catalog).to[Chunk].transact(xa)
+
+  def readEvents[Event: {BinaryCodec, EventTag, MetaInfo}](
+    id: Key,
+    discriminator: Discriminator,
+    snapshotVersion: Version,
+    tag: Option[EvenTag],
+    catalog: Catalog,
+  ): Task[Chunk[Change[Event]]] =
+      Queries.READ_EVENTS(id, discriminator, snapshotVersion, tag, catalog).to[Chunk].transact(xa)
+
+  def readEvents[Event: {BinaryCodec, EventTag, MetaInfo}](
+    discriminator: Discriminator,
+    namespace: Namespace,
+    tag: Option[EvenTag],
+    options: FetchOptions,
+    catalog: Catalog,
+  ): Task[Chunk[Change[Event]]] =
+      Queries.READ_EVENTS(discriminator, namespace, tag, options, catalog).to[Chunk].transact(xa)
+
+  def readEvents[Event: {BinaryCodec, EventTag, MetaInfo}](
+    id: Key,
+    discriminator: Discriminator,
+    namespace: Namespace,
+    tag: Option[EvenTag],
+    options: FetchOptions,
+    catalog: Catalog,
+  ): Task[Chunk[Change[Event]]] =
+      Queries.READ_EVENTS(id, discriminator, namespace, tag, options, catalog).to[Chunk].transact(xa)
+
+  def readEvents[Event: {BinaryCodec, EventTag, MetaInfo}](
+    discriminator: Discriminator,
+    namespace: Namespace,
+    tag: Option[EvenTag],
+    interval: TimeInterval,
+    catalog: Catalog,
     ): Task[Chunk[Change[Event]]] =
-      Queries.READ_EVENTS(id, discriminator, catalog).to[Chunk].transact(xa)
+      Queries.READ_EVENTS(discriminator, namespace, tag, interval, catalog).to[Chunk].transact(xa)
 
-    def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
-      id: Key,
-      discriminator: Discriminator,
-      snapshotVersion: Version,
-      catalog: Catalog,
+  def readEvents[Event: {BinaryCodec, EventTag, MetaInfo}](
+    id: Key,
+    discriminator: Discriminator,
+    namespace: Namespace,
+    tag: Option[EvenTag],
+    interval: TimeInterval,
+    catalog: Catalog,
     ): Task[Chunk[Change[Event]]] =
-      Queries.READ_EVENTS(id, discriminator, snapshotVersion, catalog).to[Chunk].transact(xa)
+      Queries.READ_EVENTS(id, discriminator, namespace, tag, interval, catalog).to[Chunk].transact(xa)
 
-    def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
-      discriminator: Discriminator,
-      query: PersistenceQuery,
-      options: FetchOptions,
-      catalog: Catalog,
-    ): Task[Chunk[Change[Event]]] =
-      Queries.READ_EVENTS(discriminator, query, options, catalog).to[Chunk].transact(xa)
-
-    def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
-      id: Key,
-      discriminator: Discriminator,
-      query: PersistenceQuery,
-      options: FetchOptions,
-      catalog: Catalog,
-    ): Task[Chunk[Change[Event]]] =
-      Queries.READ_EVENTS(id, discriminator, query, options, catalog).to[Chunk].transact(xa)
-
-    def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
-      discriminator: Discriminator,
-      query: PersistenceQuery,
-      interval: TimeInterval,
-      catalog: Catalog,
-      ): Task[Chunk[Change[Event]]] =
-      Queries.READ_EVENTS(discriminator, query, interval, catalog).to[Chunk].transact(xa)
-
-    def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
-      id: Key,
-      discriminator: Discriminator,
-      query: PersistenceQuery,
-      interval: TimeInterval,
-      catalog: Catalog,
-      ): Task[Chunk[Change[Event]]] =
-      Queries.READ_EVENTS(id, discriminator, query, interval, catalog).to[Chunk].transact(xa)
-
-    def saveEvent[Event: {BinaryCodec, MetaInfo, Tag}](
+    def saveEvent[Event: {BinaryCodec, MetaInfo, EventTag}](
       id: Key,
       discriminator: Discriminator,
       event: Change[Event],
       catalog: Catalog,
     ): Task[Int] =
-      Queries.SAVE_EVENT(id, discriminator, event, catalog).run.transact(xa)
+      for {
+        _ <- Queries.SAVE_EVENT(id, discriminator, event, catalog).run.transact(xa)
+        _ <- ZIO.foreachDiscard(summon[MetaInfo[Event]].tags(event.payload)) { t =>
+               Queries.ADD_TAG(event.version, t).run.transact(xa)
+             }
+      } yield 1
 
     def readSnapshot(id: Key): Task[Option[Version]] =
       Queries.READ_SNAPSHOT(id).option.transact(xa)
@@ -103,10 +114,13 @@ object PostgresCQRSPersistence {
         case event => Change(version, event)
       }
 
-    def READ_EVENTS[Event: BinaryCodec](id: Key, discriminator: Discriminator, catalog: Catalog): Query0[Change[Event]] =
+    def READ_EVENTS[Event: BinaryCodec](id: Key, discriminator: Discriminator, tag: Option[EvenTag], catalog: Catalog): Query0[Change[Event]] =
       given Read[Event] = byteArrayReader[Event]
 
-      (fr"SELECT version, payload FROM ${Fragment.const(catalog.tableName)} WHERE aggregate_id = $id AND discriminator = $discriminator ORDER BY version ASC")
+      val tagJoin = tag.fold(Fragment.empty)(_ => fr" JOIN tags t ON e.version = t.version")
+      val tagFilter = tag.fold(Fragment.empty)(t => sql" AND " ++ t.toSql)
+
+      (fr"SELECT e.version, e.payload FROM ${Fragment.const(catalog.tableName)} e" ++ tagJoin ++ fr" WHERE e.aggregate_id = $id AND e.discriminator = $discriminator" ++ tagFilter ++ fr" ORDER BY e.version ASC")
         .query[(Version, Event)]
         .map { case (version, event) => Change(version, event) }
 
@@ -114,22 +128,24 @@ object PostgresCQRSPersistence {
       id: Key,
       discriminator: Discriminator,
       snapshotVersion: Version,
+      tag: Option[EvenTag],
       catalog: Catalog,
     ): Query0[Change[Event]] =
       given Read[Event] = byteArrayReader[Event]
 
+      val tagJoin = tag.fold(Fragment.empty)(_ => fr" JOIN tags t ON e.version = t.version")
+      val tagFilter = tag.fold(Fragment.empty)(t => sql" AND " ++ t.toSql)
+
       (
         fr"""
-        SELECT version, payload
-        FROM ${Fragment.const(catalog.tableName)}
-        WHERE aggregate_id = $id AND discriminator = $discriminator AND version > $snapshotVersion
-        ORDER BY version ASC
-        """
+        SELECT e.version, e.payload
+        FROM ${Fragment.const(catalog.tableName)} e""" ++ tagJoin ++ fr" WHERE e.aggregate_id = $id AND e.discriminator = $discriminator AND e.version > $snapshotVersion" ++ tagFilter ++ fr" ORDER BY e.version ASC"
       ).query[(Version, Event)].map(Change.apply)
 
     def READ_EVENTS[Event: BinaryCodec](
       discriminator: Discriminator,
-      query: PersistenceQuery,
+      namespace: Namespace,
+      tag: Option[EvenTag],
       options: FetchOptions,
       catalog: Catalog,
     ): Query0[Change[Event]] =
@@ -141,8 +157,11 @@ object PostgresCQRSPersistence {
         orderQuery,
       ) = options.toSql
 
+      val tagJoin = tag.fold(Fragment.empty)(_ => fr" JOIN tags t ON e.version = t.version")
+      val tagFilter = tag.fold(Fragment.empty)(t => sql" AND " ++ t.toSql)
+
       (
-        sql"""SELECT version, payload FROM ${Fragment.const(catalog.tableName)} WHERE discriminator = $discriminator""" ++ query.toSql.fold(Fragment.empty)(ql => sql" AND " ++ ql) ++ offsetQuery.fold(Fragment.empty)(ql => sql" AND " ++ ql) ++
+        fr"""SELECT e.version, e.payload FROM ${Fragment.const(catalog.tableName)} e""" ++ tagJoin ++ fr" WHERE e.discriminator = $discriminator AND """ ++ namespace.toSql ++ tagFilter ++ offsetQuery.fold(Fragment.empty)(ql => sql" AND " ++ ql) ++
         orderQuery ++ limitQuery.fold(Fragment.empty)(ql => sql" " ++ ql)
       ).query[
       (
@@ -154,7 +173,8 @@ object PostgresCQRSPersistence {
     def READ_EVENTS[Event: BinaryCodec](
       id: Key,
       discriminator: Discriminator,
-      query: PersistenceQuery,
+      namespace: Namespace,
+      tag: Option[EvenTag],
       options: FetchOptions,
       catalog: Catalog,
     ): Query0[Change[Event]] =
@@ -166,8 +186,11 @@ object PostgresCQRSPersistence {
         orderQuery,
       ) = options.toSql
 
+      val tagJoin = tag.fold(Fragment.empty)(_ => fr" JOIN tags t ON e.version = t.version")
+      val tagFilter = tag.fold(Fragment.empty)(t => sql" AND " ++ t.toSql)
+
       (
-        fr"""SELECT version, payload FROM ${Fragment.const(catalog.tableName)} WHERE aggregate_id = $id AND discriminator = $discriminator""" ++ query.toSql.fold(Fragment.empty)(ql => sql" AND " ++ ql) ++ offsetQuery.fold(Fragment.empty)(ql => sql" AND " ++ ql) ++
+        fr"""SELECT e.version, e.payload FROM ${Fragment.const(catalog.tableName)} e""" ++ tagJoin ++ fr" WHERE e.aggregate_id = $id AND e.discriminator = $discriminator AND """ ++ namespace.toSql ++ tagFilter ++ offsetQuery.fold(Fragment.empty)(ql => sql" AND " ++ ql) ++
         orderQuery ++ limitQuery.fold(Fragment.empty)(ql => sql" " ++ ql)
       ).query[
       (
@@ -179,14 +202,18 @@ object PostgresCQRSPersistence {
     def READ_EVENTS[Event: BinaryCodec](
       id: Key,
       discriminator: Discriminator,
-      query: PersistenceQuery,
+      namespace: Namespace,
+      tag: Option[EvenTag],
       interval: TimeInterval,
       catalog: Catalog,
     ): Query0[Change[Event]] =
       given Read[Event] = byteArrayReader[Event]
 
+      val tagJoin = tag.fold(Fragment.empty)(_ => fr" JOIN tags t ON e.version = t.version")
+      val tagFilter = tag.fold(Fragment.empty)(t => sql" AND " ++ t.toSql)
+
       (
-        fr"""SELECT version, payload FROM ${Fragment.const(catalog.tableName)} WHERE aggregate_id = $id AND discriminator = $discriminator AND """ ++ interval.toSql ++ query.toSql.fold(Fragment.empty)(ql => sql" AND " ++ ql) ++ sql" ORDER BY version ASC"
+        fr"""SELECT e.version, e.payload FROM ${Fragment.const(catalog.tableName)} e""" ++ tagJoin ++ fr" WHERE e.aggregate_id = $id AND e.discriminator = $discriminator AND """ ++ interval.toSql ++ sql" AND " ++ namespace.toSql ++ tagFilter ++ sql" ORDER BY e.version ASC"
       ).query[
       (
         Version,
@@ -196,14 +223,18 @@ object PostgresCQRSPersistence {
 
     def READ_EVENTS[Event: BinaryCodec](
       discriminator: Discriminator,
-      query: PersistenceQuery,
+      namespace: Namespace,
+      tag: Option[EvenTag],
       interval: TimeInterval,
       catalog: Catalog,
     ): Query0[Change[Event]] =
       given Read[Event] = byteArrayReader[Event]
 
+      val tagJoin = tag.fold(Fragment.empty)(_ => fr" JOIN tags t ON e.version = t.version")
+      val tagFilter = tag.fold(Fragment.empty)(t => sql" AND " ++ t.toSql)
+
       (
-        fr"""SELECT version, payload FROM ${Fragment.const(catalog.tableName)} WHERE discriminator = $discriminator AND """ ++ interval.toSql ++ query.toSql.fold(Fragment.empty)(ql => sql" AND " ++ ql) ++ sql" ORDER BY version ASC"
+        fr"""SELECT e.version, e.payload FROM ${Fragment.const(catalog.tableName)} e""" ++ tagJoin ++ fr" WHERE e.discriminator = $discriminator AND """ ++ interval.toSql ++ sql" AND " ++ namespace.toSql ++ tagFilter ++ sql" ORDER BY e.version ASC"
       ).query[
       (
         Version,
@@ -219,141 +250,31 @@ object PostgresCQRSPersistence {
     ): Update0 =
       val payload = java.util.Base64.getEncoder.encodeToString(summon[BinaryCodec[Event]].encode(event.payload).toArray)
 
-      val props = toJson(event.payload.props)
-
-      val q = event.payload.hierarchy match {
-        case None =>
-
-          fr"""
-          INSERT INTO ${Fragment.const(catalog.tableName)}(
-            'version',
-            'aggregate_id',
-            'discriminator',
-            'namespace',
-            'props',
-            'payload',
-            'timestamp'
-
-
-            )
-          VALUES (
-            ${event.version},
-            ${id},
-            ${discriminator},
-            ${event.payload.namespace},
-            (
-              SELECT COALESCE(
-                jsonb_object_agg(each.key, each.value),
-                '{}'::jsonb
-              ) AS props
-              FROM jsonb_array_elements($props::jsonb) AS elem,
-              LATERAL jsonb_each(elem) each
-            ),
-            decode(${payload}, 'base64'),
-            ${event.payload.timestamp `getOrElse` event.version.timestamp}
-          )
-          """
-
-        case Some(Hierarchy.GrandChild(grandParentId)) =>
-          fr"""
-          INSERT INTO ${Fragment.const(catalog.tableName)}(
-            'version',
-            'aggregate_id',
-            'discriminator',
-            'namespace',
-            'grand_parent_id',
-            'props',
-            'payload',
-            'timestamp'
-            )
-          VALUES (
-            ${event.version},
-            ${id},
-            ${discriminator},
-            ${event.payload.namespace},
-            $grandParentId,
-            (
-              SELECT COALESCE(
-                jsonb_object_agg(each.key, each.value),
-                '{}'::jsonb
-              ) AS props
-              FROM jsonb_array_elements($props::jsonb) AS elem,
-              LATERAL jsonb_each(elem) each
-            ),
-            decode(${payload}, 'base64'),
-            ${event.payload.timestamp `getOrElse` event.version.timestamp}
-          )
-          """
-
-        case Some(Hierarchy.Child(parentId)) =>
-          fr"""
-          INSERT INTO ${Fragment.const(catalog.tableName)}(
-            'version',
-            'aggregate_id',
-            'discriminator',
-            'namespace',
-            'parent_id',
-            'props',
-            'payload',
-            'timestamp'
-            )
-          VALUES (
-            ${event.version},
-            ${id},
-            ${discriminator},
-            ${event.payload.namespace},
-            $parentId,
-            (
-              SELECT COALESCE(
-                jsonb_object_agg(each.key, each.value),
-                '{}'::jsonb
-              ) AS props
-              FROM jsonb_array_elements($props::jsonb) AS elem,
-              LATERAL jsonb_each(elem) each
-            ),
-            decode(${payload}, 'base64'),
-            ${event.payload.timestamp `getOrElse` event.version.timestamp}
-          )
-          """
-
-        case Some(Hierarchy.Descendant(grandParentId, parentId)) =>
-          fr"""
-          INSERT INTO ${Fragment.const(catalog.tableName)}(
-            'version",
-            'aggregate_id",
-            'discriminator",
-            'namespace",
-            'parent_id",
-            'grand_parent_id",
-            'props",
-            'payload",
-            'timestamp"
-            )
-          VALUES (
-            ${event.version},
-            ${id},
-            ${discriminator},
-            ${event.payload.namespace},
-            $parentId,
-            $grandParentId,
-            (
-              SELECT COALESCE(
-                jsonb_object_agg(each.key, each.value),
-                '{}'::jsonb
-              ) AS props
-              FROM jsonb_array_elements($props::jsonb) AS elem,
-              LATERAL jsonb_each(elem) each
-            ),
-
-            decode(${payload}, 'base64'),
-            ${event.payload.timestamp `getOrElse` event.version.timestamp}
-          )
-          """
-
-
-      }
+      val q =
+        fr"""
+        INSERT INTO ${Fragment.const(catalog.tableName)}(
+          version,
+          aggregate_id,
+          discriminator,
+          namespace,
+          payload,
+          timestamp
+        )
+        VALUES (
+          ${event.version},
+          ${id},
+          ${discriminator},
+          ${event.payload.namespace},
+          decode(${payload}, 'base64'),
+          ${event.payload.timestamp `getOrElse` event.version.timestamp}
+        )
+        """
 
       q.update
+
+    def ADD_TAG(version: Version, tag: EventTag): Update0 =
+      sql"INSERT INTO tags (version, tag) VALUES ($version, $tag)".update
+
 
     def READ_SNAPSHOT(id: Key): Query0[Version] =
       sql"""
