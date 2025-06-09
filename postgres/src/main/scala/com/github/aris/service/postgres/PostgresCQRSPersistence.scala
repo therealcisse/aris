@@ -23,68 +23,68 @@ object PostgresCQRSPersistence {
     ZLayer.succeed(new PostgresCQRSPersistenceLive(xa))
 
   class PostgresCQRSPersistenceLive(xa: Transactor[Task]) extends CQRSPersistence { self =>
-    def readEvent[Event: {BinaryCodec, Tag, MetaInfo}](
+    def readEvent[Event: {BinaryCodec, EventTag, MetaInfo}](
       version: Version,
       catalog: Catalog,
       ): Task[Option[Change[Event]]] =
         Queries.READ_EVENT[Event](version, catalog).option.transact(xa)
 
-  def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
+  def readEvents[Event: {BinaryCodec, EventTag, MetaInfo}](
     id: Key,
     discriminator: Discriminator,
-    tag: Option[aris.Tag],
+    tag: Option[aris.EventTag],
     catalog: Catalog,
   ): Task[Chunk[Change[Event]]] =
       Queries.READ_EVENTS(id, discriminator, tag, catalog).to[Chunk].transact(xa)
 
-  def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
+  def readEvents[Event: {BinaryCodec, EventTag, MetaInfo}](
     id: Key,
     discriminator: Discriminator,
     snapshotVersion: Version,
-    tag: Option[aris.Tag],
+    tag: Option[aris.EventTag],
     catalog: Catalog,
   ): Task[Chunk[Change[Event]]] =
       Queries.READ_EVENTS(id, discriminator, snapshotVersion, tag, catalog).to[Chunk].transact(xa)
 
-  def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
+  def readEvents[Event: {BinaryCodec, EventTag, MetaInfo}](
     discriminator: Discriminator,
     namespace: Namespace,
-    tag: Option[aris.Tag],
+    tag: Option[aris.EventTag],
     options: FetchOptions,
     catalog: Catalog,
   ): Task[Chunk[Change[Event]]] =
       Queries.READ_EVENTS(discriminator, namespace, tag, options, catalog).to[Chunk].transact(xa)
 
-  def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
+  def readEvents[Event: {BinaryCodec, EventTag, MetaInfo}](
     id: Key,
     discriminator: Discriminator,
     namespace: Namespace,
-    tag: Option[aris.Tag],
+    tag: Option[aris.EventTag],
     options: FetchOptions,
     catalog: Catalog,
   ): Task[Chunk[Change[Event]]] =
       Queries.READ_EVENTS(id, discriminator, namespace, tag, options, catalog).to[Chunk].transact(xa)
 
-  def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
+  def readEvents[Event: {BinaryCodec, EventTag, MetaInfo}](
     discriminator: Discriminator,
     namespace: Namespace,
-    tag: Option[aris.Tag],
+    tag: Option[aris.EventTag],
     interval: TimeInterval,
     catalog: Catalog,
     ): Task[Chunk[Change[Event]]] =
       Queries.READ_EVENTS(discriminator, namespace, tag, interval, catalog).to[Chunk].transact(xa)
 
-  def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
+  def readEvents[Event: {BinaryCodec, EventTag, MetaInfo}](
     id: Key,
     discriminator: Discriminator,
     namespace: Namespace,
-    tag: Option[aris.Tag],
+    tag: Option[aris.EventTag],
     interval: TimeInterval,
     catalog: Catalog,
     ): Task[Chunk[Change[Event]]] =
       Queries.READ_EVENTS(id, discriminator, namespace, tag, interval, catalog).to[Chunk].transact(xa)
 
-    def saveEvent[Event: {BinaryCodec, MetaInfo, Tag}](
+    def saveEvent[Event: {BinaryCodec, MetaInfo, EventTag}](
       id: Key,
       discriminator: Discriminator,
       event: Change[Event],
@@ -114,7 +114,7 @@ object PostgresCQRSPersistence {
         case event => Change(version, event)
       }
 
-    def READ_EVENTS[Event: BinaryCodec](id: Key, discriminator: Discriminator, tag: Option[aris.Tag], catalog: Catalog): Query0[Change[Event]] =
+    def READ_EVENTS[Event: BinaryCodec](id: Key, discriminator: Discriminator, tag: Option[aris.EventTag], catalog: Catalog): Query0[Change[Event]] =
       given Read[Event] = byteArrayReader[Event]
 
       val tagJoin = tag.fold(Fragment.empty)(_ => fr" JOIN tags t ON e.version = t.version")
@@ -128,7 +128,7 @@ object PostgresCQRSPersistence {
       id: Key,
       discriminator: Discriminator,
       snapshotVersion: Version,
-      tag: Option[aris.Tag],
+      tag: Option[aris.EventTag],
       catalog: Catalog,
     ): Query0[Change[Event]] =
       given Read[Event] = byteArrayReader[Event]
@@ -145,7 +145,7 @@ object PostgresCQRSPersistence {
     def READ_EVENTS[Event: BinaryCodec](
       discriminator: Discriminator,
       namespace: Namespace,
-      tag: Option[aris.Tag],
+      tag: Option[aris.EventTag],
       options: FetchOptions,
       catalog: Catalog,
     ): Query0[Change[Event]] =
@@ -174,7 +174,7 @@ object PostgresCQRSPersistence {
       id: Key,
       discriminator: Discriminator,
       namespace: Namespace,
-      tag: Option[aris.Tag],
+      tag: Option[aris.EventTag],
       options: FetchOptions,
       catalog: Catalog,
     ): Query0[Change[Event]] =
@@ -203,7 +203,7 @@ object PostgresCQRSPersistence {
       id: Key,
       discriminator: Discriminator,
       namespace: Namespace,
-      tag: Option[aris.Tag],
+      tag: Option[aris.EventTag],
       interval: TimeInterval,
       catalog: Catalog,
     ): Query0[Change[Event]] =
@@ -224,7 +224,7 @@ object PostgresCQRSPersistence {
     def READ_EVENTS[Event: BinaryCodec](
       discriminator: Discriminator,
       namespace: Namespace,
-      tag: Option[aris.Tag],
+      tag: Option[aris.EventTag],
       interval: TimeInterval,
       catalog: Catalog,
     ): Query0[Change[Event]] =
@@ -272,7 +272,7 @@ object PostgresCQRSPersistence {
 
       q.update
 
-    def ADD_TAG(version: Version, tag: Tag): Update0 =
+    def ADD_TAG(version: Version, tag: EventTag): Update0 =
       sql"INSERT INTO tags (version, tag) VALUES ($version, $tag)".update
 
 

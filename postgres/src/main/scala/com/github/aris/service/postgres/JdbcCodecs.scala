@@ -9,7 +9,7 @@ import zio.schema.*
 import zio.schema.codec.*
 
 import zio.*
-import com.github.aris.Tag as ArisTag
+import com.github.aris.EventTag as ArisTag
 import zio.prelude.*
 
 import doobie.*
@@ -71,7 +71,7 @@ trait JdbcCodecs {
     }
 
   extension (t: ArisTag)
-    @scala.annotation.targetName("toSql_Tag")
+    @scala.annotation.targetName("toSql_EventTag")
     def toSql: Fragment = fr"t.tag = $t"
 
 
