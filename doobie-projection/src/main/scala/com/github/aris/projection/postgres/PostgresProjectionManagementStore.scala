@@ -34,24 +34,24 @@ object PostgresProjectionManagementStore {
 
   object Queries extends JdbcCodecs {
     def PAUSE(id: Projection.Id): Update0 =
-      sql"""INSERT INTO projections (name, version, offset, paused)
-             VALUES (${id.name}, ${id.version}, 0, true)
-             ON CONFLICT (name, version) DO UPDATE SET paused = true""".update
+      sql"""INSERT INTO projection_management (name, version, namespace, paused)
+             VALUES (${id.name}, ${id.version}, ${id.namespace}, true)
+             ON CONFLICT (name, version, namespace) DO UPDATE SET paused = true""".update
 
     def RESUME(id: Projection.Id): Update0 =
-      sql"""INSERT INTO projections (name, version, offset, paused)
-             VALUES (${id.name}, ${id.version}, 0, false)
-             ON CONFLICT (name, version) DO UPDATE SET paused = false""".update
+      sql"""INSERT INTO projection_management (name, version, namespace, paused)
+             VALUES (${id.name}, ${id.version}, ${id.namespace}, false)
+             ON CONFLICT (name, version, namespace) DO UPDATE SET paused = false""".update
 
     def IS_PAUSED(id: Projection.Id): Query0[Boolean] =
-      sql"""SELECT paused FROM projections WHERE name = ${id.name} AND version = ${id.version}""".query[Boolean]
+      sql"""SELECT paused FROM projection_management WHERE name = ${id.name} AND version = ${id.version} AND namespace = ${id.namespace}""".query[Boolean]
 
     def READ_OFFSET(id: Projection.Id): Query0[Version] =
-      sql"""SELECT offset FROM projections WHERE name = ${id.name} AND version = ${id.version}""".query[Version]
+      sql"""SELECT offset FROM projection_offset WHERE name = ${id.name} AND version = ${id.version} AND namespace = ${id.namespace}""".query[Version]
 
     def UPDATE_OFFSET(id: Projection.Id, version: Version): Update0 =
-      sql"""INSERT INTO projections (name, version, offset, paused)
-             VALUES (${id.name}, ${id.version}, $version, false)
-             ON CONFLICT (name, version) DO UPDATE SET offset = $version""".update
+      sql"""INSERT INTO projection_offset (name, version, namespace, offset)
+             VALUES (${id.name}, ${id.version}, ${id.namespace}, $version)
+             ON CONFLICT (name, version, namespace) DO UPDATE SET offset = $version""".update
   }
 }

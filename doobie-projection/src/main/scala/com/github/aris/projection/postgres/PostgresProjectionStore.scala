@@ -25,11 +25,11 @@ object PostgresProjectionStore {
 
   object Queries extends JdbcCodecs {
     def READ(id: Projection.Id): Query0[Version] =
-      sql"""SELECT offset FROM projections WHERE name = ${id.name} AND version = ${id.version}""".query[Version]
+      sql"""SELECT offset FROM projection_offset WHERE name = ${id.name} AND version = ${id.version} AND namespace = ${id.namespace}""".query[Version]
 
     def SAVE(id: Projection.Id, version: Version): Update0 =
-      sql"""INSERT INTO projections (name, version, offset, paused)
-             VALUES (${id.name}, ${id.version}, $version, false)
-             ON CONFLICT (name, version) DO UPDATE SET offset = $version""".update
+      sql"""INSERT INTO projection_offset (name, version, namespace, offset)
+             VALUES (${id.name}, ${id.version}, ${id.namespace}, $version)
+             ON CONFLICT (name, version, namespace) DO UPDATE SET offset = $version""".update
   }
 }

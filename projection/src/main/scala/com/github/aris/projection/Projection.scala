@@ -25,7 +25,7 @@ object Projection {
     extension (v: VersionId) inline def value: String = unwrap(v)
   }
 
-  final case class Id(name: Name, version: VersionId)
+  final case class Id(name: Name, version: VersionId, namespace: Namespace)
 
   def exactlyOnce[Event](
     id: Id,
