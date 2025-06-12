@@ -3,6 +3,7 @@ package aris
 package tenants
 
 import aris.*
+import aris.service.CQRSPersistence
 import aris.store.*
 
 import zio.*
@@ -20,10 +21,15 @@ trait TenantService {
 }
 
 object TenantService {
-  def live(): ZLayer[TenantCQRS with TenantEventStore, Nothing, TenantService] =
-    ZLayer.fromFunction(new TenantServiceLive(_, _))
+  def live(catalog: Catalog = Catalog.Default): ZLayer[CQRSPersistence, Nothing, TenantService] =
+    ZLayer.fromFunction(new TenantServiceLive(_, catalog))
 
-  class TenantServiceLive(cqrs: TenantCQRS, store: TenantEventStore) extends TenantService {
+  class TenantServiceLive(persistence: CQRSPersistence, catalog: Catalog) extends TenantService {
+    private val discriminator = Discriminator("Tenant")
+    private val rootNamespace = Namespace.root
+    private val store: EventStore[TenantEvent] =
+      EventStore[TenantEvent](persistence, discriminator, rootNamespace, catalog)
+    private val cqrs: TenantCQRS = new TenantCQRS.TenantCQRSLive(store)
     def addTenant(id: Namespace, name: String, description: String, ts: Timestamp): Task[Unit] =
       cqrs.add(id.asKey, TenantCommand.AddTenant(id, name, description, ts))
 

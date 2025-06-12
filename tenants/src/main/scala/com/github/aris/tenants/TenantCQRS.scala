@@ -11,10 +11,10 @@ import zio.prelude.*
 trait TenantCQRS extends CQRS[TenantEvent, TenantCommand]
 
 object TenantCQRS {
-  def live(): ZLayer[TenantEventStore, Nothing, TenantCQRS] =
+  def live(): ZLayer[EventStore[TenantEvent], Nothing, TenantCQRS] =
     ZLayer.fromFunction(new TenantCQRSLive(_))
 
-  class TenantCQRSLive(store: TenantEventStore) extends TenantCQRS {
+  class TenantCQRSLive(store: EventStore[TenantEvent]) extends TenantCQRS {
     def add(id: Key, cmd: TenantCommand): Task[Unit] =
       for {
         events <- ZIO.succeed(CmdHandler.applyCmd(cmd))
