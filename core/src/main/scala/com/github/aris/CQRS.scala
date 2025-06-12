@@ -8,8 +8,4 @@ transparent trait CQRS[Event, Command: [X] =>> CmdHandler[X, Event]] {
 }
 
 object CQRS {
-  transparent trait Loader[T] {
-    def load(id: Key): Task[Option[T]]
-  }
-
 }
