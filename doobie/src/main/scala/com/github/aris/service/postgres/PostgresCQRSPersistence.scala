@@ -31,20 +31,18 @@ object PostgresCQRSPersistence {
 
   def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
     id: Key,
-    discriminator: Discriminator,
     tag: Option[EvenTag],
     catalog: Catalog,
   ): Task[Chunk[Change[Event]]] =
-      Queries.READ_EVENTS(id, discriminator, tag, catalog).to[Chunk].transact(xa)
+      Queries.READ_EVENTS(id, tag, catalog).to[Chunk].transact(xa)
 
   def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
     id: Key,
-    discriminator: Discriminator,
     snapshotVersion: Version,
     tag: Option[EvenTag],
     catalog: Catalog,
   ): Task[Chunk[Change[Event]]] =
-      Queries.READ_EVENTS(id, discriminator, snapshotVersion, tag, catalog).to[Chunk].transact(xa)
+      Queries.READ_EVENTS(id, snapshotVersion, tag, catalog).to[Chunk].transact(xa)
 
   def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
     discriminator: Discriminator,
@@ -57,13 +55,12 @@ object PostgresCQRSPersistence {
 
   def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
     id: Key,
-    discriminator: Discriminator,
     namespace: Namespace,
     tag: Option[EvenTag],
     options: FetchOptions,
     catalog: Catalog,
   ): Task[Chunk[Change[Event]]] =
-      Queries.READ_EVENTS(id, discriminator, namespace, tag, options, catalog).to[Chunk].transact(xa)
+      Queries.READ_EVENTS(id, namespace, tag, options, catalog).to[Chunk].transact(xa)
 
   def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
     discriminator: Discriminator,
@@ -76,22 +73,22 @@ object PostgresCQRSPersistence {
 
   def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
     id: Key,
-    discriminator: Discriminator,
     namespace: Namespace,
     tag: Option[EvenTag],
     interval: TimeInterval,
     catalog: Catalog,
     ): Task[Chunk[Change[Event]]] =
-      Queries.READ_EVENTS(id, discriminator, namespace, tag, interval, catalog).to[Chunk].transact(xa)
+      Queries.READ_EVENTS(id, namespace, tag, interval, catalog).to[Chunk].transact(xa)
 
     def saveEvent[Event: {BinaryCodec, MetaInfo, Tag}](
       id: Key,
       discriminator: Discriminator,
+      namespace: Namespace,
       event: Change[Event],
       catalog: Catalog,
     ): Task[Int] =
       for {
-        _ <- Queries.SAVE_EVENT(id, discriminator, event, catalog).run.transact(xa)
+        _ <- Queries.SAVE_EVENT(id, discriminator, namespace, event, catalog).run.transact(xa)
         _ <- ZIO.foreachDiscard(summon[MetaInfo[Event]].tags(event.payload)) { t =>
                Queries.ADD_TAG(event.version, t).run.transact(xa)
              }
@@ -114,19 +111,18 @@ object PostgresCQRSPersistence {
         case event => Change(version, event)
       }
 
-    def READ_EVENTS[Event: BinaryCodec](id: Key, discriminator: Discriminator, tag: Option[EvenTag], catalog: Catalog): Query0[Change[Event]] =
+    def READ_EVENTS[Event: BinaryCodec](id: Key, tag: Option[EvenTag], catalog: Catalog): Query0[Change[Event]] =
       given Read[Event] = byteArrayReader[Event]
 
       val tagJoin = tag.fold(Fragment.empty)(_ => fr" JOIN tags t ON e.version = t.version")
       val tagFilter = tag.fold(Fragment.empty)(t => sql" AND " ++ t.toSql)
 
-      (fr"SELECT e.version, e.payload FROM ${Fragment.const(catalog.tableName)} e" ++ tagJoin ++ fr" WHERE e.aggregate_id = $id AND e.discriminator = $discriminator" ++ tagFilter ++ fr" ORDER BY e.version ASC")
+      (fr"SELECT e.version, e.payload FROM ${Fragment.const(catalog.tableName)} e" ++ tagJoin ++ fr" WHERE e.aggregate_id = $id" ++ tagFilter ++ fr" ORDER BY e.version ASC")
         .query[(Version, Event)]
         .map { case (version, event) => Change(version, event) }
 
     def READ_EVENTS[Event: BinaryCodec](
       id: Key,
-      discriminator: Discriminator,
       snapshotVersion: Version,
       tag: Option[EvenTag],
       catalog: Catalog,
@@ -139,7 +135,7 @@ object PostgresCQRSPersistence {
       (
         fr"""
         SELECT e.version, e.payload
-        FROM ${Fragment.const(catalog.tableName)} e""" ++ tagJoin ++ fr" WHERE e.aggregate_id = $id AND e.discriminator = $discriminator AND e.version > $snapshotVersion" ++ tagFilter ++ fr" ORDER BY e.version ASC"
+        FROM ${Fragment.const(catalog.tableName)} e""" ++ tagJoin ++ fr" WHERE e.aggregate_id = $id AND e.version > $snapshotVersion" ++ tagFilter ++ fr" ORDER BY e.version ASC"
       ).query[(Version, Event)].map(Change.apply)
 
     def READ_EVENTS[Event: BinaryCodec](
@@ -172,7 +168,6 @@ object PostgresCQRSPersistence {
 
     def READ_EVENTS[Event: BinaryCodec](
       id: Key,
-      discriminator: Discriminator,
       namespace: Namespace,
       tag: Option[EvenTag],
       options: FetchOptions,
@@ -190,7 +185,7 @@ object PostgresCQRSPersistence {
       val tagFilter = tag.fold(Fragment.empty)(t => sql" AND " ++ t.toSql)
 
       (
-        fr"""SELECT e.version, e.payload FROM ${Fragment.const(catalog.tableName)} e""" ++ tagJoin ++ fr""" WHERE e.aggregate_id = $id AND e.discriminator = $discriminator AND """ ++ namespace.toSql ++ tagFilter ++ offsetQuery.fold(Fragment.empty)(ql => sql" AND " ++ ql) ++
+        fr"""SELECT e.version, e.payload FROM ${Fragment.const(catalog.tableName)} e""" ++ tagJoin ++ fr""" WHERE e.aggregate_id = $id AND """ ++ namespace.toSql ++ tagFilter ++ offsetQuery.fold(Fragment.empty)(ql => sql" AND " ++ ql) ++
         orderQuery ++ limitQuery.fold(Fragment.empty)(ql => sql" " ++ ql)
       ).query[
       (
@@ -201,7 +196,6 @@ object PostgresCQRSPersistence {
 
     def READ_EVENTS[Event: BinaryCodec](
       id: Key,
-      discriminator: Discriminator,
       namespace: Namespace,
       tag: Option[EvenTag],
       interval: TimeInterval,
@@ -213,7 +207,7 @@ object PostgresCQRSPersistence {
       val tagFilter = tag.fold(Fragment.empty)(t => sql" AND " ++ t.toSql)
 
       (
-        fr"""SELECT e.version, e.payload FROM ${Fragment.const(catalog.tableName)} e""" ++ tagJoin ++ fr""" WHERE e.aggregate_id = $id AND e.discriminator = $discriminator AND """ ++ interval.toSql ++ sql" AND " ++ namespace.toSql ++ tagFilter ++ sql" ORDER BY e.version ASC"
+        fr"""SELECT e.version, e.payload FROM ${Fragment.const(catalog.tableName)} e""" ++ tagJoin ++ fr""" WHERE e.aggregate_id = $id AND """ ++ interval.toSql ++ sql" AND " ++ namespace.toSql ++ tagFilter ++ sql" ORDER BY e.version ASC"
       ).query[
       (
         Version,
@@ -245,6 +239,7 @@ object PostgresCQRSPersistence {
     def SAVE_EVENT[Event: { BinaryCodec, MetaInfo }](
       id: Key,
       discriminator: Discriminator,
+      namespace: Namespace,
       event: Change[Event],
       catalog: Catalog,
     ): Update0 =
@@ -264,7 +259,7 @@ object PostgresCQRSPersistence {
           ${event.version},
           ${id},
           ${discriminator},
-          ${event.payload.namespace},
+          ${namespace},
           decode(${payload}, 'base64'),
           ${event.payload.timestamp `getOrElse` event.version.timestamp}
         )
