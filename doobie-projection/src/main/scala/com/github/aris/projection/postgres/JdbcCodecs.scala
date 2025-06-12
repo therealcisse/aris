@@ -24,6 +24,8 @@ trait JdbcCodecs {
   given Meta[Namespace] = Meta[Int].timap(Namespace.wrap)(Namespace.unwrap)
   given Meta[Discriminator] = Meta[String].timap(Discriminator.wrap)(Discriminator.unwrap)
   given Meta[EventTag] = Meta[String].timap(EventTag.wrap)(EventTag.unwrap)
+  given Meta[Projection.Name] = Meta[String].timap(Projection.Name.wrap)(Projection.Name.unwrap)
+  given Meta[Projection.VersionId] = Meta[String].timap(Projection.VersionId.wrap)(Projection.VersionId.unwrap)
 
   inline def byteArrayReader[Event: BinaryCodec]: Read[Event] =
     Read[Array[Byte]].map { case (bytes) =>

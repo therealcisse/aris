@@ -2,14 +2,11 @@ package com.github
 package aris
 package projection
 
-import com.github.aris.domain.*
-
 import zio.*
 import zio.stream.*
-import zio.prelude.*
 
 trait Projection {
-  def run: ZIO[Scope, Nothing, Unit]
+  def run: ZIO[Scope, Throwable, Unit]
 }
 
 object Projection {
@@ -59,7 +56,7 @@ final private[aris] case class ExactlyOnce[Event](
   retry: RetryStrategy = RetryStrategy.Skip,
 ) extends Projection {
 
-  def run: ZIO[Scope, Nothing, Unit] =
+  def run: ZIO[Scope, Throwable, Unit] =
     store
       .isStopped(id)
       .flatMap { stopped =>
@@ -95,9 +92,9 @@ final private[aris] case class ExactlyOnce[Event](
         observer.processingError(id, env.version, e) *>
           (retry match
             case RetryStrategy.Skip => ZIO.unit
-            case RetryStrategy.RetryAndFail(n) if left > 0 => loop(left - 1)
+            case RetryStrategy.RetryAndFail(_) if left > 0 => loop(left - 1)
             case RetryStrategy.RetryAndFail(_) => ZIO.unit
-            case RetryStrategy.RetryAndSkip(n) if left > 0 => loop(left - 1)
+            case RetryStrategy.RetryAndSkip(_) if left > 0 => loop(left - 1)
             case RetryStrategy.RetryAndSkip(_) => ZIO.unit
           )
       }
@@ -119,7 +116,7 @@ final private[aris] case class AtLeastOnce[Event](
   retry: RetryStrategy = RetryStrategy.Skip,
 ) extends Projection {
 
-  def run: ZIO[Scope, Nothing, Unit] =
+  def run: ZIO[Scope, Throwable, Unit] =
     store
       .isStopped(id)
       .flatMap { stopped =>
@@ -170,9 +167,9 @@ final private[aris] case class AtLeastOnce[Event](
         observer.processingError(id, env.version, e) *>
           (retry match
             case RetryStrategy.Skip => ZIO.unit
-            case RetryStrategy.RetryAndFail(n) if left > 0 => loop(left - 1)
+            case RetryStrategy.RetryAndFail(_) if left > 0 => loop(left - 1)
             case RetryStrategy.RetryAndFail(_) => ZIO.unit
-            case RetryStrategy.RetryAndSkip(n) if left > 0 => loop(left - 1)
+            case RetryStrategy.RetryAndSkip(_) if left > 0 => loop(left - 1)
             case RetryStrategy.RetryAndSkip(_) => ZIO.unit
           )
       }

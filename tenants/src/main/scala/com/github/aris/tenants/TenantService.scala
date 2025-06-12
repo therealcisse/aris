@@ -2,9 +2,10 @@ package com.github
 package aris
 package tenants
 
-import aris.*
-import aris.service.CQRSPersistence
-import aris.store.*
+import com.github.aris.*
+import com.github.aris.service.CQRSPersistence
+import com.github.aris.domain.*
+import com.github.aris.store.*
 
 import zio.*
 import zio.prelude.*
@@ -21,30 +22,32 @@ trait TenantService {
 }
 
 object TenantService {
-  def live(catalog: Catalog = Catalog.Default): ZLayer[CQRSPersistence & TenantCQRS, Nothing, TenantService] =
+  def live(catalog: Catalog = Catalog.Default): ZLayer[CQRSPersistence, Nothing, TenantService] =
     ZLayer.fromZIO {
       for {
         persistence <- ZIO.service[CQRSPersistence]
-        cqrs        <- ZIO.service[TenantCQRS]
-      } yield TenantServiceLive(persistence, cqrs, catalog)
+      } yield TenantServiceLive(persistence, catalog)
     }
 
-  case class TenantServiceLive(persistence: CQRSPersistence, cqrs: TenantCQRS, catalog: Catalog) extends TenantService {
+  case class TenantServiceLive(persistence: CQRSPersistence, catalog: Catalog) extends TenantService {
     private val discriminator = Discriminator("Tenant")
     private val rootNamespace = Namespace.root
-    private val store: EventStore[TenantEvent] =
-      EventStore[TenantEvent](persistence, discriminator, rootNamespace, catalog)
+
+    private val store = EventStore[TenantEvent](persistence, discriminator, rootNamespace, catalog)
+
+    private val events = CQRS[TenantEvent, TenantCommand](store)
+
     def addTenant(id: Namespace, name: String, description: String, ts: Timestamp): Task[Unit] =
-      cqrs.add(id.asKey, TenantCommand.AddTenant(id, name, description, ts))
+      events.add(id.asKey, TenantCommand.AddTenant(id, name, description, ts))
 
     def deleteTenant(id: Namespace, ts: Timestamp): Task[Unit] =
-      cqrs.add(id.asKey, TenantCommand.DeleteTenant(id, ts))
+      events.add(id.asKey, TenantCommand.DeleteTenant(id, ts))
 
     def enableTenant(id: Namespace, ts: Timestamp): Task[Unit] =
-      cqrs.add(id.asKey, TenantCommand.EnableTenant(id, ts))
+      events.add(id.asKey, TenantCommand.EnableTenant(id, ts))
 
     def disableTenant(id: Namespace, ts: Timestamp): Task[Unit] =
-      cqrs.add(id.asKey, TenantCommand.DisableTenant(id, ts))
+      events.add(id.asKey, TenantCommand.DisableTenant(id, ts))
 
     def loadTenant(id: Namespace): Task[Option[NameTenant]] =
       store.readEvents(id.asKey).map(_.flatMap(NameTenantEventHandler.applyEvents))

@@ -3,11 +3,11 @@ package aris
 package projection
 package postgres
 
-import com.github.aris.projection.{Projection, ProjectionStore}
 import com.github.aris.Version
 import zio.*
 import doobie.*
 import doobie.implicits.*
+import zio.interop.catz.*
 
 trait PostgresProjectionStore extends ProjectionStore
 

@@ -3,9 +3,12 @@ package aris
 package store
 
 import com.github.aris.domain.*
+import com.github.aris.service.CQRSPersistence
 
 import zio.*
 import zio.prelude.*
+
+import zio.schema.codec.*
 
 transparent trait EventStore[Event] {
   def readEvents(id: Key): Task[Option[NonEmptyList[Change[Event]]]]
@@ -26,25 +29,25 @@ object EventStore {
     catalog: Catalog = Catalog.Default,
   ): EventStore[Event] = new EventStore[Event] {
     private def toNel(ch: Chunk[Change[Event]]): Option[NonEmptyList[Change[Event]]] =
-      NonEmptyList.fromChunk(ch)
+      NonEmptyList.fromIterableOption(ch)
 
     def readEvents(id: Key): Task[Option[NonEmptyList[Change[Event]]]] =
-      persistence.readEvents[Event](id, None, catalog).map(toNel)
+      persistence.readEvents[Event](id, catalog).map(toNel)
 
     def readEvents(id: Key, snapshotVersion: Version): Task[Option[NonEmptyList[Change[Event]]]] =
-      persistence.readEvents[Event](id, snapshotVersion, None, catalog).map(toNel)
+      persistence.readEvents[Event](id, FetchOptions().offset(snapshotVersion.asKey), catalog).map(toNel)
 
     def readEvents(options: FetchOptions): Task[Option[NonEmptyList[Change[Event]]]] =
-      persistence.readEvents[Event](discriminator, namespace, None, options, catalog).map(toNel)
+      persistence.readEvents[Event](discriminator, namespace, options, catalog).map(toNel)
 
     def readEvents(id: Key, options: FetchOptions): Task[Option[NonEmptyList[Change[Event]]]] =
-      persistence.readEvents[Event](id, None, options, catalog).map(toNel)
+      persistence.readEvents[Event](id, options, catalog).map(toNel)
 
     def readEvents(id: Key, interval: TimeInterval): Task[Option[NonEmptyList[Change[Event]]]] =
-      persistence.readEvents[Event](id, None, interval, catalog).map(toNel)
+      persistence.readEvents[Event](id, interval, catalog).map(toNel)
 
     def readEvents(interval: TimeInterval): Task[Option[NonEmptyList[Change[Event]]]] =
-      persistence.readEvents[Event](discriminator, namespace, None, interval, catalog).map(toNel)
+      persistence.readEvents[Event](discriminator, namespace, interval, catalog).map(toNel)
 
     def save(id: Key, event: Change[Event]): Task[Long] =
       persistence.saveEvent(id, discriminator, namespace, event, catalog).map(_.toLong)

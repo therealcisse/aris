@@ -2,8 +2,8 @@ package com.github
 package aris
 package tenants
 
-import aris.*
-import Codecs.protobuf.given
+import com.github.aris.*
+import com.github.aris.domain.*
 
 import zio.*
 import zio.schema.*
@@ -26,10 +26,10 @@ enum TenantEvent {
 
 object TenantEvent {
   given Schema[TenantEvent] = DeriveSchema.gen[TenantEvent]
-  given BinaryCodec[TenantEvent] = protobufCodec[TenantEvent]
-  given Tag[TenantEvent] = Tag[TenantEvent]
+  given BinaryCodec[TenantEvent] = ProtobufCodec.protobufCodec[TenantEvent]
 
-  given MetaInfo[TenantEvent] with
+  given MetaInfo[TenantEvent] {
+
     extension (e: TenantEvent) def timestamp: Option[Timestamp] =
       e match {
         case TenantEvent.TenantAdded(_, _, _, ts) => Some(ts)
@@ -37,10 +37,12 @@ object TenantEvent {
         case TenantEvent.TenantDisabled(_, ts)    => Some(ts)
         case TenantEvent.TenantEnabled(_, ts)     => Some(ts)
       }
+  }
 }
 
 object TenantCommand {
-  given CmdHandler[TenantCommand, TenantEvent] with
+  given CmdHandler[TenantCommand, TenantEvent] {
+
     def applyCmd(cmd: TenantCommand): NonEmptyList[TenantEvent] =
       cmd match {
         case TenantCommand.AddTenant(id, name, desc, ts) =>
@@ -52,6 +54,7 @@ object TenantCommand {
         case TenantCommand.EnableTenant(id, ts) =>
           NonEmptyList.single(TenantEvent.TenantEnabled(id, ts))
       }
+  }
 }
 
 object NameTenantEventHandler extends EventHandler[TenantEvent, NameTenant] {
@@ -96,18 +99,18 @@ object NameTenantsEventHandler extends EventHandler[TenantEvent, NonEmptyList[Na
   def applyEvents(events: NonEmptyList[Change[TenantEvent]]): Option[NonEmptyList[NameTenant]] =
     val groups = events.toChunk.groupBy(ch => groupId(ch.payload))
     val tenants = groups.values.flatMap { chunk =>
-      NonEmptyList.fromChunk(chunk).flatMap(NameTenantEventHandler.applyEvents)
+      NonEmptyList.fromIterableOption(chunk).flatMap(NameTenantEventHandler.applyEvents)
     }
-    NonEmptyList.fromChunk(Chunk.fromIterable(tenants))
+    NonEmptyList.fromIterableOption(tenants)
 
   def applyEvents(zero: NonEmptyList[NameTenant], events: NonEmptyList[Change[TenantEvent]]): Option[NonEmptyList[NameTenant]] =
     val zeroMap = zero.toChunk.map(t => t.id -> t).toMap
     val groups = events.toChunk.groupBy(ch => groupId(ch.payload))
     val result = groups.foldLeft(zeroMap) { case (acc, (id, chunk)) =>
-      NonEmptyList.fromChunk(chunk).flatMap(NameTenantEventHandler.applyEvents) match {
+      NonEmptyList.fromIterableOption(chunk).flatMap(NameTenantEventHandler.applyEvents) match {
         case Some(t) => acc.updated(id, t)
         case None    => acc
       }
     }
-    NonEmptyList.fromChunk(Chunk.fromIterable(result.values))
+    NonEmptyList.fromIterableOption(result.values)
 }
