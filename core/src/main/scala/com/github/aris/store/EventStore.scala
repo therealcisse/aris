@@ -10,25 +10,43 @@ import zio.prelude.*
 transparent trait EventStore[Event] {
   def readEvents(id: Key): Task[Option[NonEmptyList[Change[Event]]]]
   def readEvents(id: Key, snapshotVersion: Version): Task[Option[NonEmptyList[Change[Event]]]]
-  def readEvents(
-    namespace: Namespace,
-    options: FetchOptions,
-  ): Task[Option[NonEmptyList[Change[Event]]]]
-  def readEvents(
-    id: Key,
-    namespace: Namespace,
-    options: FetchOptions,
-  ): Task[Option[NonEmptyList[Change[Event]]]]
-
-  def readEvents(
-    id: Key,
-    namespace: Namespace,
-    interval: TimeInterval,
-  ): Task[Option[NonEmptyList[Change[Event]]]]
-  def readEvents(
-    namespace: Namespace,
-    interval: TimeInterval,
-  ): Task[Option[NonEmptyList[Change[Event]]]]
+  def readEvents(options: FetchOptions): Task[Option[NonEmptyList[Change[Event]]]]
+  def readEvents(id: Key, options: FetchOptions): Task[Option[NonEmptyList[Change[Event]]]]
+  def readEvents(id: Key, interval: TimeInterval): Task[Option[NonEmptyList[Change[Event]]]]
+  def readEvents(interval: TimeInterval): Task[Option[NonEmptyList[Change[Event]]]]
 
   def save(id: Key, event: Change[Event]): Task[Long]
+}
+
+object EventStore {
+  def apply[Event: { BinaryCodec, Tag, MetaInfo }](
+    persistence: CQRSPersistence,
+    discriminator: Discriminator,
+    namespace: Namespace,
+    catalog: Catalog = Catalog.Default,
+  ): EventStore[Event] = new EventStore[Event] {
+    private def toNel(ch: Chunk[Change[Event]]): Option[NonEmptyList[Change[Event]]] =
+      NonEmptyList.fromChunk(ch)
+
+    def readEvents(id: Key): Task[Option[NonEmptyList[Change[Event]]]] =
+      persistence.readEvents[Event](id, None, catalog).map(toNel)
+
+    def readEvents(id: Key, snapshotVersion: Version): Task[Option[NonEmptyList[Change[Event]]]] =
+      persistence.readEvents[Event](id, snapshotVersion, None, catalog).map(toNel)
+
+    def readEvents(options: FetchOptions): Task[Option[NonEmptyList[Change[Event]]]] =
+      persistence.readEvents[Event](discriminator, namespace, None, options, catalog).map(toNel)
+
+    def readEvents(id: Key, options: FetchOptions): Task[Option[NonEmptyList[Change[Event]]]] =
+      persistence.readEvents[Event](id, None, options, catalog).map(toNel)
+
+    def readEvents(id: Key, interval: TimeInterval): Task[Option[NonEmptyList[Change[Event]]]] =
+      persistence.readEvents[Event](id, None, interval, catalog).map(toNel)
+
+    def readEvents(interval: TimeInterval): Task[Option[NonEmptyList[Change[Event]]]] =
+      persistence.readEvents[Event](discriminator, namespace, None, interval, catalog).map(toNel)
+
+    def save(id: Key, event: Change[Event]): Task[Long] =
+      persistence.saveEvent(id, discriminator, namespace, event, catalog).map(_.toLong)
+  }
 }

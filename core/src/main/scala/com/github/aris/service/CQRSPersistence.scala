@@ -14,13 +14,11 @@ trait CQRSPersistence {
     ): Task[Option[Change[Event]]]
   def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
     id: Key,
-    discriminator: Discriminator,
     tag: Option[EventTag],
     catalog: Catalog,
   ): Task[Chunk[Change[Event]]]
   def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
     id: Key,
-    discriminator: Discriminator,
     snapshotVersion: Version,
     tag: Option[EventTag],
     catalog: Catalog,
@@ -34,8 +32,6 @@ trait CQRSPersistence {
   ): Task[Chunk[Change[Event]]]
   def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
     id: Key,
-    discriminator: Discriminator,
-    namespace: Namespace,
     tag: Option[EventTag],
     options: FetchOptions,
     catalog: Catalog,
@@ -50,8 +46,6 @@ trait CQRSPersistence {
   ): Task[Chunk[Change[Event]]]
   def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
     id: Key,
-    discriminator: Discriminator,
-    namespace: Namespace,
     tag: Option[EventTag],
     interval: TimeInterval,
     catalog: Catalog,
@@ -61,9 +55,10 @@ trait CQRSPersistence {
   def saveEvent[Event: {BinaryCodec, MetaInfo, Tag}](
     id: Key,
     discriminator: Discriminator,
+    namespace: Namespace,
     event: Change[Event],
     catalog: Catalog,
-    ): Task[Int]
+  ): Task[Int]
 
   def readSnapshot(id: Key): Task[Option[Version]]
   def saveSnapshot(id: Key, version: Version): Task[Int]

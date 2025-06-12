@@ -27,10 +27,11 @@ object MemoryCQRSPersistence {
       events: Map[EntryKey, MultiDict[Key, Version]],
       snapshots: Map[Key, Version],
       data: Map[Version, Change[?]],
-      tags: Map[EvenTag, Set[Version]]
+      tags: Map[EvenTag, Set[Version]],
+      namespaces: Map[Version, Namespace],
     )
 
-    def empty: State = State(Info(Map.empty, Map.empty, Map.empty, Map.empty))
+    def empty: State = State(Info(Map.empty, Map.empty, Map.empty, Map.empty, Map.empty))
 
     extension (s: State)
       def getSnapshot(id: Key): Option[Version] =
@@ -44,7 +45,7 @@ object MemoryCQRSPersistence {
         State(p.copy(snapshots = p.snapshots + (id -> version)))
 
     extension (s: State)
-      def add[Event: MetaInfo](id: Key, discriminator: Discriminator, event: Change[Event], catalog: Catalog): State =
+      def add[Event: MetaInfo](id: Key, discriminator: Discriminator, namespace: Namespace, event: Change[Event], catalog: Catalog): State =
         val p = State.unwrap(s)
 
         val r = p.events.updatedWith(EntryKey(catalog, discriminator)) {
@@ -57,12 +58,19 @@ object MemoryCQRSPersistence {
           .tags(event.payload)
           .foldLeft(p.tags) { (acc, t) =>
             acc.updatedWith(t) {
-              case None       => Some(Set(event.version))
-              case Some(set)  => Some(set + event.version)
+              case None      => Some(Set(event.version))
+              case Some(set) => Some(set + event.version)
             }
           }
 
-        State(p.copy(events = r, data = p.data + (event.version -> event), tags = tagMap))
+        State(
+          p.copy(
+            events = r,
+            data = p.data + (event.version -> event),
+            tags = tagMap,
+            namespaces = p.namespaces + (event.version -> namespace),
+          )
+        )
 
     extension (s: State)
       def get[Event](version: Version, catalog: Catalog): Option[Change[Event]] =
@@ -70,33 +78,30 @@ object MemoryCQRSPersistence {
         p.data.get(version).asInstanceOf[Option[Change[Event]]]
 
     extension (s: State)
-      def fetch[Event: MetaInfo](id: Key, discriminator: Discriminator, tag: Option[EvenTag], catalog: Catalog): Chunk[Change[Event]] =
+      def fetch[Event: MetaInfo](id: Key, tag: Option[EvenTag], catalog: Catalog): Chunk[Change[Event]] =
         val p = State.unwrap(s)
 
-        p.events.get(EntryKey(catalog, discriminator)) match {
-          case None => Chunk()
-          case Some(map) =>
-            val versions = map.get(id)
-            val changes = versions.toList.mapFilter { version => p.data.get(version) }
-            val filtered = changes.asInstanceOf[List[Change[Event]]].filter(ch => tag.forall(t => p.tags.get(t).exists(_.contains(ch.version))))
-            Chunk.fromIterable(filtered).sorted
-        }
+        val versions = p.events.collect {
+          case (EntryKey(cat, _), map) if cat == catalog => map.get(id)
+        }.foldLeft(Iterable.empty[Version])(_ ++ _)
+
+        val changes = versions.toList.mapFilter(v => p.data.get(v))
+        val filtered = changes.asInstanceOf[List[Change[Event]]].filter(ch => tag.forall(t => p.tags.get(t).exists(_.contains(ch.version))))
+        Chunk.fromIterable(filtered).sorted
 
     extension (s: State)
       def fetch[Event: MetaInfo](
         id: Key,
-        discriminator: Discriminator,
         snapshotVersion: Version,
         tag: Option[EvenTag],
         catalog: Catalog,
       ): Chunk[Change[Event]] =
-        val p = s.fetch[Event](id, discriminator, tag, catalog)
+        val p = s.fetch[Event](id, tag, catalog)
         p.filter(_.version.value > snapshotVersion.value)
 
     extension (s: State)
       def fetch[Event: MetaInfo](
         id: Option[Key],
-        discriminator: Discriminator,
         namespace: Namespace,
         tag: Option[EvenTag],
         options: FetchOptions,
@@ -104,22 +109,20 @@ object MemoryCQRSPersistence {
       ): Chunk[Change[Event]] =
         val p = State.unwrap(s)
 
-        p.events.get(EntryKey(catalog, discriminator)) match {
-          case None => Chunk()
-          case Some(map) =>
-            val all = id match {
-              case None =>
-                p.data.values.asInstanceOf[Iterable[Change[Event]]]
+        val maps = p.events.collect { case (EntryKey(cat, _), map) if cat == catalog => map }
 
-              case Some(key) =>
-                val versions = map.get(key)
-                val changes = versions.toList.mapFilter { version => p.data.get(version) }
-                changes.asInstanceOf[Iterable[Change[Event]]]
-            }
+        val all = id match {
+          case None =>
+            maps.iterator.flatMap(_.iterator.map(_._2)).flatMap(v => p.data.get(v)).asInstanceOf[Iterable[Change[Event]]]
 
-            val matches = all.filter { ch =>
-                ch.payload.namespace == namespace && tag.forall(t => p.tags.get(t).exists(_.contains(ch.version)))
-            }
+          case Some(key) =>
+            maps.iterator.flatMap(_.get(key)).flatMap(v => p.data.get(v)).asInstanceOf[Iterable[Change[Event]]]
+        }
+
+        val matches = all.filter { ch =>
+            p.namespaces.get(ch.version).contains(namespace) &&
+              tag.forall(t => p.tags.get(t).exists(_.contains(ch.version)))
+        }
 
             val ch = Chunk.fromIterable(matches)
 
@@ -158,7 +161,6 @@ object MemoryCQRSPersistence {
     extension (s: State)
       def fetch[Event: MetaInfo](
         id: Option[Key],
-        discriminator: Discriminator,
         namespace: Namespace,
         tag: Option[EvenTag],
         interval: TimeInterval,
@@ -166,25 +168,23 @@ object MemoryCQRSPersistence {
       ): Chunk[Change[Event]] =
         val p = State.unwrap(s)
 
-        p.events.get(EntryKey(catalog, discriminator)) match {
-          case None => Chunk()
-          case Some(map) =>
-            val all = id match {
-              case None =>
-                p.data.values.asInstanceOf[Iterable[Change[Event]]]
+        val maps = p.events.collect { case (EntryKey(cat, _), map) if cat == catalog => map }
 
-              case Some(key) =>
-                val versions = map.get(key)
-                val changes = versions.toList.mapFilter { version => p.data.get(version) }
-                changes.asInstanceOf[Iterable[Change[Event]]]
-            }
+        val all = id match {
+          case None =>
+            maps.iterator.flatMap(_.iterator.map(_._2)).flatMap(v => p.data.get(v)).asInstanceOf[Iterable[Change[Event]]]
 
-            val matches = all.filter { ch =>
-                ch.payload.namespace == namespace && interval.contains(ch.payload.timestamp `getOrElse` ch.version.timestamp) &&
-                  tag.forall(t => p.tags.get(t).exists(_.contains(ch.version)))
-            }
+          case Some(key) =>
+            maps.iterator.flatMap(_.get(key)).flatMap(v => p.data.get(v)).asInstanceOf[Iterable[Change[Event]]]
+        }
 
-            Chunk.fromIterable(matches)
+        val matches = all.filter { ch =>
+            p.namespaces.get(ch.version).contains(namespace) &&
+              interval.contains(ch.payload.timestamp `getOrElse` ch.version.timestamp) &&
+              tag.forall(t => p.tags.get(t).exists(_.contains(ch.version)))
+        }
+
+        Chunk.fromIterable(matches)
         }
 
   }
@@ -207,20 +207,18 @@ object MemoryCQRSPersistence {
 
   def readEvents[Event:{ BinaryCodec, Tag, MetaInfo}](
     id: Key,
-    discriminator: Discriminator,
     tag: Option[EvenTag],
     catalog: Catalog,
   ): Task[Chunk[Change[Event]]] =
-      ref.get.map(_.fetch(id, discriminator, tag, catalog))
+      ref.get.map(_.fetch(id, tag, catalog))
 
   def readEvents[Event:{ BinaryCodec, Tag, MetaInfo}](
     id: Key,
-    discriminator: Discriminator,
     snapshotVersion: Version,
     tag: Option[EvenTag],
     catalog: Catalog,
   ): Task[Chunk[Change[Event]]] =
-      ref.get.map(_.fetch(id, discriminator, snapshotVersion, tag, catalog))
+      ref.get.map(_.fetch(id, snapshotVersion, tag, catalog))
 
   def readEvents[Event:{ BinaryCodec, Tag, MetaInfo}](
     discriminator: Discriminator,
@@ -233,23 +231,21 @@ object MemoryCQRSPersistence {
 
   def readEvents[Event:{ BinaryCodec, Tag, MetaInfo}](
     id: Key,
-    discriminator: Discriminator,
     namespace: Namespace,
     tag: Option[EvenTag],
     options: FetchOptions,
     catalog: Catalog,
   ): Task[Chunk[Change[Event]]] =
-      ref.get.map(_.fetch(id = id.some, discriminator, namespace, tag, options, catalog))
+      ref.get.map(_.fetch(id = id.some, namespace, tag, options, catalog))
 
   def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
     id: Key,
-    discriminator: Discriminator,
     namespace: Namespace,
     tag: Option[EvenTag],
     interval: TimeInterval,
     catalog: Catalog
   ): Task[Chunk[Change[Event]]] =
-      ref.get.map(_.fetch(id = id.some, discriminator, namespace, tag, interval, catalog))
+      ref.get.map(_.fetch(id = id.some, namespace, tag, interval, catalog))
 
   def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
     discriminator: Discriminator,
@@ -263,10 +259,11 @@ object MemoryCQRSPersistence {
     def saveEvent[Event: {BinaryCodec, MetaInfo, Tag}](
       id: Key,
       discriminator: Discriminator,
+      namespace: Namespace,
       event: Change[Event],
       catalog: Catalog,
     ): Task[Int] =
-      ref.update(_.add(id, discriminator, event, catalog)) `as` 1
+      ref.update(_.add(id, discriminator, namespace, event, catalog)) `as` 1
 
     def readSnapshot(id: Key): Task[Option[Version]] =
       ref.get.map(_.getSnapshot(id))
