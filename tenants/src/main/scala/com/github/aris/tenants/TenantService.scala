@@ -21,15 +21,19 @@ trait TenantService {
 }
 
 object TenantService {
-  def live(catalog: Catalog = Catalog.Default): ZLayer[CQRSPersistence, Nothing, TenantService] =
-    ZLayer.fromFunction(new TenantServiceLive(_, catalog))
+  def live(catalog: Catalog = Catalog.Default): ZLayer[CQRSPersistence & TenantCQRS, Nothing, TenantService] =
+    ZLayer.fromZIO {
+      for {
+        persistence <- ZIO.service[CQRSPersistence]
+        cqrs        <- ZIO.service[TenantCQRS]
+      } yield TenantServiceLive(persistence, cqrs, catalog)
+    }
 
-  class TenantServiceLive(persistence: CQRSPersistence, catalog: Catalog) extends TenantService {
+  case class TenantServiceLive(persistence: CQRSPersistence, cqrs: TenantCQRS, catalog: Catalog) extends TenantService {
     private val discriminator = Discriminator("Tenant")
     private val rootNamespace = Namespace.root
     private val store: EventStore[TenantEvent] =
       EventStore[TenantEvent](persistence, discriminator, rootNamespace, catalog)
-    private val cqrs: TenantCQRS = new TenantCQRS.TenantCQRSLive(store)
     def addTenant(id: Namespace, name: String, description: String, ts: Timestamp): Task[Unit] =
       cqrs.add(id.asKey, TenantCommand.AddTenant(id, name, description, ts))
 
