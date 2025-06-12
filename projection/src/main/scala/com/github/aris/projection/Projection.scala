@@ -65,7 +65,7 @@ private[aris] final case class ExactlyOnce[Event](
       else process
     }.orDie
 
-  private def process: ZIO[Scope, Nothing, Unit] =
+  private def process: ZIO[Scope, Throwable, Unit] =
     for {
       start <- store.offset(id).map(_.getOrElse(Version.wrap(0L))).orDie
       _     <- observer.started(id, start)
@@ -76,8 +76,8 @@ private[aris] final case class ExactlyOnce[Event](
                  .tapError(e => observer.projectionError(id, e))
     } yield ()
 
-  private def commit(v: Version): UIO[Unit] =
-    store.updateOffset(id, v).catchAll(e => observer.projectionError(id, e)) *> observer.offsetCommitted(id, v)
+  private def commit(v: Version): Task[Unit] =
+    store.updateOffset(id, v) *> observer.offsetCommitted(id, v)
 
   private def handleWithRetry(env: Envelope[Event]): ZIO[Any, Nothing, Unit] =
     def loop(left: Int): ZIO[Any, Nothing, Unit] =
@@ -115,7 +115,7 @@ private[aris] final case class AtLeastOnce[Event](
       else process
     }.orDie
 
-  private def process: ZIO[Scope, Nothing, Unit] =
+  private def process: ZIO[Scope, Throwable, Unit] =
     for {
       start <- store.offset(id).map(_.getOrElse(Version.wrap(0L))).orDie
       _     <- observer.started(id, start)
@@ -127,10 +127,10 @@ private[aris] final case class AtLeastOnce[Event](
                  .tapError(e => observer.projectionError(id, e))
     } yield ()
 
-  private def commit(v: Version): UIO[Unit] =
-    store.updateOffset(id, v).catchAll(e => observer.projectionError(id, e)) *> observer.offsetCommitted(id, v)
+  private def commit(v: Version): Task[Unit] =
+    store.updateOffset(id, v) *> observer.offsetCommitted(id, v)
 
-  private def maybeCommit(v: Version, ref: Ref[(Version, Int, Long)]): UIO[Unit] =
+  private def maybeCommit(v: Version, ref: Ref[(Version, Int, Long)]): Task[Unit] =
     for {
       now    <- Clock.nanoTime
       shouldSave <- ref.modify { case (_, count, ts) =>
