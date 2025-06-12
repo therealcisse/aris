@@ -50,7 +50,7 @@ object Projection {
     AtLeastOnce(id, handler, query, store, commitAfterN, commitAfter, observer, retry)
 }
 
-private[aris] final case class ExactlyOnce[Event](
+final private[aris] case class ExactlyOnce[Event](
   id: Projection.Id,
   handler: Envelope[Event] => Task[Unit],
   query: Version => ZStream[Any, Throwable, Envelope[Event]],
@@ -60,27 +60,30 @@ private[aris] final case class ExactlyOnce[Event](
 ) extends Projection {
 
   def run: ZIO[Scope, Nothing, Unit] =
-    store.isStopped(id).flatMap { stopped =>
-      if stopped then ZIO.unit
-      else process
-    }.orDie
+    store
+      .isStopped(id)
+      .flatMap { stopped =>
+        if stopped then ZIO.unit
+        else process
+      }
 
   private def process: ZIO[Scope, Throwable, Unit] =
     for {
-      start <- store.offset(id).map(_.getOrElse(Version.wrap(0L))).orDie
-      _     <- observer.started(id, start)
+      start <- store.offset(id).map(_.getOrElse(Version.wrap(0L)))
+      _ <- observer.started(id, start)
       stoppedRef <- Ref.make(false)
-      _ <- (store.isStopped(id).flatMap(stoppedRef.set))
-             .repeat(Schedule.spaced(15.seconds))
-             .forkScoped
-      _     <- query(start)
-                .foreach { env =>
-                  stoppedRef.get.flatMap { stopped =>
-                    if stopped then ZIO.unit
-                    else handleWithRetry(env) *> commit(env.version)
-                  }
-                }
-                .tapError(e => observer.projectionError(id, e))
+      _ <- (store
+        .isStopped(id)
+        .flatMap(stoppedRef.set))
+        .repeat(Schedule.spaced(15.seconds))
+        .forkScoped
+      _ <- query(start).foreach { env =>
+        stoppedRef.get.flatMap { stopped =>
+          if stopped then ZIO.unit
+          else handleWithRetry(env) *> commit(env.version)
+        }
+      }
+        .tapError(e => observer.projectionError(id, e))
     } yield ()
 
   private def commit(v: Version): Task[Unit] =
@@ -91,21 +94,21 @@ private[aris] final case class ExactlyOnce[Event](
       handler(env).catchAll { e =>
         observer.processingError(id, env.version, e) *>
           (retry match
-            case RetryStrategy.Skip                      => ZIO.unit
-            case RetryStrategy.RetryAndFail(n) if left > 0  => loop(left - 1)
-            case RetryStrategy.RetryAndFail(_)              => ZIO.unit
-            case RetryStrategy.RetryAndSkip(n) if left > 0  => loop(left - 1)
-            case RetryStrategy.RetryAndSkip(_)              => ZIO.unit
+            case RetryStrategy.Skip => ZIO.unit
+            case RetryStrategy.RetryAndFail(n) if left > 0 => loop(left - 1)
+            case RetryStrategy.RetryAndFail(_) => ZIO.unit
+            case RetryStrategy.RetryAndSkip(n) if left > 0 => loop(left - 1)
+            case RetryStrategy.RetryAndSkip(_) => ZIO.unit
           )
       }
 
     retry match
-      case RetryStrategy.Skip            => loop(0)
+      case RetryStrategy.Skip => loop(0)
       case RetryStrategy.RetryAndFail(n) => loop(n)
       case RetryStrategy.RetryAndSkip(n) => loop(n)
 }
 
-private[aris] final case class AtLeastOnce[Event](
+final private[aris] case class AtLeastOnce[Event](
   id: Projection.Id,
   handler: Envelope[Event] => Task[Unit],
   query: Version => ZStream[Any, Throwable, Envelope[Event]],
@@ -117,28 +120,31 @@ private[aris] final case class AtLeastOnce[Event](
 ) extends Projection {
 
   def run: ZIO[Scope, Nothing, Unit] =
-    store.isStopped(id).flatMap { stopped =>
-      if stopped then ZIO.unit
-      else process
-    }.orDie
+    store
+      .isStopped(id)
+      .flatMap { stopped =>
+        if stopped then ZIO.unit
+        else process
+      }
 
   private def process: ZIO[Scope, Throwable, Unit] =
     for {
-      start <- store.offset(id).map(_.getOrElse(Version.wrap(0L))).orDie
-      _     <- observer.started(id, start)
-      ref         <- Ref.make((start, 0, 0L))
-      stoppedRef  <- Ref.make(false)
-      _           <- (store.isStopped(id).flatMap(stoppedRef.set))
-                       .repeat(Schedule.spaced(15.seconds))
-                       .forkScoped
-      _     <- query(start)
-                 .foreach { env =>
-                   stoppedRef.get.flatMap { stopped =>
-                     if stopped then ZIO.unit
-                     else handleWithRetry(env) *> maybeCommit(env.version, ref)
-                   }
-                 }
-                 .tapError(e => observer.projectionError(id, e))
+      start <- store.offset(id).map(_.getOrElse(Version.wrap(0L)))
+      _ <- observer.started(id, start)
+      ref <- Ref.make((start, 0, 0L))
+      stoppedRef <- Ref.make(false)
+      _ <- (store
+        .isStopped(id)
+        .flatMap(stoppedRef.set))
+        .repeat(Schedule.spaced(15.seconds))
+        .forkScoped
+      _ <- query(start).foreach { env =>
+        stoppedRef.get.flatMap { stopped =>
+          if stopped then ZIO.unit
+          else handleWithRetry(env) *> maybeCommit(env.version, ref)
+        }
+      }
+        .tapError(e => observer.projectionError(id, e))
     } yield ()
 
   private def commit(v: Version): Task[Unit] =
@@ -146,15 +152,15 @@ private[aris] final case class AtLeastOnce[Event](
 
   private def maybeCommit(v: Version, ref: Ref[(Version, Int, Long)]): Task[Unit] =
     for {
-      now    <- Clock.nanoTime
+      now <- Clock.nanoTime
       shouldSave <- ref.modify { case (_, count, ts) =>
-                   val newCount   = count + 1
-                   val elapsed    = Duration.fromNanos(now - ts)
-                   val shouldSave = newCount >= commitAfterN || elapsed >= commitAfter
-                   val nextTs     = if shouldSave then now else ts
-                   val next       = if shouldSave then (v, 0, nextTs) else (v, newCount, ts)
-                   (shouldSave, next)
-                 }
+        val newCount = count + 1
+        val elapsed = Duration.fromNanos(now - ts)
+        val shouldSave = newCount >= commitAfterN || elapsed >= commitAfter
+        val nextTs = if shouldSave then now else ts
+        val next = if shouldSave then (v, 0, nextTs) else (v, newCount, ts)
+        (shouldSave, next)
+      }
       _ <- ZIO.when(shouldSave)(commit(v))
     } yield ()
 
@@ -163,16 +169,16 @@ private[aris] final case class AtLeastOnce[Event](
       handler(env).catchAll { e =>
         observer.processingError(id, env.version, e) *>
           (retry match
-            case RetryStrategy.Skip                      => ZIO.unit
-            case RetryStrategy.RetryAndFail(n) if left > 0  => loop(left - 1)
-            case RetryStrategy.RetryAndFail(_)              => ZIO.unit
-            case RetryStrategy.RetryAndSkip(n) if left > 0  => loop(left - 1)
-            case RetryStrategy.RetryAndSkip(_)              => ZIO.unit
+            case RetryStrategy.Skip => ZIO.unit
+            case RetryStrategy.RetryAndFail(n) if left > 0 => loop(left - 1)
+            case RetryStrategy.RetryAndFail(_) => ZIO.unit
+            case RetryStrategy.RetryAndSkip(n) if left > 0 => loop(left - 1)
+            case RetryStrategy.RetryAndSkip(_) => ZIO.unit
           )
       }
 
     retry match
-      case RetryStrategy.Skip            => loop(0)
+      case RetryStrategy.Skip => loop(0)
       case RetryStrategy.RetryAndFail(n) => loop(n)
       case RetryStrategy.RetryAndSkip(n) => loop(n)
 }

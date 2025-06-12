@@ -3,8 +3,8 @@ package aris
 package projection
 package postgres
 
-import com.github.aris.projection.{ProjectionStore, Projection}
-import com.github.aris.{Version}
+import com.github.aris.projection.{Projection, ProjectionStore}
+import com.github.aris.Version
 import zio.*
 import doobie.*
 import doobie.implicits.*
@@ -25,7 +25,8 @@ object PostgresProjectionStore {
 
   object Queries extends JdbcCodecs {
     def READ(id: Projection.Id): Query0[Version] =
-      sql"""SELECT offset FROM projection_offset WHERE name = ${id.name} AND version = ${id.version} AND namespace = ${id.namespace}""".query[Version]
+      sql"""SELECT offset FROM projection_offset WHERE name = ${id.name} AND version = ${id.version} AND namespace = ${id.namespace}"""
+        .query[Version]
 
     def SAVE(id: Projection.Id, version: Version): Update0 =
       sql"""INSERT INTO projection_offset (name, version, namespace, offset)

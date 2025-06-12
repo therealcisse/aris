@@ -18,7 +18,7 @@ ThisBuild / git.useGitDescribe := true
 
 ThisBuild / Test / javaOptions ++= Seq(
   "-Dlogback.configurationFile=logback-test.xml",
-  )
+)
 
 ThisBuild / git.gitTagToVersionNumber := { tag: String =>
   if (tag matches "[0-9]+\\..*") Some(tag)
@@ -117,9 +117,9 @@ lazy val memory = (project in file("memory"))
       cats,
       `zio-test`,
       `zio-test-sbt`,
-    `zio-test-magnolia`,
-  ),
-)
+      `zio-test-magnolia`,
+    ),
+  )
 
 lazy val projection = (project in file("projection"))
   .dependsOn(memory % "compile->compile;test->test")
@@ -152,4 +152,3 @@ lazy val doobieProjection = (project in file("doobie-projection"))
       `zio-mock`,
     ),
   )
-

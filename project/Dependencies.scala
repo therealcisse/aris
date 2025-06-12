@@ -2,8 +2,7 @@ import sbt.*
 
 object Dependencies {
 
-  val ZioJdbcVersion = "0.1.2"
-  val ZioVersion = "2.1.14"
+  val ZioVersion = "2.1.19"
   val ZioCliVersion = "0.5.0"
   val ZioSchemaVersion = "1.5.0"
   val ZioConfigVersion = "4.0.2"

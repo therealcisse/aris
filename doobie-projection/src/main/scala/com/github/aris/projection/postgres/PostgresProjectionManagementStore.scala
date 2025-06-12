@@ -3,7 +3,7 @@ package aris
 package projection
 package postgres
 
-import com.github.aris.projection.{ProjectionManagementStore, Projection}
+import com.github.aris.projection.{Projection, ProjectionManagementStore}
 import com.github.aris.Version
 import zio.*
 import doobie.*
@@ -15,7 +15,9 @@ object PostgresProjectionManagementStore {
   def live(xa: Transactor[Task]): ZLayer[Any, Nothing, ProjectionManagementStore] =
     ZLayer.succeed(new PostgresProjectionManagementStoreLive(xa))
 
-  class PostgresProjectionManagementStoreLive(xa: Transactor[Task]) extends PostgresProjectionManagementStore with JdbcCodecs {
+  class PostgresProjectionManagementStoreLive(xa: Transactor[Task])
+      extends PostgresProjectionManagementStore
+      with JdbcCodecs {
     def stop(id: Projection.Id): Task[Unit] =
       Queries.STOP(id).run.transact(xa).unit
 
@@ -44,10 +46,12 @@ object PostgresProjectionManagementStore {
              ON CONFLICT (name, version, namespace) DO UPDATE SET stopped = false""".update
 
     def IS_STOPPED(id: Projection.Id): Query0[Boolean] =
-      sql"""SELECT stopped FROM projection_management WHERE name = ${id.name} AND version = ${id.version} AND namespace = ${id.namespace}""".query[Boolean]
+      sql"""SELECT stopped FROM projection_management WHERE name = ${id.name} AND version = ${id.version} AND namespace = ${id.namespace}"""
+        .query[Boolean]
 
     def READ_OFFSET(id: Projection.Id): Query0[Version] =
-      sql"""SELECT offset FROM projection_offset WHERE name = ${id.name} AND version = ${id.version} AND namespace = ${id.namespace}""".query[Version]
+      sql"""SELECT offset FROM projection_offset WHERE name = ${id.name} AND version = ${id.version} AND namespace = ${id.namespace}"""
+        .query[Version]
 
     def UPDATE_OFFSET(id: Projection.Id, version: Version): Update0 =
       sql"""INSERT INTO projection_offset (name, version, namespace, offset)

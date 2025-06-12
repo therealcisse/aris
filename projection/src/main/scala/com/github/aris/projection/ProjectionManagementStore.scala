@@ -35,9 +35,7 @@ object ProjectionManagementStore {
         ref.get.map(_.get(id).map(_.offset))
 
       def updateOffset(id: Projection.Id, version: Version): Task[Unit] =
-        ref.update(m =>
-          m.updated(id, m.getOrElse(id, defaultState).copy(offset = version))
-        ).unit
+        ref.update(m => m.updated(id, m.getOrElse(id, defaultState).copy(offset = version))).unit
     }
   }
 }

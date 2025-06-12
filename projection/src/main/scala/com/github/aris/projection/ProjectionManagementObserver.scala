@@ -12,4 +12,3 @@ trait ProjectionManagementObserver {
 object ProjectionManagementObserver {
   val empty: ProjectionManagementObserver = new ProjectionManagementObserver {}
 }
-

@@ -199,13 +199,13 @@ object MemoryCQRSPersistence {
     }
 
   class MemoryCQRSPersistenceLive(ref: Ref.Synchronized[State]) extends CQRSPersistence { self =>
-    def readEvent[Event: {BinaryCodec, EventTag, MetaInfo}](
+    def readEvent[Event: {BinaryCodec, Tag, MetaInfo}](
       version: Version,
       catalog: Catalog,
       ): Task[Option[Change[Event]]] =
       ref.get.map(_.get(version, catalog))
 
-  def readEvents[Event:{ BinaryCodec, EventTag, MetaInfo}](
+  def readEvents[Event:{ BinaryCodec, Tag, MetaInfo}](
     id: Key,
     discriminator: Discriminator,
     tag: Option[EvenTag],
@@ -213,7 +213,7 @@ object MemoryCQRSPersistence {
   ): Task[Chunk[Change[Event]]] =
       ref.get.map(_.fetch(id, discriminator, tag, catalog))
 
-  def readEvents[Event:{ BinaryCodec, EventTag, MetaInfo}](
+  def readEvents[Event:{ BinaryCodec, Tag, MetaInfo}](
     id: Key,
     discriminator: Discriminator,
     snapshotVersion: Version,
@@ -222,7 +222,7 @@ object MemoryCQRSPersistence {
   ): Task[Chunk[Change[Event]]] =
       ref.get.map(_.fetch(id, discriminator, snapshotVersion, tag, catalog))
 
-  def readEvents[Event:{ BinaryCodec, EventTag, MetaInfo}](
+  def readEvents[Event:{ BinaryCodec, Tag, MetaInfo}](
     discriminator: Discriminator,
     namespace: Namespace,
     tag: Option[EvenTag],
@@ -231,7 +231,7 @@ object MemoryCQRSPersistence {
   ): Task[Chunk[Change[Event]]] =
       ref.get.map(_.fetch(id = None, discriminator, namespace, tag, options, catalog))
 
-  def readEvents[Event:{ BinaryCodec, EventTag, MetaInfo}](
+  def readEvents[Event:{ BinaryCodec, Tag, MetaInfo}](
     id: Key,
     discriminator: Discriminator,
     namespace: Namespace,
@@ -241,7 +241,7 @@ object MemoryCQRSPersistence {
   ): Task[Chunk[Change[Event]]] =
       ref.get.map(_.fetch(id = id.some, discriminator, namespace, tag, options, catalog))
 
-  def readEvents[Event: {BinaryCodec, EventTag, MetaInfo}](
+  def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
     id: Key,
     discriminator: Discriminator,
     namespace: Namespace,
@@ -251,7 +251,7 @@ object MemoryCQRSPersistence {
   ): Task[Chunk[Change[Event]]] =
       ref.get.map(_.fetch(id = id.some, discriminator, namespace, tag, interval, catalog))
 
-  def readEvents[Event: {BinaryCodec, EventTag, MetaInfo}](
+  def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
     discriminator: Discriminator,
     namespace: Namespace,
     tag: Option[EvenTag],
@@ -260,7 +260,7 @@ object MemoryCQRSPersistence {
   ): Task[Chunk[Change[Event]]] =
       ref.get.map(_.fetch(id = None, discriminator, namespace, tag, interval, catalog))
 
-    def saveEvent[Event: {BinaryCodec, MetaInfo, EventTag}](
+    def saveEvent[Event: {BinaryCodec, MetaInfo, Tag}](
       id: Key,
       discriminator: Discriminator,
       event: Change[Event],

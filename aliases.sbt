@@ -17,8 +17,7 @@ onLoadMessage := {
     /  \     _ __   _   ___
    / /\ \   | '__| | | / __|
   / ____ \  | |    | | \__ \
- /_/    \_\ |_|    |_| |___/"""
-      )}
+ /_/    \_\ |_|    |_| |___/""")}
       |
       |Useful sbt tasks:
       |${item("fmt")}: Prepares source files using scalafix and scalafmt.
