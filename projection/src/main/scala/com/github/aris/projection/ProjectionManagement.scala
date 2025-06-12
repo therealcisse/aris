@@ -10,11 +10,11 @@ final class ProjectionManagement(
   observer: ProjectionManagementObserver = ProjectionManagementObserver.empty,
 ) {
 
-  def pause(): UIO[Unit] =
+  def stop(): UIO[Unit] =
     for {
       off <- store.offset(id).map(_.getOrElse(Version.wrap(0L))).orDie
-      _   <- observer.paused(id, off)
-      _   <- store.pause(id).orDie
+      _   <- observer.stopped(id, off)
+      _   <- store.stop(id).orDie
     } yield ()
 
   def resume(): UIO[Unit] =
@@ -24,7 +24,7 @@ final class ProjectionManagement(
       _   <- observer.resumed(id, off)
     } yield ()
 
-  def isPaused: Task[Boolean] = store.isPaused(id)
+  def isStopped: Task[Boolean] = store.isStopped(id)
   def updateOffset(v: Version): Task[Unit] = store.updateOffset(id, v)
   def offset: Task[Option[Version]] = store.offset(id)
 }

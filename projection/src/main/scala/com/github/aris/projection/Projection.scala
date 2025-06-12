@@ -60,8 +60,8 @@ private[aris] final case class ExactlyOnce[Event](
 ) extends Projection {
 
   def run: ZIO[Scope, Nothing, Unit] =
-    store.isPaused(id).flatMap { paused =>
-      if paused then ZIO.unit
+    store.isStopped(id).flatMap { stopped =>
+      if stopped then ZIO.unit
       else process
     }.orDie
 
@@ -69,11 +69,18 @@ private[aris] final case class ExactlyOnce[Event](
     for {
       start <- store.offset(id).map(_.getOrElse(Version.wrap(0L))).orDie
       _     <- observer.started(id, start)
+      stoppedRef <- Ref.make(false)
+      _ <- (store.isStopped(id).flatMap(stoppedRef.set))
+             .repeat(Schedule.spaced(15.seconds))
+             .forkScoped
       _     <- query(start)
-                 .foreach { env =>
-                   handleWithRetry(env) *> commit(env.version)
-                 }
-                 .tapError(e => observer.projectionError(id, e))
+                .foreach { env =>
+                  stoppedRef.get.flatMap { stopped =>
+                    if stopped then ZIO.unit
+                    else handleWithRetry(env) *> commit(env.version)
+                  }
+                }
+                .tapError(e => observer.projectionError(id, e))
     } yield ()
 
   private def commit(v: Version): Task[Unit] =
@@ -110,8 +117,8 @@ private[aris] final case class AtLeastOnce[Event](
 ) extends Projection {
 
   def run: ZIO[Scope, Nothing, Unit] =
-    store.isPaused(id).flatMap { paused =>
-      if paused then ZIO.unit
+    store.isStopped(id).flatMap { stopped =>
+      if stopped then ZIO.unit
       else process
     }.orDie
 
@@ -119,10 +126,17 @@ private[aris] final case class AtLeastOnce[Event](
     for {
       start <- store.offset(id).map(_.getOrElse(Version.wrap(0L))).orDie
       _     <- observer.started(id, start)
-      ref   <- Ref.make((start, 0, 0L))
+      ref         <- Ref.make((start, 0, 0L))
+      stoppedRef  <- Ref.make(false)
+      _           <- (store.isStopped(id).flatMap(stoppedRef.set))
+                       .repeat(Schedule.spaced(15.seconds))
+                       .forkScoped
       _     <- query(start)
                  .foreach { env =>
-                   handleWithRetry(env) *> maybeCommit(env.version, ref)
+                   stoppedRef.get.flatMap { stopped =>
+                     if stopped then ZIO.unit
+                     else handleWithRetry(env) *> maybeCommit(env.version, ref)
+                   }
                  }
                  .tapError(e => observer.projectionError(id, e))
     } yield ()

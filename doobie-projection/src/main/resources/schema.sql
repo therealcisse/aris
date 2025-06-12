@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS projection_management (
   name TEXT NOT NULL,
   version TEXT NOT NULL,
   namespace INT NOT NULL,
-  paused BOOLEAN NOT NULL,
+  stopped BOOLEAN NOT NULL,
   PRIMARY KEY(name, version, namespace)
 );
 
