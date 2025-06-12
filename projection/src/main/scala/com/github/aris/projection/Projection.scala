@@ -74,7 +74,6 @@ private[aris] final case class ExactlyOnce[Event](
                    handleWithRetry(env) *> commit(env.version)
                  }
                  .tapError(e => observer.projectionError(id, e))
-                 .catchAll(_ => ZIO.unit)
     } yield ()
 
   private def commit(v: Version): UIO[Unit] =
@@ -126,7 +125,6 @@ private[aris] final case class AtLeastOnce[Event](
                    handleWithRetry(env) *> maybeCommit(env.version, ref)
                  }
                  .tapError(e => observer.projectionError(id, e))
-                 .catchAll(_ => ZIO.unit)
     } yield ()
 
   private def commit(v: Version): UIO[Unit] =
