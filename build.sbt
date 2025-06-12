@@ -53,6 +53,8 @@ lazy val aggregatedProjects: Seq[ProjectReference] =
     core,
     doobie,
     memory,
+    projection,
+    doobieProjection,
   )
 
 inThisBuild(replSettings)
@@ -115,7 +117,39 @@ lazy val memory = (project in file("memory"))
       cats,
       `zio-test`,
       `zio-test-sbt`,
+    `zio-test-magnolia`,
+  ),
+)
+
+lazy val projection = (project in file("projection"))
+  .dependsOn(memory % "compile->compile;test->test")
+  .settings(stdSettings("projection"))
+  .settings(
+    testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
+    Test / unmanagedResourceDirectories ++= (Compile / unmanagedResourceDirectories).value,
+    libraryDependencies ++= Seq(
+      cats,
+      `zio-test`,
+      `zio-test-sbt`,
       `zio-test-magnolia`,
+    ),
+  )
+
+lazy val doobieProjection = (project in file("doobie-projection"))
+  .dependsOn(core % "compile->compile;test->test", projection % "compile->compile;test->test")
+  .settings(stdSettings("doobie-projection"))
+  .settings(
+    testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
+    Test / unmanagedResourceDirectories ++= (Compile / unmanagedResourceDirectories).value,
+    libraryDependencies ++= db,
+    libraryDependencies ++= Seq(
+      cats,
+      `zio-interop-cats`,
+      mockito,
+      `zio-test`,
+      `zio-test-sbt`,
+      `zio-test-magnolia`,
+      `zio-mock`,
     ),
   )
 
