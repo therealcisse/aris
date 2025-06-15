@@ -21,7 +21,7 @@ trait JdbcCodecs {
   given Meta[Version] = Meta[Long].timap(Version.wrap)(Version.unwrap)
   given Meta[Timestamp] = Meta[Long].timap(Timestamp.wrap)(Timestamp.unwrap)
   given Meta[Key] = Meta[Long].timap(Key.wrap)(Key.unwrap)
-  given Meta[Namespace] = Meta[Int].timap(Namespace.wrap)(Namespace.unwrap)
+  given Meta[Namespace] = Meta[String].timap(Namespace.wrap)(Namespace.unwrap)
   given Meta[Discriminator] = Meta[String].timap(Discriminator.wrap)(Discriminator.unwrap)
   given Meta[EventTag] = Meta[String].timap(EventTag.wrap)(EventTag.unwrap)
 

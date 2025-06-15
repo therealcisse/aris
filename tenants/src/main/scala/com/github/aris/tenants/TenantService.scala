@@ -11,14 +11,14 @@ import zio.*
 import zio.prelude.*
 
 trait TenantService {
-  def addTenant(id: Namespace, name: String, description: String, ts: Timestamp): Task[Unit]
-  def deleteTenant(id: Namespace, ts: Timestamp): Task[Unit]
-  def enableTenant(id: Namespace, ts: Timestamp): Task[Unit]
-  def disableTenant(id: Namespace, ts: Timestamp): Task[Unit]
+  def addTenant(id: TenantId, namespace: Namespace, name: String, description: String, ts: Timestamp): Task[Unit]
+  def deleteTenant(id: TenantId, ts: Timestamp): Task[Unit]
+  def enableTenant(id: TenantId, ts: Timestamp): Task[Unit]
+  def disableTenant(id: TenantId, ts: Timestamp): Task[Unit]
 
-  def loadTenant(id: Namespace): Task[Option[NameTenant]]
+  def loadTenant(id: TenantId): Task[Option[NameTenant]]
   def loadTenants(options: FetchOptions): Task[Chunk[NameTenant]]
-  def loadEvents(id: Namespace): Task[Option[NonEmptyList[Change[TenantEvent]]]]
+  def loadEvents(id: TenantId): Task[Option[NonEmptyList[Change[TenantEvent]]]]
 }
 
 object TenantService {
@@ -37,19 +37,19 @@ object TenantService {
 
     private val events = CQRS[TenantEvent, TenantCommand](store)
 
-    def addTenant(id: Namespace, name: String, description: String, ts: Timestamp): Task[Unit] =
-      events.add(id.asKey, TenantCommand.AddTenant(id, name, description, ts))
+    def addTenant(id: TenantId, namespace: Namespace, name: String, description: String, ts: Timestamp): Task[Unit] =
+      events.add(id.asKey, TenantCommand.AddTenant(id, namespace, name, description, ts))
 
-    def deleteTenant(id: Namespace, ts: Timestamp): Task[Unit] =
-      events.add(id.asKey, TenantCommand.DeleteTenant(id, ts))
+    def deleteTenant(id: TenantId, ts: Timestamp): Task[Unit] =
+      events.add(id.asKey, TenantCommand.DeleteTenant(id, rootNamespace, ts))
 
-    def enableTenant(id: Namespace, ts: Timestamp): Task[Unit] =
-      events.add(id.asKey, TenantCommand.EnableTenant(id, ts))
+    def enableTenant(id: TenantId, ts: Timestamp): Task[Unit] =
+      events.add(id.asKey, TenantCommand.EnableTenant(id, rootNamespace, ts))
 
-    def disableTenant(id: Namespace, ts: Timestamp): Task[Unit] =
-      events.add(id.asKey, TenantCommand.DisableTenant(id, ts))
+    def disableTenant(id: TenantId, ts: Timestamp): Task[Unit] =
+      events.add(id.asKey, TenantCommand.DisableTenant(id, rootNamespace, ts))
 
-    def loadTenant(id: Namespace): Task[Option[NameTenant]] =
+    def loadTenant(id: TenantId): Task[Option[NameTenant]] =
       store.readEvents(id.asKey).map(_.flatMap(NameTenantEventHandler.applyEvents))
 
     def loadTenants(options: FetchOptions): Task[Chunk[NameTenant]] =
@@ -59,7 +59,7 @@ object TenantService {
         case None => Chunk.empty
       }
 
-    def loadEvents(id: Namespace): Task[Option[NonEmptyList[Change[TenantEvent]]]] =
+    def loadEvents(id: TenantId): Task[Option[NonEmptyList[Change[TenantEvent]]]] =
       store.readEvents(id.asKey)
   }
 }

@@ -17,6 +17,7 @@ transparent trait EventStore[Event] {
   def readEvents(id: Key, options: FetchOptions): Task[Option[NonEmptyList[Change[Event]]]]
   def readEvents(id: Key, interval: TimeInterval): Task[Option[NonEmptyList[Change[Event]]]]
   def readEvents(interval: TimeInterval): Task[Option[NonEmptyList[Change[Event]]]]
+  def readEvents(tag: EventTag, options: FetchOptions): Task[Option[NonEmptyList[Change[Event]]]]
 
   def save(id: Key, event: Change[Event]): Task[Long]
 }
@@ -48,6 +49,9 @@ object EventStore {
 
     def readEvents(interval: TimeInterval): Task[Option[NonEmptyList[Change[Event]]]] =
       persistence.readEvents[Event](discriminator, namespace, interval, catalog).map(toNel)
+
+    def readEvents(tag: EventTag, options: FetchOptions): Task[Option[NonEmptyList[Change[Event]]]] =
+      persistence.readEvents[Event](namespace, options, catalog, tag).map(toNel)
 
     def save(id: Key, event: Change[Event]): Task[Long] =
       persistence.saveEvent(id, discriminator, namespace, event, catalog).map(_.toLong)

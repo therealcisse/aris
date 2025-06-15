@@ -132,6 +132,30 @@ object MemoryCQRSPersistence {
                                                           }).getOrElse(0)
 
                                                           val slicedEvents = orderedEvents.slice(offsetIndex, options.limit.fold(orderedEvents.size)(_ + offsetIndex))
+                                                        Chunk.fromArray(slicedEvents.toArray)
+                                                      }
+
+    def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
+                                                        namespace: Namespace,
+                                                        options: FetchOptions,
+                                                        catalog: Catalog,
+                                                        tag: EventTag,
+                                                      ): Task[Chunk[Change[Event]]] =
+                                                        ref.get.map { state =>
+                                                          val info     = State.unwrap(state)
+                                                          val versions = info.tags.getOrElse(tag, Set.empty)
+                                                          val events = info.events.collect {
+                                                            case (State.EntryKey(`catalog`, _, ns), multiDict) if ns == namespace =>
+                                                              multiDict.collect { case (_, v) if versions.contains(v) => info.data.get(v).asInstanceOf[Option[Change[Event]]] }
+                                                          }.flatten
+
+                                                          val orderedEvents = events.toSeq.sortBy(_.version.timestamp)(if options.order == FetchOptions.Order.asc then Ordering[Timestamp] else Ordering[Timestamp].reverse)
+                                                          val offsetIndex = options.offset.flatMap(offset => orderedEvents.indexWhere(_.version == offset) match {
+                                                            case -1 => None
+                                                            case idx => Some(idx + 1)
+                                                          }).getOrElse(0)
+
+                                                          val slicedEvents = orderedEvents.slice(offsetIndex, options.limit.fold(orderedEvents.size)(_ + offsetIndex))
                                                           Chunk.fromArray(slicedEvents.toArray)
                                                         }
 

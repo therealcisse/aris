@@ -52,6 +52,14 @@ object PostgresCQRSPersistence {
         Queries.READ_EVENTS(discriminator, namespace, options, catalog).to[Chunk].transact(xa)
 
     def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
+      namespace: Namespace,
+      options: FetchOptions,
+      catalog: Catalog,
+      tag: EventTag,
+    ): Task[Chunk[Change[Event]]] =
+        Queries.READ_EVENTS(namespace, options, catalog, tag).to[Chunk].transact(xa)
+
+    def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
       discriminator: Discriminator,
       namespace: Namespace,
       interval: TimeInterval,
@@ -196,6 +204,31 @@ object PostgresCQRSPersistence {
         Version,
         Event,
         )
+      ].map(Change.apply)
+
+    def READ_EVENTS[Event: BinaryCodec](
+      namespace: Namespace,
+      options: FetchOptions,
+      catalog: Catalog,
+      tag: EventTag,
+    ): Query0[Change[Event]] =
+      given Read[Event] = byteArrayReader[Event]
+
+      val (
+        offsetQuery,
+        limitQuery,
+        orderQuery,
+      ) = options.toSql
+
+      (
+        fr"""SELECT e.version, e.payload FROM ${Fragment.const(catalog.tableName)} e JOIN tags t ON e.version = t.version""" ++
+          fr""" WHERE """ ++ namespace.toSql ++ fr" AND " ++ tag.toSql ++ offsetQuery.fold(Fragment.empty)(ql => sql" AND " ++ ql) ++
+          orderQuery ++ limitQuery.fold(Fragment.empty)(ql => sql" " ++ ql)
+      ).query[
+      (
+        Version,
+        Event,
+      )
       ].map(Change.apply)
 
     def SAVE_EVENT[Event: { BinaryCodec, MetaInfo }](

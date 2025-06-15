@@ -70,6 +70,21 @@ trait CQRSPersistence {
   ): Task[Chunk[Change[Event]]]
 
   /**
+   * Reads events by namespace and tag using fetch options.
+   *
+   * @param namespace the namespace to filter events
+   * @param options   fetch options describing where to start and how many to load
+   * @param catalog   the catalog from where the events should be read
+   * @param tag       the tag to filter events
+   */
+  def readEvents[Event: {BinaryCodec, Tag, MetaInfo}](
+    namespace: Namespace,
+    options: FetchOptions,
+    catalog: Catalog,
+    tag: EventTag,
+  ): Task[Chunk[Change[Event]]]
+
+  /**
    * Reads events using discriminator, namespace, and time interval from the catalog.
    *
    * @tparam Event The type of the events.

@@ -7,6 +7,7 @@ import com.github.aris.service.CQRSPersistence
 import com.github.aris.service.memory.MemoryCQRSPersistence
 import com.github.aris.store.SnapshotStore
 import com.github.aris.domain.Change
+import com.github.aris.projection.ProjectionManagementStore
 import zio.*
 import zio.http.*
 import zio.http.netty.*
@@ -22,7 +23,7 @@ object Aris extends ZIOApp, JsonSupport {
   given Config[Port.Type] = Config.int.nested("http_port").withDefault(8181).map(Port(_))
 
   type Environment =
-    CQRSPersistence & SnapshotStore & Server & Server.Config & NettyConfig & TenantService & SnapshotStrategy.Factory
+    CQRSPersistence & SnapshotStore & Server & Server.Config & NettyConfig & TenantService & SnapshotStrategy.Factory & TenantRepository & ProjectionManagementStore
 
   given environmentTag: EnvironmentTag[Environment] = EnvironmentTag[Environment]
 
@@ -43,17 +44,19 @@ object Aris extends ZIOApp, JsonSupport {
       SnapshotStore.live(),
       TenantService.live(),
       SnapshotStrategy.live(),
+      TenantRepository.memory.live(),
+      ProjectionManagementStore.memory.live(),
       configLayer,
       nettyConfigLayer,
       Server.customized,
     )
 
-  final case class TenantInfo(id: Int, name: String, description: String)
+  final case class TenantInfo(id: Int, namespace: String, name: String, description: String)
   object TenantInfo {
     implicit val codec: JsonCodec[TenantInfo] = DeriveJsonCodec.gen[TenantInfo]
   }
 
-  final case class TenantView(id: Int, name: String, description: String, created: Long, status: String)
+  final case class TenantView(id: Int, namespace: String, name: String, description: String, created: Long, status: String)
   object TenantView {
     implicit val codec: JsonCodec[TenantView] = DeriveJsonCodec.gen[TenantView]
   }
@@ -61,6 +64,7 @@ object Aris extends ZIOApp, JsonSupport {
   final case class TenantEventView(
     event: String,
     id: Int,
+    namespace: String,
     name: Option[String],
     description: Option[String],
     timestamp: Long,
@@ -76,33 +80,33 @@ object Aris extends ZIOApp, JsonSupport {
 
   private def toEventView(ev: TenantEvent): TenantEventView =
     ev match {
-      case TenantEvent.TenantAdded(id, name, desc, ts) =>
-        TenantEventView("TenantAdded", id.value, Some(name), Some(desc), ts.value)
-      case TenantEvent.TenantDeleted(id, ts) =>
-        TenantEventView("TenantDeleted", id.value, None, None, ts.value)
-      case TenantEvent.TenantDisabled(id, ts) =>
-        TenantEventView("TenantDisabled", id.value, None, None, ts.value)
-      case TenantEvent.TenantEnabled(id, ts) =>
-        TenantEventView("TenantEnabled", id.value, None, None, ts.value)
+      case TenantEvent.TenantAdded(id, ns, name, desc, ts) =>
+        TenantEventView("TenantAdded", id.value, ns.value, Some(name), Some(desc), ts.value)
+      case TenantEvent.TenantDeleted(id, ns, ts) =>
+        TenantEventView("TenantDeleted", id.value, ns.value, None, None, ts.value)
+      case TenantEvent.TenantDisabled(id, ns, ts) =>
+        TenantEventView("TenantDisabled", id.value, ns.value, None, None, ts.value)
+      case TenantEvent.TenantEnabled(id, ns, ts) =>
+        TenantEventView("TenantEnabled", id.value, ns.value, None, None, ts.value)
     }
 
   private def toChangeView(ch: Change[TenantEvent]): ChangeView =
     ChangeView(ch.version.value, toEventView(ch.payload))
 
   private def toView(t: NameTenant): TenantView =
-    TenantView(t.id.value, t.name, t.description, t.created.value, t.status.toString)
+    TenantView(t.id.value, t.namespace.value, t.name, t.description, t.created.value, t.status.toString)
 
   val routes: Routes[Environment, Response] = Routes(
     Method.POST / "tenants" -> handler { (req: Request) =>
       for {
         body <- req.jsonBody[TenantInfo]
         ts   <- Timestamp.gen
-        _    <- ZIO.serviceWithZIO[TenantService](_.addTenant(Namespace.wrap(body.id), body.name, body.description, ts))
+        _    <- ZIO.serviceWithZIO[TenantService](_.addTenant(TenantId.wrap(body.id), Namespace.wrap(body.namespace), body.name, body.description, ts))
       } yield Response.ok
     },
     Method.GET / "tenants" / int("id") -> handler { (id: Int, _: Request) =>
       for {
-        tenant <- ZIO.serviceWithZIO[TenantService](_.loadTenant(Namespace.wrap(id)))
+        tenant <- ZIO.serviceWithZIO[TenantService](_.loadTenant(TenantId.wrap(id)))
       } yield tenant.map(toView).toJsonResponse
     },
     Method.GET / "tenants" -> handler { (_: Request) =>
@@ -113,29 +117,36 @@ object Aris extends ZIOApp, JsonSupport {
     Method.DELETE / "tenants" / int("id") -> handler { (id: Int, _: Request) =>
       for {
         ts <- Timestamp.gen
-        _  <- ZIO.serviceWithZIO[TenantService](_.deleteTenant(Namespace.wrap(id), ts))
+        _  <- ZIO.serviceWithZIO[TenantService](_.deleteTenant(TenantId.wrap(id), ts))
       } yield Response.ok
     },
     Method.POST / "tenants" / int("id") / "enable" -> handler { (id: Int, _: Request) =>
       for {
         ts <- Timestamp.gen
-        _  <- ZIO.serviceWithZIO[TenantService](_.enableTenant(Namespace.wrap(id), ts))
+        _  <- ZIO.serviceWithZIO[TenantService](_.enableTenant(TenantId.wrap(id), ts))
       } yield Response.ok
     },
     Method.POST / "tenants" / int("id") / "disable" -> handler { (id: Int, _: Request) =>
       for {
         ts <- Timestamp.gen
-        _  <- ZIO.serviceWithZIO[TenantService](_.disableTenant(Namespace.wrap(id), ts))
+        _  <- ZIO.serviceWithZIO[TenantService](_.disableTenant(TenantId.wrap(id), ts))
       } yield Response.ok
     },
     Method.GET / "tenants" / int("id") / "events" -> handler { (id: Int, _: Request) =>
       for {
-        eventsOpt <- ZIO.serviceWithZIO[TenantService](_.loadEvents(Namespace.wrap(id)))
+        eventsOpt <- ZIO.serviceWithZIO[TenantService](_.loadEvents(TenantId.wrap(id)))
         events = eventsOpt.map(_.map(toChangeView).toChunk).getOrElse(Chunk.empty)
       } yield events.toJsonResponse
     }
   )
 
   def run: RIO[Environment & Scope, Unit] =
-    Server.serve(routes).provideSome[Scope](bootstrap)
+    ZIO.serviceWithZIO[CQRSPersistence] { persistence =>
+      for {
+        repo  <- ZIO.service[TenantRepository]
+        store <- ZIO.service[ProjectionManagementStore]
+        fiber <- TenantProjection(persistence, repo, store).run.forkScoped
+        _     <- Server.serve(routes).ensuring(fiber.interrupt)
+      } yield ()
+    }
 }
