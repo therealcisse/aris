@@ -19,7 +19,7 @@ object TenantProjection {
   def apply(
     persistence: CQRSPersistence,
     repository: TenantRepository,
-    store: ProjectionManagementStore = ProjectionManagementStore.empty,
+    store: ProjectionManagementStore,
   ): Projection = {
     val commit = CommitOffset(100, 5.seconds)
     val bufferSize = 100

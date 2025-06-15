@@ -12,9 +12,9 @@ import zio.prelude.*
 
 trait TenantService {
   def addTenant(id: TenantId, namespace: Namespace, name: String, description: String, ts: Timestamp): Task[Unit]
-  def deleteTenant(id: TenantId, namespace: Namespace, ts: Timestamp): Task[Unit]
-  def enableTenant(id: TenantId, namespace: Namespace, ts: Timestamp): Task[Unit]
-  def disableTenant(id: TenantId, namespace: Namespace, ts: Timestamp): Task[Unit]
+  def deleteTenant(id: TenantId, ts: Timestamp): Task[Unit]
+  def enableTenant(id: TenantId, ts: Timestamp): Task[Unit]
+  def disableTenant(id: TenantId, ts: Timestamp): Task[Unit]
 
   def loadTenant(id: TenantId): Task[Option[NameTenant]]
   def loadTenants(options: FetchOptions): Task[Chunk[NameTenant]]
@@ -40,14 +40,14 @@ object TenantService {
     def addTenant(id: TenantId, namespace: Namespace, name: String, description: String, ts: Timestamp): Task[Unit] =
       events.add(id.asKey, TenantCommand.AddTenant(id, namespace, name, description, ts))
 
-    def deleteTenant(id: TenantId, namespace: Namespace, ts: Timestamp): Task[Unit] =
-      events.add(id.asKey, TenantCommand.DeleteTenant(id, namespace, ts))
+    def deleteTenant(id: TenantId, ts: Timestamp): Task[Unit] =
+      events.add(id.asKey, TenantCommand.DeleteTenant(id, rootNamespace, ts))
 
-    def enableTenant(id: TenantId, namespace: Namespace, ts: Timestamp): Task[Unit] =
-      events.add(id.asKey, TenantCommand.EnableTenant(id, namespace, ts))
+    def enableTenant(id: TenantId, ts: Timestamp): Task[Unit] =
+      events.add(id.asKey, TenantCommand.EnableTenant(id, rootNamespace, ts))
 
-    def disableTenant(id: TenantId, namespace: Namespace, ts: Timestamp): Task[Unit] =
-      events.add(id.asKey, TenantCommand.DisableTenant(id, namespace, ts))
+    def disableTenant(id: TenantId, ts: Timestamp): Task[Unit] =
+      events.add(id.asKey, TenantCommand.DisableTenant(id, rootNamespace, ts))
 
     def loadTenant(id: TenantId): Task[Option[NameTenant]] =
       store.readEvents(id.asKey).map(_.flatMap(NameTenantEventHandler.applyEvents))

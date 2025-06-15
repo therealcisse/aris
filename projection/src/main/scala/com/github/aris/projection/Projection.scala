@@ -34,7 +34,7 @@ object Projection {
     id: Id,
     handler: Envelope[Event] => Task[Unit],
     query: Version => ZStream[Any, Throwable, Envelope[Event]],
-    store: ProjectionManagementStore = ProjectionManagementStore.empty,
+    store: ProjectionManagementStore,
     observer: ProjectionObserver = ProjectionObserver.empty,
     retry: RetryStrategy = RetryStrategy.Skip,
   ): Projection =
@@ -45,7 +45,7 @@ object Projection {
     handler: Envelope[Event] => Task[Unit],
     query: Version => ZStream[Any, Throwable, Envelope[Event]],
     commit: CommitOffset,
-    store: ProjectionManagementStore = ProjectionManagementStore.empty,
+    store: ProjectionManagementStore,
     observer: ProjectionObserver = ProjectionObserver.empty,
     retry: RetryStrategy = RetryStrategy.Skip,
   ): Projection =
