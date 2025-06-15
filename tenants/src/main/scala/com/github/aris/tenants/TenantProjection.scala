@@ -19,31 +19,31 @@ object TenantProjection {
   def apply(
     persistence: CQRSPersistence,
     repository: TenantRepository,
-    store: ProjectionManagementStore,
-    bufferSize: Int,
+    store: ProjectionManagementStore = ProjectionManagementStore.empty,
   ): Projection = {
-    val commit = CommitOffset().afterN(bufferSize).after(5.seconds)
+    val commit = CommitOffset(100, 5.seconds)
+    val bufferSize = 100
 
     val handler: Envelope[TenantEvent] => Task[Unit] = {
-      case Envelope(_, TenantEvent.TenantAdded(id, name, desc, created), _, _, _) =>
-        repository.add(id, name, desc, created)
-      case Envelope(_, TenantEvent.TenantDeleted(id, _), _, _, _) =>
-        repository.delete(id)
-      case Envelope(_, TenantEvent.TenantDisabled(id, _), _, _, _) =>
-        repository.disable(id)
-      case Envelope(_, TenantEvent.TenantEnabled(id, _), _, _, _) =>
-        repository.enable(id)
+      case Envelope(_, TenantEvent.TenantAdded(id, ns, name, desc, created), _, _, _) =>
+        repository.add(id, ns, name, desc, created)
+      case Envelope(_, TenantEvent.TenantDeleted(id, ns, _), _, _, _) =>
+        repository.delete(id, ns)
+      case Envelope(_, TenantEvent.TenantDisabled(id, ns, _), _, _, _) =>
+        repository.disable(id, ns)
+      case Envelope(_, TenantEvent.TenantEnabled(id, ns, _), _, _, _) =>
+        repository.enable(id, ns)
     }
 
     def extractId(ev: TenantEvent): Key =
       ev match {
-        case TenantEvent.TenantAdded(id, _, _, _)  => id.asKey
-        case TenantEvent.TenantDeleted(id, _)      => id.asKey
-        case TenantEvent.TenantDisabled(id, _)     => id.asKey
-        case TenantEvent.TenantEnabled(id, _)      => id.asKey
+        case TenantEvent.TenantAdded(id, _, _, _, _)  => id.asKey
+        case TenantEvent.TenantDeleted(id, _, _)      => id.asKey
+        case TenantEvent.TenantDisabled(id, _, _)     => id.asKey
+        case TenantEvent.TenantEnabled(id, _, _)      => id.asKey
       }
 
-    def query(start: Version): ZStream[Any, Throwable, Envelope[TenantEvent]] =
+    def query(bufferSize: Int)(start: Version): ZStream[Any, Throwable, Envelope[TenantEvent]] =
       ZStream.unwrap {
         Ref.make(start).map { ref =>
           ZStream.repeatZIO {
@@ -57,6 +57,6 @@ object TenantProjection {
         }
       }
 
-    Projection.atLeastOnce(id, handler, query, commit, store)
+    Projection.atLeastOnce(id, handler, query(bufferSize), commit, store)
   }
 }

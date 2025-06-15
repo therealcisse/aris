@@ -11,17 +11,17 @@ import zio.schema.codec.*
 import zio.prelude.*
 
 enum TenantCommand {
-  case AddTenant(id: Namespace, name: String, description: String, timestamp: Timestamp)
-  case DeleteTenant(id: Namespace, timestamp: Timestamp)
-  case DisableTenant(id: Namespace, timestamp: Timestamp)
-  case EnableTenant(id: Namespace, timestamp: Timestamp)
+  case AddTenant(id: TenantId, namespace: Namespace, name: String, description: String, timestamp: Timestamp)
+  case DeleteTenant(id: TenantId, namespace: Namespace, timestamp: Timestamp)
+  case DisableTenant(id: TenantId, namespace: Namespace, timestamp: Timestamp)
+  case EnableTenant(id: TenantId, namespace: Namespace, timestamp: Timestamp)
 }
 
 enum TenantEvent {
-  case TenantAdded(id: Namespace, name: String, description: String, timestamp: Timestamp)
-  case TenantDeleted(id: Namespace, timestamp: Timestamp)
-  case TenantDisabled(id: Namespace, timestamp: Timestamp)
-  case TenantEnabled(id: Namespace, timestamp: Timestamp)
+  case TenantAdded(id: TenantId, namespace: Namespace, name: String, description: String, timestamp: Timestamp)
+  case TenantDeleted(id: TenantId, namespace: Namespace, timestamp: Timestamp)
+  case TenantDisabled(id: TenantId, namespace: Namespace, timestamp: Timestamp)
+  case TenantEnabled(id: TenantId, namespace: Namespace, timestamp: Timestamp)
 }
 
 object TenantEvent {
@@ -32,10 +32,10 @@ object TenantEvent {
 
     extension (e: TenantEvent) def timestamp: Option[Timestamp] =
       e match {
-        case TenantEvent.TenantAdded(_, _, _, ts) => Some(ts)
-        case TenantEvent.TenantDeleted(_, ts)     => Some(ts)
-        case TenantEvent.TenantDisabled(_, ts)    => Some(ts)
-        case TenantEvent.TenantEnabled(_, ts)     => Some(ts)
+        case TenantEvent.TenantAdded(_, _, _, _, ts) => Some(ts)
+        case TenantEvent.TenantDeleted(_, _, ts)     => Some(ts)
+        case TenantEvent.TenantDisabled(_, _, ts)    => Some(ts)
+        case TenantEvent.TenantEnabled(_, _, ts)     => Some(ts)
       }
 
     extension (e: TenantEvent) override def tags: Set[EventTag] =
@@ -48,14 +48,14 @@ object TenantCommand {
 
     def applyCmd(cmd: TenantCommand): NonEmptyList[TenantEvent] =
       cmd match {
-        case TenantCommand.AddTenant(id, name, desc, ts) =>
-          NonEmptyList.single(TenantEvent.TenantAdded(id, name, desc, ts))
-        case TenantCommand.DeleteTenant(id, ts) =>
-          NonEmptyList.single(TenantEvent.TenantDeleted(id, ts))
-        case TenantCommand.DisableTenant(id, ts) =>
-          NonEmptyList.single(TenantEvent.TenantDisabled(id, ts))
-        case TenantCommand.EnableTenant(id, ts) =>
-          NonEmptyList.single(TenantEvent.TenantEnabled(id, ts))
+        case TenantCommand.AddTenant(id, ns, name, desc, ts) =>
+          NonEmptyList.single(TenantEvent.TenantAdded(id, ns, name, desc, ts))
+        case TenantCommand.DeleteTenant(id, ns, ts) =>
+          NonEmptyList.single(TenantEvent.TenantDeleted(id, ns, ts))
+        case TenantCommand.DisableTenant(id, ns, ts) =>
+          NonEmptyList.single(TenantEvent.TenantDisabled(id, ns, ts))
+        case TenantCommand.EnableTenant(id, ns, ts) =>
+          NonEmptyList.single(TenantEvent.TenantEnabled(id, ns, ts))
       }
   }
 }
@@ -64,8 +64,8 @@ object NameTenantEventHandler extends EventHandler[TenantEvent, NameTenant] {
   def applyEvents(events: NonEmptyList[Change[TenantEvent]]): Option[NameTenant] =
     events.foldLeft(Option.empty[NameTenant]) { (tenant, change) =>
       change.payload match {
-        case TenantEvent.TenantAdded(id, name, desc, created) =>
-          Some(NameTenant(id, name, desc, created, NameTenant.Status.Active))
+        case TenantEvent.TenantAdded(id, ns, name, desc, created) =>
+          Some(NameTenant(id, ns, name, desc, created, NameTenant.Status.Active))
         case TenantEvent.TenantDeleted(_, _) =>
           tenant.map(_.copy(status = NameTenant.Status.Deleted))
         case TenantEvent.TenantDisabled(_, _) =>
@@ -78,8 +78,8 @@ object NameTenantEventHandler extends EventHandler[TenantEvent, NameTenant] {
   def applyEvents(zero: NameTenant, events: NonEmptyList[Change[TenantEvent]]): Option[NameTenant] =
     Some(events.foldLeft(zero) { (tenant, change) =>
       change.payload match {
-        case TenantEvent.TenantAdded(id, name, desc, created) =>
-          tenant.copy(id = id, name = name, description = desc, created = created, status = NameTenant.Status.Active)
+        case TenantEvent.TenantAdded(id, ns, name, desc, created) =>
+          tenant.copy(id = id, namespace = ns, name = name, description = desc, created = created, status = NameTenant.Status.Active)
         case TenantEvent.TenantDeleted(_, _) =>
           tenant.copy(status = NameTenant.Status.Deleted)
         case TenantEvent.TenantDisabled(_, _) =>
@@ -91,12 +91,12 @@ object NameTenantEventHandler extends EventHandler[TenantEvent, NameTenant] {
 }
 
 object NameTenantsEventHandler extends EventHandler[TenantEvent, NonEmptyList[NameTenant]] {
-  private def groupId(ev: TenantEvent): Namespace =
+  private def groupId(ev: TenantEvent): TenantId =
     ev match {
-      case TenantEvent.TenantAdded(id, _, _, _)  => id
-      case TenantEvent.TenantDeleted(id, _)      => id
-      case TenantEvent.TenantDisabled(id, _)     => id
-      case TenantEvent.TenantEnabled(id, _)      => id
+      case TenantEvent.TenantAdded(id, _, _, _, _)  => id
+      case TenantEvent.TenantDeleted(id, _, _)      => id
+      case TenantEvent.TenantDisabled(id, _, _)     => id
+      case TenantEvent.TenantEnabled(id, _, _)      => id
     }
 
   def applyEvents(events: NonEmptyList[Change[TenantEvent]]): Option[NonEmptyList[NameTenant]] =

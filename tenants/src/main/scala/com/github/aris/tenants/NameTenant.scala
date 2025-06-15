@@ -5,7 +5,8 @@ package tenants
 import aris.*
 
 final case class NameTenant(
-  id: Namespace,
+  id: TenantId,
+  namespace: Namespace,
   name: String,
   description: String,
   created: Timestamp,
@@ -19,6 +20,7 @@ object NameTenant {
 
   val root: NameTenant =
     NameTenant(
+      TenantId.wrap(0),
       Namespace.root,
       "Root Namespace",
       "The description",

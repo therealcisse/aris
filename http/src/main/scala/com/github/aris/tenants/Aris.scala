@@ -76,13 +76,13 @@ object Aris extends ZIOApp, JsonSupport {
 
   private def toEventView(ev: TenantEvent): TenantEventView =
     ev match {
-      case TenantEvent.TenantAdded(id, name, desc, ts) =>
+      case TenantEvent.TenantAdded(id, _, name, desc, ts) =>
         TenantEventView("TenantAdded", id.value, Some(name), Some(desc), ts.value)
-      case TenantEvent.TenantDeleted(id, ts) =>
+      case TenantEvent.TenantDeleted(id, _, ts) =>
         TenantEventView("TenantDeleted", id.value, None, None, ts.value)
-      case TenantEvent.TenantDisabled(id, ts) =>
+      case TenantEvent.TenantDisabled(id, _, ts) =>
         TenantEventView("TenantDisabled", id.value, None, None, ts.value)
-      case TenantEvent.TenantEnabled(id, ts) =>
+      case TenantEvent.TenantEnabled(id, _, ts) =>
         TenantEventView("TenantEnabled", id.value, None, None, ts.value)
     }
 
@@ -97,12 +97,12 @@ object Aris extends ZIOApp, JsonSupport {
       for {
         body <- req.jsonBody[TenantInfo]
         ts   <- Timestamp.gen
-        _    <- ZIO.serviceWithZIO[TenantService](_.addTenant(Namespace.wrap(body.id), body.name, body.description, ts))
+        _    <- ZIO.serviceWithZIO[TenantService](_.addTenant(TenantId.wrap(body.id), Namespace.root, body.name, body.description, ts))
       } yield Response.ok
     },
     Method.GET / "tenants" / int("id") -> handler { (id: Int, _: Request) =>
       for {
-        tenant <- ZIO.serviceWithZIO[TenantService](_.loadTenant(Namespace.wrap(id)))
+        tenant <- ZIO.serviceWithZIO[TenantService](_.loadTenant(TenantId.wrap(id)))
       } yield tenant.map(toView).toJsonResponse
     },
     Method.GET / "tenants" -> handler { (_: Request) =>
@@ -113,24 +113,24 @@ object Aris extends ZIOApp, JsonSupport {
     Method.DELETE / "tenants" / int("id") -> handler { (id: Int, _: Request) =>
       for {
         ts <- Timestamp.gen
-        _  <- ZIO.serviceWithZIO[TenantService](_.deleteTenant(Namespace.wrap(id), ts))
+        _  <- ZIO.serviceWithZIO[TenantService](_.deleteTenant(TenantId.wrap(id), Namespace.root, ts))
       } yield Response.ok
     },
     Method.POST / "tenants" / int("id") / "enable" -> handler { (id: Int, _: Request) =>
       for {
         ts <- Timestamp.gen
-        _  <- ZIO.serviceWithZIO[TenantService](_.enableTenant(Namespace.wrap(id), ts))
+        _  <- ZIO.serviceWithZIO[TenantService](_.enableTenant(TenantId.wrap(id), Namespace.root, ts))
       } yield Response.ok
     },
     Method.POST / "tenants" / int("id") / "disable" -> handler { (id: Int, _: Request) =>
       for {
         ts <- Timestamp.gen
-        _  <- ZIO.serviceWithZIO[TenantService](_.disableTenant(Namespace.wrap(id), ts))
+        _  <- ZIO.serviceWithZIO[TenantService](_.disableTenant(TenantId.wrap(id), Namespace.root, ts))
       } yield Response.ok
     },
     Method.GET / "tenants" / int("id") / "events" -> handler { (id: Int, _: Request) =>
       for {
-        eventsOpt <- ZIO.serviceWithZIO[TenantService](_.loadEvents(Namespace.wrap(id)))
+        eventsOpt <- ZIO.serviceWithZIO[TenantService](_.loadEvents(TenantId.wrap(id)))
         events = eventsOpt.map(_.map(toChangeView).toChunk).getOrElse(Chunk.empty)
       } yield events.toJsonResponse
     }

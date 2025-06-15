@@ -1,7 +1,9 @@
 CREATE TABLE IF NOT EXISTS tenants (
-  id INT PRIMARY KEY,
+  namespace TEXT NOT NULL,
+  id INT NOT NULL,
   name TEXT NOT NULL,
   description TEXT NOT NULL,
   created BIGINT NOT NULL,
-  status TEXT NOT NULL
+  status TEXT NOT NULL,
+  PRIMARY KEY(namespace, id)
 );

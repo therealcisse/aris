@@ -15,6 +15,14 @@ trait ProjectionManagementStore {
 object ProjectionManagementStore {
   final case class State(offset: Version, stopped: Boolean)
 
+  val empty: ProjectionManagementStore = new ProjectionManagementStore {
+    def stop(id: Projection.Id): Task[Unit] = ZIO.unit
+    def resume(id: Projection.Id): Task[Unit] = ZIO.unit
+    def isStopped(id: Projection.Id): Task[Boolean] = ZIO.succeed(false)
+    def offset(id: Projection.Id): Task[Option[Version]] = ZIO.none
+    def updateOffset(id: Projection.Id, version: Version): Task[Unit] = ZIO.unit
+  }
+
   object memory {
     def live(): ZLayer[Any, Nothing, ProjectionManagementStore] =
       ZLayer.fromZIO(Ref.make(Map.empty[Projection.Id, State]).map(new MemoryProjectionManagementStore(_)))

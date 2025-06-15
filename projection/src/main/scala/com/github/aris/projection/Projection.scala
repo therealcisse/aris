@@ -24,22 +24,17 @@ object Projection {
 
   final case class Id(name: Name, version: VersionId, namespace: Namespace)
 
-  final case class CommitOffset(afterN: Option[Int], after: Option[Duration])
+  final case class CommitOffset(afterN: Int, afterDuration: Duration)
   object CommitOffset {
-    inline def apply(): CommitOffset = CommitOffset(None, None)
-    inline def afterN(n: Int): CommitOffset = CommitOffset(Some(n), None)
-    inline def after(d: Duration): CommitOffset = CommitOffset(None, Some(d))
-
-    extension (c: CommitOffset)
-      def afterN(n: Int): CommitOffset = c.copy(afterN = Some(n))
-      def after(d: Duration): CommitOffset = c.copy(after = Some(d))
+    inline def apply(afterN: Int, afterDuration: Duration): CommitOffset =
+      new CommitOffset(afterN, afterDuration)
   }
 
   def exactlyOnce[Event](
     id: Id,
     handler: Envelope[Event] => Task[Unit],
     query: Version => ZStream[Any, Throwable, Envelope[Event]],
-    store: ProjectionManagementStore,
+    store: ProjectionManagementStore = ProjectionManagementStore.empty,
     observer: ProjectionObserver = ProjectionObserver.empty,
     retry: RetryStrategy = RetryStrategy.Skip,
   ): Projection =
@@ -50,7 +45,7 @@ object Projection {
     handler: Envelope[Event] => Task[Unit],
     query: Version => ZStream[Any, Throwable, Envelope[Event]],
     commit: CommitOffset,
-    store: ProjectionManagementStore,
+    store: ProjectionManagementStore = ProjectionManagementStore.empty,
     observer: ProjectionObserver = ProjectionObserver.empty,
     retry: RetryStrategy = RetryStrategy.Skip,
   ): Projection =
@@ -162,8 +157,8 @@ final private[aris] case class AtLeastOnce[Event](
       shouldSave <- ref.modify { case (_, count, ts) =>
         val newCount = count + 1
         val elapsed = Duration.fromNanos(now - ts)
-        val nReached = commit.afterN.exists(newCount >= _)
-        val tReached = commit.after.exists(elapsed >= _)
+        val nReached = newCount >= commit.afterN
+        val tReached = elapsed >= commit.afterDuration
         val shouldSave = nReached || tReached
         val nextTs = if shouldSave then now else ts
         val next = if shouldSave then (v, 0, nextTs) else (v, newCount, ts)
