@@ -7,6 +7,7 @@ import com.github.aris.service.CQRSPersistence
 import com.github.aris.service.memory.MemoryCQRSPersistence
 import com.github.aris.store.SnapshotStore
 import com.github.aris.domain.Change
+import com.github.aris.projection.ProjectionManagementStore
 import zio.*
 import zio.http.*
 import zio.http.netty.*
@@ -22,7 +23,7 @@ object Aris extends ZIOApp, JsonSupport {
   given Config[Port.Type] = Config.int.nested("http_port").withDefault(8181).map(Port(_))
 
   type Environment =
-    CQRSPersistence & SnapshotStore & Server & Server.Config & NettyConfig & TenantService & SnapshotStrategy.Factory
+    CQRSPersistence & SnapshotStore & Server & Server.Config & NettyConfig & TenantService & SnapshotStrategy.Factory & TenantRepository & ProjectionManagementStore
 
   given environmentTag: EnvironmentTag[Environment] = EnvironmentTag[Environment]
 
@@ -43,6 +44,8 @@ object Aris extends ZIOApp, JsonSupport {
       SnapshotStore.live(),
       TenantService.live(),
       SnapshotStrategy.live(),
+      TenantRepository.memory.live(),
+      ProjectionManagementStore.memory.live(),
       configLayer,
       nettyConfigLayer,
       Server.customized,
@@ -138,5 +141,12 @@ object Aris extends ZIOApp, JsonSupport {
   )
 
   def run: RIO[Environment & Scope, Unit] =
-    Server.serve(routes)
+    ZIO.serviceWithZIO[CQRSPersistence] { persistence =>
+      for {
+        repo  <- ZIO.service[TenantRepository]
+        store <- ZIO.service[ProjectionManagementStore]
+        fiber <- TenantProjection(persistence, repo, store).run.forkScoped
+        _     <- Server.serve(routes).ensuring(fiber.interrupt)
+      } yield ()
+    }
 }

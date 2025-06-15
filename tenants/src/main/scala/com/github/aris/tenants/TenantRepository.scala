@@ -39,4 +39,25 @@ object TenantRepository {
     def enable(id: TenantId): Task[Unit] =
       sql"UPDATE tenants SET status = 'active' WHERE namespace = $rootNamespace AND id = $id".update.run.transact(xa).unit
   }
+
+  object memory {
+    def live(): ZLayer[Any, Nothing, TenantRepository] =
+      ZLayer.fromZIO(Ref.Synchronized.make(Map.empty[TenantId, String]).map { ref =>
+        new TenantRepository {
+          private val rootNamespace = Namespace.root
+
+          def add(id: TenantId, namespace: Namespace, name: String, description: String, created: Timestamp): Task[Unit] =
+            ref.update(_.updated(id, "active")).unit
+
+          def delete(id: TenantId): Task[Unit] =
+            ref.update(_ - id).unit
+
+          def disable(id: TenantId): Task[Unit] =
+            ref.update(_.updatedWith(id)(_.map(_ => "disabled"))).unit
+
+          def enable(id: TenantId): Task[Unit] =
+            ref.update(_.updatedWith(id)(_.map(_ => "active"))).unit
+        }
+      })
+  }
 }
