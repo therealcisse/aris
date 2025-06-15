@@ -37,6 +37,9 @@ object TenantEvent {
         case TenantEvent.TenantDisabled(_, ts)    => Some(ts)
         case TenantEvent.TenantEnabled(_, ts)     => Some(ts)
       }
+
+    extension (e: TenantEvent) override def tags: Set[EventTag] =
+      Set(EventTag("tenant"))
   }
 }
 

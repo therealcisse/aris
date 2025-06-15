@@ -137,5 +137,5 @@ object Aris extends ZIOApp, JsonSupport {
   )
 
   def run: RIO[Environment & Scope, Unit] =
-    Server.serve(routes).provideSome[Scope](bootstrap)
+    Server.serve(routes)
 }

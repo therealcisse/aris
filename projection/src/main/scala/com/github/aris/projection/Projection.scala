@@ -24,6 +24,17 @@ object Projection {
 
   final case class Id(name: Name, version: VersionId, namespace: Namespace)
 
+  final case class CommitOffset(afterN: Option[Int], after: Option[Duration])
+  object CommitOffset {
+    inline def apply(): CommitOffset = CommitOffset(None, None)
+    inline def afterN(n: Int): CommitOffset = CommitOffset(Some(n), None)
+    inline def after(d: Duration): CommitOffset = CommitOffset(None, Some(d))
+
+    extension (c: CommitOffset)
+      def afterN(n: Int): CommitOffset = c.copy(afterN = Some(n))
+      def after(d: Duration): CommitOffset = c.copy(after = Some(d))
+  }
+
   def exactlyOnce[Event](
     id: Id,
     handler: Envelope[Event] => Task[Unit],
@@ -38,13 +49,12 @@ object Projection {
     id: Id,
     handler: Envelope[Event] => Task[Unit],
     query: Version => ZStream[Any, Throwable, Envelope[Event]],
+    commit: CommitOffset,
     store: ProjectionManagementStore,
-    commitAfterN: Int,
-    commitAfter: Duration,
     observer: ProjectionObserver = ProjectionObserver.empty,
     retry: RetryStrategy = RetryStrategy.Skip,
   ): Projection =
-    AtLeastOnce(id, handler, query, store, commitAfterN, commitAfter, observer, retry)
+    AtLeastOnce(id, handler, query, store, commit, observer, retry)
 }
 
 final private[aris] case class ExactlyOnce[Event](
@@ -110,8 +120,7 @@ final private[aris] case class AtLeastOnce[Event](
   handler: Envelope[Event] => Task[Unit],
   query: Version => ZStream[Any, Throwable, Envelope[Event]],
   store: ProjectionManagementStore,
-  commitAfterN: Int,
-  commitAfter: Duration,
+  commit: CommitOffset,
   observer: ProjectionObserver = ProjectionObserver.empty,
   retry: RetryStrategy = RetryStrategy.Skip,
 ) extends Projection {
@@ -153,7 +162,9 @@ final private[aris] case class AtLeastOnce[Event](
       shouldSave <- ref.modify { case (_, count, ts) =>
         val newCount = count + 1
         val elapsed = Duration.fromNanos(now - ts)
-        val shouldSave = newCount >= commitAfterN || elapsed >= commitAfter
+        val nReached = commit.afterN.exists(newCount >= _)
+        val tReached = commit.after.exists(elapsed >= _)
+        val shouldSave = nReached || tReached
         val nextTs = if shouldSave then now else ts
         val next = if shouldSave then (v, 0, nextTs) else (v, newCount, ts)
         (shouldSave, next)
