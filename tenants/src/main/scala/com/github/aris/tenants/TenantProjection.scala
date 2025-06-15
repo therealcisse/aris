@@ -27,12 +27,12 @@ object TenantProjection {
     val handler: Envelope[TenantEvent] => Task[Unit] = {
       case Envelope(_, TenantEvent.TenantAdded(id, ns, name, desc, created), _, _, _) =>
         repository.add(id, ns, name, desc, created)
-      case Envelope(_, TenantEvent.TenantDeleted(id, ns, _), _, _, _) =>
-        repository.delete(id, ns)
-      case Envelope(_, TenantEvent.TenantDisabled(id, ns, _), _, _, _) =>
-        repository.disable(id, ns)
-      case Envelope(_, TenantEvent.TenantEnabled(id, ns, _), _, _, _) =>
-        repository.enable(id, ns)
+      case Envelope(_, TenantEvent.TenantDeleted(id, _, _), _, _, _) =>
+        repository.delete(id)
+      case Envelope(_, TenantEvent.TenantDisabled(id, _, _), _, _, _) =>
+        repository.disable(id)
+      case Envelope(_, TenantEvent.TenantEnabled(id, _, _), _, _, _) =>
+        repository.enable(id)
     }
 
     def extractId(ev: TenantEvent): Key =

@@ -10,9 +10,9 @@ import doobie.implicits.*
 
 trait TenantRepository {
   def add(id: TenantId, namespace: Namespace, name: String, description: String, created: Timestamp): Task[Unit]
-  def delete(id: TenantId, namespace: Namespace): Task[Unit]
-  def disable(id: TenantId, namespace: Namespace): Task[Unit]
-  def enable(id: TenantId, namespace: Namespace): Task[Unit]
+  def delete(id: TenantId): Task[Unit]
+  def disable(id: TenantId): Task[Unit]
+  def enable(id: TenantId): Task[Unit]
 }
 
 object TenantRepository {
@@ -20,6 +20,8 @@ object TenantRepository {
     ZLayer.succeed(new DoobieTenantRepository(xa))
 
   final class DoobieTenantRepository(xa: Transactor[Task]) extends TenantRepository {
+    private val rootNamespace = Namespace.root
+
     def add(id: TenantId, namespace: Namespace, name: String, description: String, created: Timestamp): Task[Unit] =
       sql"""INSERT INTO tenants(namespace, id, name, description, created, status)
              VALUES ($namespace, $id, $name, $description, $created, 'active')
@@ -28,13 +30,13 @@ object TenantRepository {
              created = EXCLUDED.created,
              status = 'active'""".update.run.transact(xa).unit
 
-    def delete(id: TenantId, namespace: Namespace): Task[Unit] =
-      sql"DELETE FROM tenants WHERE namespace = $namespace AND id = $id".update.run.transact(xa).unit
+    def delete(id: TenantId): Task[Unit] =
+      sql"DELETE FROM tenants WHERE namespace = $rootNamespace AND id = $id".update.run.transact(xa).unit
 
-    def disable(id: TenantId, namespace: Namespace): Task[Unit] =
-      sql"UPDATE tenants SET status = 'disabled' WHERE namespace = $namespace AND id = $id".update.run.transact(xa).unit
+    def disable(id: TenantId): Task[Unit] =
+      sql"UPDATE tenants SET status = 'disabled' WHERE namespace = $rootNamespace AND id = $id".update.run.transact(xa).unit
 
-    def enable(id: TenantId, namespace: Namespace): Task[Unit] =
-      sql"UPDATE tenants SET status = 'active' WHERE namespace = $namespace AND id = $id".update.run.transact(xa).unit
+    def enable(id: TenantId): Task[Unit] =
+      sql"UPDATE tenants SET status = 'active' WHERE namespace = $rootNamespace AND id = $id".update.run.transact(xa).unit
   }
 }
