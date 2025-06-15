@@ -73,5 +73,8 @@ object Dependencies {
 
   val jansi = "org.fusesource.jansi" % "jansi" % "2.4.1"
 
+  val ZioHttpVersion = "3.3.3"
+  val `zio-http` = "dev.zio" %% "zio-http" % ZioHttpVersion
+
   val `logstash-logback-encoder` = "net.logstash.logback" % "logstash-logback-encoder" % "8.0"
 }
