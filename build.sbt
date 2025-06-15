@@ -56,6 +56,7 @@ lazy val aggregatedProjects: Seq[ProjectReference] =
     projection,
     doobieProjection,
     tenants,
+    http,
   )
 
 inThisBuild(replSettings)
@@ -165,5 +166,17 @@ lazy val doobieProjection = (project in file("doobie-projection"))
       `zio-test-sbt`,
       `zio-test-magnolia`,
       `zio-mock`,
+    ),
+  )
+
+lazy val http = (project in file("http"))
+  .dependsOn(tenants % "compile->compile;test->test", memory % "compile->compile;test->test")
+  .settings(stdSettings("http"))
+  .settings(
+    testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
+    Test / unmanagedResourceDirectories ++= (Compile / unmanagedResourceDirectories).value,
+    libraryDependencies ++= Seq(
+      `zio-http`,
+      `zio-json`,
     ),
   )
